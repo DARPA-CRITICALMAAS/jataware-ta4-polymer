@@ -1,0 +1,184 @@
+.control_panel {
+    font-family: "Helvetica, Arial, sans-serif";
+    position: absolute;
+    top: 0;
+    margin: 12px;
+    padding: 20px;
+    z-index: 1;
+    border-radius: 25px;
+    background-color: #57799a;
+    color: white;
+    opacity: 0.8;
+}
+
+.container_card {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    grid-gap: 20px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.floatchild {
+    flex: 1;
+    justify-content: center;
+}
+
+.smallMap {
+    border: solid;
+    height: 200px;
+    width: 200px;
+    justify-content: center;
+    align-self: center;
+}
+
+.root {
+    width: 40%;
+    overflow-x: auto;
+    overflow-y: auto;
+    margin: 15px;
+}
+
+.selectTableCell {
+    width: 60px;
+}
+
+.tableCell {
+    width: 64px;
+    height: 40px;
+}
+
+.input {
+    width: 64px;
+    height: 40px;
+}
+
+.title {
+    align-content: center;
+    text-align: center;
+}
+
+.scrollableContent {
+    flex-grow: 1;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    height: 100%;
+    background-color: babyblue;
+    max-width: 45%;
+
+    /* Note: "baby blue" is invalid in CSS. Changed to "babyblue". */
+}
+
+
+.cardSmall {
+    display: flex;
+    max-width: 500px;
+    margin: 5px;
+    padding: 5px;
+    justify-content: center;
+}
+
+.cardSmall button {
+    margin-left: 30px;
+}
+
+.saved {
+    color: #2e7d32;
+}
+
+.previewButton {
+    display: flex;
+    justify-content: flex-end;
+    margin: 45px;
+}
+
+.flexChild {
+    flex: 1;
+    height: 100%;
+    /* max-width: 50%; */
+}
+
+.autoComplete {
+    margin: 5px;
+}
+
+.miniMapWrapper {
+    display: flex;
+    height: 220px;
+    width: 220px;
+    justify-content: center;
+    align-self: center;
+}
+
+.mapBackground {
+    position: relative;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    background: black;
+}
+
+.nextButton {
+    align-self: flex-start;
+    margin: 20px;
+    display: flex;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+.buttonWrapper {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-end;
+}
+
+.extractButton {
+    text-transform: none;
+    align-self: flex-start;
+    margin: 20px;
+    display: flex;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+.span {
+    display: table;
+    margin: 0 auto;
+}
+
+.borderBox {
+    display: grid;
+    justify-content: center;
+    align-items: center;
+}
+
+
+.loading {
+    width: 100%;
+    height: 100%;
+    opacity: .5;
+    display: grid;
+    align-items: center;
+    justify-content: center;
+    font-family: "Helvetica, Arial, sans-serif";
+    position: absolute;
+    top: 0;
+    z-index: 2;
+    background-color: rgb(167, 155, 155);
+
+}
+
+
+.map {
+    background-color: #cfcfcf;
+}
+
+.left-panel {
+    padding: 10px 10px 0;
+}

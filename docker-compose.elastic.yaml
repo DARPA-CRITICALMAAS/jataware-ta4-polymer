@@ -1,0 +1,21 @@
+services:
+
+  elastic:
+    profiles:
+      - elastic
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.12
+    hostname: elastic.ny.lon
+    environment:
+      'discovery.type': single-node
+      'network.host': 0.0.0.0
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - nylon
+
+volumes:
+  esdata:

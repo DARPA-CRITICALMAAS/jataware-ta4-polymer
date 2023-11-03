@@ -1,0 +1,35 @@
+{
+  "name": "deckgl-example-pure-js-georef",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "vite -d",
+    "preview": "vite preview -d",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.14.7",
+    "@mui/material": "^5.14.6",
+    "@mui/x-data-grid": "^6.14.0",
+    "axios": "^1.5.0",
+    "dotenv": "^16.3.1",
+    "ol": "^8.1.0",
+    "ol-mbtiles": "^2.0.2",
+    "proj4": "^2.9.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.15.0",
+    "styled-components": "^5.3.11",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^4.0.3",
+    "postcss": "^8.4.29",
+    "vite": "^4.4.5"
+  }
+}

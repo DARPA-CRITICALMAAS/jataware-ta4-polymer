@@ -1,0 +1,12 @@
+
+
+services:
+
+  elastic:
+    ports:
+      - 9200:9200
+
+
+configs:
+  aws_creds:
+    file: ./aws/credentials

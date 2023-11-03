@@ -1,0 +1,33 @@
+.container {
+    width: "80%";
+    height: "80%";
+    display: "grid";
+    justify-items: "center";
+    padding: "100px";
+    overflow: "auto";
+}
+
+.tableContainer {
+    max-height: "80% !important";
+    max-width: "80% !important";
+}
+
+.tableTitle {
+    padding: "10px";
+    text-align: "center";
+    margin: "auto";
+    width: "100%";
+}
+
+.tableCell {
+    min-width: "300px ";
+}
+
+.scrollableContent {
+    flex-grow: 1;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    height: calc(100vh - 200px);
+    background-color: babyblue;
+    /* Note: "baby blue" is invalid in CSS. Changed to "babyblue". */
+}

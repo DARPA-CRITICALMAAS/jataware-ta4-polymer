@@ -1,0 +1,14 @@
+elasticsearch>="7.0.0,<8.0.0"
+geopandas
+boto3
+Pillow
+numpy
+shapely
+pyproj
+rasterio
+icecream
+utm
+albumentations
+torch
+torchvision
+segmentation_models_pytorch

@@ -1,0 +1,10 @@
+# Byte-compiled / optimized / DLL files
+**/__pycache__/ 
+
+ui/assets/tiffs/
+ui/assets/tiles/
+
+ui/node_modules
+# Environments
+.env
+.python-version

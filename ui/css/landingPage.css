@@ -1,0 +1,57 @@
+.AppHeader {
+    background-color: "#282c34";
+    padding: "10px";
+    padding-top: "100px";
+    color: "white";
+    overflow: "auto";
+    max-height: "200px";
+}
+
+.MapsList {
+    margin-top: "10px";
+    padding: "5px";
+    max-width: "600px";
+    margin: "0 auto";
+    height: "600px";
+}
+
+.Landing {
+    text-align: "center";
+    height: "100vh";
+    background-color: "#282c34"
+}
+
+.button {
+    background-color: "#007bff";
+    color: "white";
+    border: "none";
+    padding: "10px 20px";
+    border-radius: "4px";
+    cursor: "pointer";
+}
+
+.container {
+    display: grid;
+    align-items: center;
+    justify-content: center;
+}
+
+.stats_container {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: top;
+    justify-content: top;
+    background-color: #E8E8E8;
+    padding: 20px;
+    border-radius: 10px;
+}
+
+.stats {
+    display: grid;
+}
+
+.stat_nav {
+    display: grid;
+    justify-content: center;
+    align-items: center;
+}

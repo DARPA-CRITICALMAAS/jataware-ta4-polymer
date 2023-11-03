@@ -1,0 +1,63 @@
+
+services:
+
+  minio:
+    hostname: minio.ny.lon
+    profiles:
+      - minio
+    image: "minio/minio:RELEASE.2023-09-20T22-49-55Z"
+    environment:
+      MINIO_ROOT_USER: miniouser
+      MINIO_ROOT_PASSWORD: miniopass
+    ports:
+      - 9000:9000
+      - 9001:9001
+    command:
+      - minio
+      - server
+      - -console-address
+      - :9001
+      - /data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9001"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - ${PWD}/data:/data
+    networks:
+      - nylon
+
+  minio_mc:
+    profiles:
+      - minio
+    image: "minio/mc:RELEASE.2023-09-20T15-22-31Z"
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |
+        mc alias set local http://minio:9000 miniouser miniopass;
+        mc mb local/polymer-rocks;
+        mc anonymous set public local/polymer-rocks;
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - nylon
+
+  minio_ingest:
+    profiles:
+      - minio
+    image: "minio/mc:RELEASE.2023-09-20T15-22-31Z"
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |
+        mc alias set local http://minio:9000 miniouser miniopass;
+        mc cp --recursive /tiles local/polymer-rocks;
+    depends_on:
+      minio_mc:
+        condition: service_completed_successfully
+    volumes:
+      - ${PWD}/load:/tiles
+    networks:
+      - nylon
+
