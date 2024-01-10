@@ -59,8 +59,8 @@ function gcp2pt_start({ coll, rowb, x, y, crs, gcp_id, color }) {
         },
         properties: {
             color: color,
-            coll: Math.floor(coll),
-            rowb: Math.floor(rowb),
+            coll: coll,
+            rowb: rowb,
             x: x,
             y: y,
             gcp_id: gcp_id,
@@ -79,7 +79,7 @@ function MapPage({ mapData }) {
     const [loading, setLoading] = useState(false)
     const mapTargetElement = useRef<HTMLDivElement>(null)
     const [map, setMap] = useState<Map | undefined>()
-    const [gcps, setGCPs] = useState(mapData['all_gcps']);
+    const [gcps, setGCPs] = useState(mapData['latest_proj']['gcps']);
     const [map_crs, setMapCRS] = useState(null);
     const [showExtractButton, setShowExtractButton] = useState(true)
     const [georeferenced, setGeoreferenced] = useState(false)
@@ -91,8 +91,6 @@ function MapPage({ mapData }) {
     const [reasoning, setReasoning] = useState("")
     const navigate = useNavigate();
     const drawRef = useRef()
-    const ocrVectorRef = useRef()
-    const proj_index = useRef(0)
     const mapRef = useRef()
     let draw;
 
@@ -116,7 +114,7 @@ function MapPage({ mapData }) {
         'type': 'FeatureCollection',
         'features': []
     }
-    for (let gcp of mapData['all_gcps']) {
+    for (let gcp of mapData['latest_proj']['gcps']) {
         used_gcps['features'].push(gcp2pt_start({
             "coll": gcp['coll'],
             "rowb": gcp['rowb'],
@@ -130,7 +128,6 @@ function MapPage({ mapData }) {
     const vector_source = new VectorSource({
         features: new GeoJSON().readFeatures(used_gcps)
     });
-
 
 
     const vector_layer = new VectorLayer({
@@ -149,7 +146,7 @@ function MapPage({ mapData }) {
     const map_source = new GeoTIFF({
         sources: [
             {
-                url: `${TIFF_URL}/tiles/${map_name}/${map_name}.cog.tif`,
+                url: `${TIFF_URL}/cogs/${map_id}/${map_id}.cog.tif`,
                 nodata: 0,
             }
         ],
@@ -182,60 +179,17 @@ function MapPage({ mapData }) {
         id: "bounding-box",
         source: ocr_source,
     });
-    ocrVectorRef.current = ocr_vector
 
-    // API calls
+    function create_gcp_id(gcp) {
+        let gcp_id
+        if (gcp.gcp_id == undefined) {
+            gcp_id = gcp.y.toString() + gcp.x.toString() + gcp.coll.toString() + gcp.rowb.toString() + gcp.crs.toString()
+        } else {
+            gcp_id = gcp.gcp_id
+        }
 
-    function showproject(gcps) {
+        return gcp_id
 
-        setLoading(true)
-
-        register_proj(map_crs).then(() => {
-            let gcps_ = gcps.map((gcp) => ({
-                gcp_id: gcp.gcp_id,
-                rowb: gcp.rowb,
-                coll: gcp.coll,
-                x: gcp.x,
-                y: gcp.y,
-                crs: gcp.crs.split("__")[0],
-            }))
-            // update points
-            axios({
-                method: 'post',
-                url: "/api/map/maps/" + map_id + "/gcps_fix",
-                data: gcps_,
-                headers: _APP_JSON_HEADER
-            }).then((response) => {
-                console.log(response)
-                // Change map source
-                const new_map_source = new GeoTIFF({
-                    sources: [
-                        {
-
-                            url: `${TIFF_URL}/tiles/${map_id}/${map_id}.pro.cog.tif`,
-                            nodata: 0,
-                        }
-                    ],
-                    convertToRGB: true,
-                    interpolate: false,
-                })
-                getLayerById(map, "map-layer").setSource(new_map_source);
-
-                // Change view
-                map.setView(
-                    new_map_source.getView().then((v) => {
-                        v.resolutions = expand_resolutions(v, 5, 7);
-                        v.extent = undefined;
-                        return v;
-                    })
-                );
-
-                getLayerById(map, "base-layer").setVisible(true);
-                setGeoreferenced(true)
-                setProjected(true)
-                setLoading(false)
-            })
-        });
     }
 
     function project(gcps) {
@@ -246,8 +200,9 @@ function MapPage({ mapData }) {
         setLoading(true)
 
         register_proj(map_crs).then(() => {
+
             let gcps_ = gcps.map((gcp) => ({
-                gcp_id: gcp.y.toString() + gcp.x.toString() + gcp.coll.toString() + gcp.rowb.toString() + gcp.crs.toString(),
+                gcp_id: create_gcp_id(gcp),
                 rowb: gcp.rowb,
                 coll: gcp.coll,
                 x: gcp.x,
@@ -267,7 +222,6 @@ function MapPage({ mapData }) {
                 },
                 headers: _APP_JSON_HEADER
             }).then((response) => {
-                console.log(response.data)
                 let proj_url = response.data['pro_cog_path']
                 // Change map source
                 const new_map_source = new GeoTIFF({
@@ -296,12 +250,6 @@ function MapPage({ mapData }) {
                 setGeoreferenced(true)
                 setProjected(true)
                 setLoading(false)
-                // setGCPs([]); // [HACK ... for now]
-
-                // QUESTION:
-                //  - What about doing annotations _after_ the projection?
-                //  - Do we even want to be able to do that?
-                //      - Should we project annotations into a new coordinate system?
 
             }).catch((error) => {
                 console.error('Error fetching data:', error);
@@ -309,11 +257,10 @@ function MapPage({ mapData }) {
         });
     }
 
+
     function map_onClick(e) {
         let [coll, rowb] = e.coordinate;
-        if (drawRef.current.values_.active == true) {
-
-        } else {
+        if (drawRef.current.values_.active != true) {
             setGCPs([...gcps, {
                 gcp_id: "manual_" + uuidv4(),
                 rowb: Math.floor(rowb),
@@ -372,19 +319,15 @@ function MapPage({ mapData }) {
         return () => map.on('click', undefined);
     }, [gcps])
 
-    function transformVectorLayer(layer, sourceProjection, targetProjection) {
-        const features = layer.getSource().getFeatures();
 
-        features.forEach((feature) => {
-            const geometry = feature.getGeometry();
-            geometry.transform(sourceProjection, targetProjection);
-        });
-    }
     // Update GCPs
     function updateGCP(new_gcp) {
+
         if (map === undefined) return;
+
         let features = getLayerById(mapRef.current, 'vector-layer').getSource().getFeatures()
         let gcps_ = []
+
         for (let feature of features) {
             if (feature.values_.gcp_id == new_gcp['gcp_id']) {
                 for (const [key, value] of Object.entries(new_gcp)) {
@@ -400,7 +343,6 @@ function MapPage({ mapData }) {
                         [new_gcp['coll'] - BUFFER, new_gcp["rowb"] - BUFFER]]]
                     );
                 }
-
             }
             gcps_.push({
                 "gcp_id": feature.values_['gcp_id'],
@@ -431,7 +373,7 @@ function MapPage({ mapData }) {
             headers: {
                 "Access-Control-Allow-Origin": "*",
                 "Content-Type": "application/json",
-            },
+            }
         })
             .then((response) => {
                 let data = response.data;
@@ -443,21 +385,22 @@ function MapPage({ mapData }) {
             });
     }
 
+
     function turnOnDraw() {
         drawRef.current.setActive(!drawRef.current.values_.active)
     }
+
 
     function clearClippedPolygons(map) {
         setExtractedText("")
         setReasoning("")
         setEPSGs([])
-        let layer = getLayerById(map, "bounding-box")
-        layer.getSource().clear()
-
+        getLayerById(map, "bounding-box").getSource().clear()
     }
+
+
     function send_for_ocr() {
-        let layer = getLayerById(map, "bounding-box")
-        let features = layer.getSource().getFeatures()
+        let features = getLayerById(map, "bounding-box").getSource().getFeatures()
         let bboxes = []
         for (let feat of features) {
             bboxes.push(feat.getGeometry().extent_)
@@ -465,7 +408,7 @@ function MapPage({ mapData }) {
         axios({
             method: 'post',
             url: "/api/map/tif_ocr",
-            data: { "map_name": map_name, "bboxes": bboxes },
+            data: { "map_id": map_id, "bboxes": bboxes },
             headers: _APP_JSON_HEADER
         }).then((response) => {
             setExtractedText(response.data['extracted_text'])
@@ -475,7 +418,7 @@ function MapPage({ mapData }) {
         });
     }
 
-    function send_for_EPSGs(e) {
+    function send_for_EPSGs() {
 
         let prompt = `Here is some ocr extracted text from a geological map. Can you help determine the EPSG code for this map? 
         Make sure to explain your reasoning for each recommendation with a max limit of 5 codes.
@@ -492,6 +435,7 @@ function MapPage({ mapData }) {
             data: { "prompt": prompt },
             headers: _APP_JSON_HEADER
         }).then((response) => {
+
             setEPSGs(response.data['matches'])
             setReasoning(response.data['reasoning'])
 
@@ -500,12 +444,14 @@ function MapPage({ mapData }) {
         });
     }
 
+
     function handleExtractedTextChange(e) {
         setExtractedText(e.target.value);
     }
+
+
     function returnEPSGName(code) {
         for (let epsg of epsg_data['codes']) {
-
             if ("label" in epsg) {
                 if (epsg['label'].split("__")[0] == code) {
                     return <div>Name: {epsg["info"]["name"]}</div>
@@ -515,13 +461,16 @@ function MapPage({ mapData }) {
     }
 
     function extract_gcps(map_name) {
+
         setLoading(true)
+
         axios({
             method: 'post',
             url: "/api/map/extract_gcps",
-            data: { "map_name": map_name },
+            data: { "map_id": map_id },
             headers: _APP_JSON_HEADER
         }).then((response) => {
+
             let new_data = response.data.map((gcp, _id) => ({
                 gcp_id: _id,
                 rowb: gcp.rowb,
@@ -543,9 +492,11 @@ function MapPage({ mapData }) {
         });
     }
 
+
     function viewprojects() {
-        navigate('/projections/' + map_name)
+        navigate('/projections/' + map_id)
     }
+
     return (
         <>
             {loading &&
@@ -584,8 +535,6 @@ function MapPage({ mapData }) {
                             position: "relative",
                         }} />
                 </div>
-
-
                 <div className="flexChild scrollableContent">
                     <div className="left-panel">
                         <Button onClick={(e) => navigate("/")}>Home</Button>
@@ -638,7 +587,7 @@ function MapPage({ mapData }) {
                                         multiline
                                         maxRows={4}
                                         variant="filled"
-                                        defaultValue={extractedText}
+                                        value={extractedText}
                                         onChange={(e) => { handleExtractedTextChange(e) }}
                                     />
                                     <br />
@@ -667,7 +616,7 @@ function MapPage({ mapData }) {
                                     return <div key={gcp.gcp_id}>
                                         <div className="container_card">
                                             <GCPCard gcp={gcp} updateGCP={updateGCP} deleteGCP={deleteGCP} />
-                                            <SmallMap map_name={map_name} gcp={gcp} updateGCP={updateGCP} />
+                                            <SmallMap map_id={map_id} gcp={gcp} updateGCP={updateGCP} />
                                         </div>
                                     </div>
                                 })
@@ -786,7 +735,9 @@ function LocationInput(input_label, gcp, updateDMS) {
                             value={degree}
                             onChange={(e) => {
                                 setDegree(e.target.value)
-                                updateValue(e.target.value, 'degree')
+                            }}
+                            onBlur={() => {
+                                updateValue(degree, 'degree')
                             }}
                             variant="standard"
                             InputLabelProps={{
@@ -805,7 +756,9 @@ function LocationInput(input_label, gcp, updateDMS) {
                             value={minute}
                             onChange={(e) => {
                                 setMinute(e.target.value)
-                                updateValue(e.target.value, 'minute')
+                            }}
+                            onBlur={() => {
+                                updateValue(minute, 'minute')
                             }}
                             variant="standard"
                             InputLabelProps={{
@@ -825,8 +778,8 @@ function LocationInput(input_label, gcp, updateDMS) {
                             value={second}
                             onChange={(e) => {
                                 setSecond(e.target.value)
-                                updateValue(e.target.value, 'second')
                             }}
+                            onBlur={() => { updateValue(second, 'second') }}
                             variant="standard"
                             InputLabelProps={{
                                 notched: false

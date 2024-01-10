@@ -19,13 +19,3 @@
     align-items: center;
     justify-content: center;
 }
-
-.stats_container {
-    display: grid;
-    grid-template-columns: 1fr;
-    align-items: top;
-    justify-content: top;
-    background-color: #E8E8E8;
-    padding: 20px;
-    border-radius: 10px;
-}

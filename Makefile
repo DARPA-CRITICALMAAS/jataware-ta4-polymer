@@ -1,4 +1,4 @@
-VERSION := 0.0.16
+VERSION := 0.0.35
 
 # make helpers
 null  :=
@@ -134,6 +134,7 @@ endif
 DOCKER_COMPOSE_FILES:=docker-compose.network.yaml \
 	docker-compose.minio.yaml \
 	docker-compose.elastic.yaml \
+	docker-compose.auto_georef.yaml \
 	$(DOCKER_COMPOSE_LOCALS) \
 	docker-compose.dev.yaml
 

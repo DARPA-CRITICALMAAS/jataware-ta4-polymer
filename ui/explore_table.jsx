@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from "axios";
 
-import './css/landingPage.css'
+import './css/exploreTable.css'
 import { Button, TextField, Table, TableBody, TableRow, TableCell, Paper, TableHead } from '@mui/material';
 import { useNavigate } from "react-router-dom";
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
-import { validate } from 'uuid';
 
 function ExploreTable() {
     const navigate = useNavigate();
@@ -84,7 +83,6 @@ function ExploreTable() {
                 <header className="AppHeader">
                     <h1>Explore Maps</h1>
                     <br />
-
                 </header>
                 <div style={{ marginBottom: "100px" }}>
 

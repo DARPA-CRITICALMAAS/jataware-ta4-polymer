@@ -5,28 +5,35 @@ import React, { useEffect, useRef, useState } from 'react';
 import Map from 'ol/Map.js';
 
 import TileLayer from 'ol/layer/WebGLTile.js';
+
 import { Vector as VectorLayer } from 'ol/layer.js';
 import XYZ from 'ol/source/XYZ.js';
 import GeoTIFF from 'ol/source/GeoTIFF.js';
 import { Vector as VectorSource } from 'ol/source.js';
-import GeoJSON from 'ol/format/GeoJSON.js';
+
 import View from 'ol/View.js';
 
-import { Fill, Stroke, RegularShape, Style } from 'ol/style.js';
 import { useNavigate } from "react-router-dom";
 
 import axios from 'axios';
 
-import { Button, Modal } from '@mui/material';
-import { Card, CardContent, TextField, Grid, Typography, Slider, Box, Link } from '@mui/material';
+import { Button, Modal, Switch } from '@mui/material';
+import { Card, CardContent, Grid, Typography, Slider, Box, Link } from '@mui/material';
 
 import "../css/georefViewer.css";
 import SmallMapImage from './smallMapImage'
-import { register_proj, getLayerById, expand_resolutions, valuetext, gcp2pt, handleOpacityChange } from "./helpers"
-import proj4 from 'proj4';
-import { applyTransform } from 'ol/extent.js';
-import { get as getProjection, getTransform, transformExtent } from 'ol/proj.js';
-import { register } from 'ol/proj/proj4.js';
+import SmallMapImageClipped from './smallMapImageClipped'
+import { register_proj, getLayerById, valuetext, basemapURLS, handleOpacityChange, loadWMTSLayer } from "./helpers"
+
+import { transform, get as getProjection } from 'ol/proj';
+
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
+
+import Draw, { createBox } from 'ol/interaction/Draw'
+import { getCenter } from 'ol/extent';
+import { Select, MenuItem } from '@mui/material';
+
 
 // Params
 const TIFF_URL = import.meta.env.VITE_TIFF_URL;
@@ -37,13 +44,12 @@ const _APP_JSON_HEADER = {
     'Content-Type': 'application/json',
 }
 
-function returnColor(arr) {
-    return `rgb(${arr[0]},${arr[1]},${arr[2]} )`
-}
-
 function MapPage({ mapData }) {
+    console.log('Map data', mapData)
     const navigate = useNavigate();
-    const map_name = mapData['map_info']['map_name']
+    const map_name = mapData['map_info']['map_id']
+    const map_id = mapData['map_info']['map_id']
+
     document.title = "Nylon Georeferencer Projections -" + map_name;
 
     const [map, setMap] = useState()
@@ -52,61 +58,50 @@ function MapPage({ mapData }) {
     const [gcps, setGCPS] = useState(mapData['proj_info'][0]['gcps'])
     const mapRef = useRef()
     const currZoomRef = useRef()
-    const currCenterRef = useRef()
-    const [open, setOpen] = useState(false);
+
+    let draw;
+    const drawRef = useRef()
+    const clippedExtentIndex = useRef(0)
+    const [clippedState, setClippedState] = useState({
+        "clipExentRef": null,
+        "clippedCenter": null,
+        "clippedProjection": null
+    })
+
+    const [openReview, setOpenReview] = useState(false);
+
+    const [showGCPs, setShowGCPs] = useState(true);
+    const [showClippedMaps, setShowClippedMaps] = useState(false)
+    const [showButtonForClip, setShowButtonForClip] = useState(false)
+
+    const baseMapSwitchRef = useRef({})
+    const [baseMapSwitch, setBaseMapSwitch] = useState()
+    const [baseMapSources, setBaseMapSources] = useState()
+
+    const [baseSelected, setBaseSelected] = useState('Satellite');
+
+
+    const currCenterRef = useRef([mapData['proj_info'][0]['gcps'][0]['x'], mapData['proj_info'][0]['gcps'][0]['y']])
+
+    const [currentProj, setCurrentProj] = useState(mapData['proj_info'][0]['epsg_code'])
+    const Proj_Ref = useRef(mapData['proj_info'][0]['epsg_code'])
 
     const handleClose = () => {
-        setOpen(false);
+        setOpenReview(false);
     };
 
-    let used_gcps = {
-        'type': 'FeatureCollection',
-        'features': []
-    }
-
-    for (let gcp of mapData['proj_info'][0]['gcps']) {
-        used_gcps['features'].push(
-            {
-                "type": "Feature",
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [gcp["x"], gcp['y']]
-                },
-                "properties": {
-                    "color": returnColor(gcp['color'])
-                }
-            }
-        )
-    }
-
-    const vector_source = new VectorSource({
-        features: new GeoJSON().readFeatures(used_gcps)
+    // add clip layer for comparing projections
+    const clip_source = new VectorSource({ wrapX: false });
+    const clip_layer = new VectorLayer({
+        id: "bounding-box",
+        source: clip_source,
     });
 
-    const vector_layer = new VectorLayer({
-        id: "vector-layer",
-        source: vector_source,
-        style: (feature) => {
-            let style = new Style({
-                image: new RegularShape({
-                    fill: new Fill({ color: feature.values_.color }),
-                    stroke: new Stroke({ color: 'black', width: 2 }),
-                    points: 5,
-                    radius: 10,
-                    radius2: 4,
-                    angle: 0,
-                }),
-            })
-            return style;
-        },
-    });
 
-    // MAP layer
-    const proj_ = register_proj(mapData['proj_info'][0]['epsg_code'])
     const map_source = new GeoTIFF({
         sources: [
             {
-                url: `${TIFF_URL}/tiles/${map_name}/${map_name}_${mapData['proj_info'][proj_index.current]['proj_id']}.pro.cog.tif`,
+                url: `${TIFF_URL}/cogs/${map_id}/${map_id}_${mapData['proj_info'][proj_index.current]['proj_id']}.pro.cog.tif`,
                 nodata: 0,
             }
         ],
@@ -121,99 +116,173 @@ function MapPage({ mapData }) {
 
 
     // BASE layer
+
     const base_source = new XYZ({
-        // projection: mapData['proj_info'][proj_index.current]['epsg_code'],
         url: `https://api.maptiler.com/tiles/satellite/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
         crossOrigin: '',
     });
 
     const base_layer = new TileLayer({
-        id: "base-layer",
+        id: "Satellite",
         source: base_source,
         visible: true
     });
+    const XYZ_base_layers = { "Satellite": base_layer };
+    const XYZ_source_layers = { "Satellite": base_source }
+    // historic base layer
 
+    async function register_projs(codes) {
+        for (let code of codes) {
+            await register_proj(code)
+        }
+    }
+
+    async function buildWMTSBaseLayers() {
+        let allWMTSBaseLayers = {}
+        let allWMTSSourceLayers = {}
+        for (let url of basemapURLS) {
+            let [resp, sources] = await loadWMTSLayer(url)
+            allWMTSBaseLayers = { ...allWMTSBaseLayers, ...resp };
+            allWMTSSourceLayers = { ...allWMTSSourceLayers, ...sources };
+
+        };
+        return [allWMTSBaseLayers, allWMTSSourceLayers]
+    }
+
+    async function waitForProjections(codes) {
+        try {
+            await register_projs(codes);
+        } catch (error) {
+            console.error("An error occurred:", error);
+        }
+    }
 
 
     // Render map
     useEffect(() => {
-        const _map = new Map({
-            controls: [],
-            layers: [base_layer, map_layer, vector_layer],
-            view: map_source.getView().then((v) => {
-                v.resolutions = expand_resolutions(v, 1, 7);
-                v.extent = undefined;
-                return v;
-            })
-        });
-        search(mapData['proj_info'][proj_index.current]['epsg_code'], _map)
 
-        currZoomRef.current = _map.getView().getZoom();
-
-        _map.on('moveend', function (e) {
-            var newZoom = _map.getView().getZoom();
-            var newCenter = _map.getView().getCenter();
-            if (currZoomRef.current != newZoom) {
-                currZoomRef.current = newZoom;
-            }
-            if (currCenterRef.current != newCenter) {
-                currCenterRef.current = newCenter
-            }
-        });
-
-        _map.setTarget(mapTargetElement.current || "");
-        setMap(_map);
-        mapRef.current = _map
-        return () => _map.setTarget("")
-    }, [])
-
-    useEffect(() => {
-        if (map === undefined) return;
-        register_proj(mapData['proj_info'][proj_index.current]['epsg_code']).then(() => {
-            getLayerById(map, "vector-layer").getSource().clear();
-            getLayerById(map, "vector-layer").getSource().addFeatures(gcps.map((gcp) => {
-                return gcp2pt(gcp, mapData['proj_info'][proj_index.current]['epsg_code'])
-            }));
-        })
-
-    }, [gcps])
-
-
-    function nextProjection(map) {
-        // hac will need to be fixed.
-        if (currZoomRef.current < 8) {
-            currZoomRef.current = 12
+        let codes = ["EPSG:4267", "EPSG:26711"]
+        for (let proj_ of mapData['proj_info']) {
+            codes.push(proj_['epsg_code'])
         }
 
-        if (proj_index.current >= mapData['proj_info'].length - 1) {
+        waitForProjections(codes)
+            .then(() => {
+                console.log('Projections loaded successfully');
+
+                return buildWMTSBaseLayers()
+            }).then(([WMTS_base_layers, WMTS_source_layers]) => {
+                var sourceProjection = getProjection(mapData['proj_info'][0]['gcps'][0]['crs']);
+                var targetProjection = getProjection(mapData['proj_info'][proj_index.current]['epsg_code']);
+                let all_layers = [
+                    ...Object.values(XYZ_base_layers),
+                    ...Object.values(WMTS_base_layers),
+                    map_layer,
+                    clip_layer
+                ]
+                baseMapSwitchRef.current = { ...XYZ_base_layers, ...WMTS_base_layers }
+                setBaseMapSwitch({ ...XYZ_base_layers, ...WMTS_base_layers })
+                setBaseMapSources({ ...WMTS_source_layers })
+                const map = new Map({
+                    layers: all_layers,
+                    view: new View({
+                        center: transform(currCenterRef.current, sourceProjection, targetProjection),
+                        zoom: 10,
+                        projection: mapData['proj_info'][proj_index.current]['epsg_code']
+                    })
+                })
+                currZoomRef.current = map.getView().getZoom();
+
+                map.on('moveend', function (e) {
+                    var newZoom = map.getView().getZoom();
+                    var newCenter = map.getView().getCenter();
+
+                    if (currZoomRef.current != newZoom) {
+                        currZoomRef.current = newZoom;
+                    }
+                    if (currCenterRef.current != newCenter) {
+                        currCenterRef.current = newCenter
+                    }
+                });
+
+                // set Target
+                map.setTarget(mapTargetElement.current || "");
+
+                draw = new Draw({
+                    source: clip_source,
+                    type: "Circle",
+                    geometryFunction: createBox(),
+
+                });
+                draw.on('drawend', function () {
+                    updateClippedState(-1)
+                    setShowButtonForClip(true)
+                });
+                draw.setActive(false)
+                drawRef.current = draw
+                map.addInteraction(draw);
+
+                // set map ref to map
+                mapRef.current = map
+            })
+
+        return
+    }, [])
+
+
+
+    function nextProjection(projIndex = null) {
+        // update projection index
+        let old_proj = currentProj
+
+        if (projIndex != null) {
+            proj_index.current = projIndex
+        } else if (proj_index.current >= mapData['proj_info'].length - 1) {
             proj_index.current = 0
         } else {
             proj_index.current = proj_index.current + 1
         }
+
+        // new map source 
         const new_map_source = new GeoTIFF({
             sources: [
                 {
-                    url: `${TIFF_URL}/tiles/${map_name}/${map_name}_${mapData['proj_info'][proj_index.current]['proj_id']}.pro.cog.tif`,
+                    url: `${TIFF_URL}/cogs/${map_id}/${map_id}_${mapData['proj_info'][proj_index.current]['proj_id']}.pro.cog.tif`,
                     nodata: 0,
                 }
             ],
             convertToRGB: true,
-            interpolate: false,
         })
-        getLayerById(map, "map-layer").setSource(new_map_source);
 
-        // register_proj(mapData['proj_info'][proj_index.current]['epsg_code'])
+        // update view to new projection view
+        let proj_ = mapData['proj_info'][proj_index.current]['epsg_code']
 
-        search(mapData['proj_info'][proj_index.current]['epsg_code'], map)
+        setCurrentProj(proj_)
+        const newView = new View({
+            center: currCenterRef.current,
+            zoom: 10,
+            projection: proj_
+        })
+
+        mapRef.current.setView(newView)
+        Proj_Ref.current = proj_
+        // set map layer to new source
+        getLayerById(mapRef.current, "map-layer").setSource(new_map_source);
 
         setGCPS([...mapData['proj_info'][proj_index.current]['gcps']])
+
+
+        var sourceProjection = getProjection(old_proj);
+        var targetProjection = getProjection(proj_);
+        newView.setCenter(transform(currCenterRef.current, sourceProjection, targetProjection))
+        newView.setZoom(currZoomRef.current)
 
     }
 
     function saveProjStatus(map_id, proj_id, status) {
         axios({
             method: 'post',
-            url: "/api/map/maps/proj_info",
+            url: "/api/map/proj_info",
             data: {
                 "map_id": map_id,
                 "proj_id": proj_id,
@@ -225,86 +294,17 @@ function MapPage({ mapData }) {
             if (status == "success") {
                 next()
             } else {
-                nextProjection(mapRef.current)
+                setTimeout(() => {
+                    window.location.reload()
+                }, 2000);
+
             }
         }).catch((e) => {
             alert(e)
         })
+
     }
 
-
-    function setProjection(code, name, proj4def, bbox, map) {
-
-        if (code === null || name === null || proj4def === null || bbox === null) {
-            map.setView(
-                new View({
-                    projection: 'EPSG:3857',
-                    center: [0, 0],
-                    zoom: 1,
-                })
-            );
-            return;
-        }
-
-        const newProjCode = 'EPSG:' + code;
-        proj4.defs(newProjCode, proj4def);
-        register(proj4);
-        const newProj = getProjection(newProjCode);
-        const fromLonLat = getTransform('EPSG:4326', newProj);
-        let worldExtent = [bbox[1], bbox[2], bbox[3], bbox[0]];
-        newProj.setWorldExtent(worldExtent);
-
-        if (bbox[1] > bbox[3]) {
-            worldExtent = [bbox[1], bbox[2], bbox[3] + 360, bbox[0]];
-        }
-        const extent = applyTransform(worldExtent, fromLonLat, undefined, 8);
-
-        newProj.setExtent(extent);
-
-        const newView = new View({
-            projection: newProj
-        })
-
-        mapRef.current.setView(newView)
-        newView.fit(extent);
-        newView.setCenter(currCenterRef.current)
-        newView.setZoom(currZoomRef.current)
-    }
-
-
-    function search(query, map) {
-        fetch('https://epsg.io/?format=json&q=' + query)
-            .then(function (response) {
-                return response.json();
-            })
-            .then(function (json) {
-                const results = json['results'];
-                if (results && results.length > 0) {
-                    for (let i = 0, ii = results.length; i < ii; i++) {
-                        const result = results[i];
-                        if (result) {
-                            const code = result['code'];
-                            const name = result['name'];
-                            const proj4def = result['wkt'];
-                            const bbox = result['bbox'];
-                            if (
-                                code &&
-                                code.length > 0 &&
-                                proj4def &&
-                                proj4def.length > 0 &&
-                                bbox &&
-                                bbox.length == 4
-                            ) {
-                                setProjection(code, name, proj4def, bbox, map);
-                                return;
-                            }
-                        }
-                    }
-                }
-                setProjection(null, null, null, null, map);
-
-            });
-    }
     function next() {
         axios({
             method: "get",
@@ -325,11 +325,96 @@ function MapPage({ mapData }) {
             });
     }
 
+    const switchRightPanel = () => {
+        setShowGCPs(!showGCPs);
+        drawRef.current.setActive(showGCPs)
+        if (!showGCPs) {
+            let layer_source = getLayerById(mapRef.current, "bounding-box").getSource()
+            layer_source.clear()
+            setShowClippedMaps(false)
+            setClippedState(clippedState => ({
+                ...clippedState,
+                "clipExentRef": null,
+                "clippedCenter": null,
+                "clippedProjection": null
+            }))
+            setShowButtonForClip(false)
+        }
+    };
+
+    function updateClippedState(clippedIndex) {
+
+        let features = getLayerById(mapRef.current, "bounding-box").getSource().getFeatures()
+
+        var sourceProjection = mapRef.current.getView().getProjection()
+
+        if (features.length > 0) {
+            let feature = features.slice(clippedIndex)[0]
+            let extent = feature.getGeometry().extent_
+            setClippedState(clippedState => ({
+                ...clippedState,
+                "clipExentRef": extent,
+                "clippedCenter": getCenter(extent),
+                "clippedProjection": sourceProjection
+            }))
+        }
+    }
+
+    function viewClippedArea() {
+        updateClippedState(0)
+        setShowClippedMaps(true)
+    }
+
+    function clearClippedArea() {
+        //clear polygons
+        getLayerById(mapRef.current, "bounding-box").getSource().clear()
+
+        //update state
+        setClippedState(clippedState => ({
+            ...clippedState,
+            "clipExentRef": null,
+            "clippedCenter": null,
+            "clippedProjection": null
+        }))
+        setShowButtonForClip(false)
+        setShowClippedMaps(false)
+    }
+
+    function nextClippedPolygon(i = null) {
+        let length = getLayerById(mapRef.current, "bounding-box").getSource().getFeatures().length
+        if (i != null) {
+            clippedExtentIndex.current = i
+        } else if (clippedExtentIndex.current >= length - 1) {
+            clippedExtentIndex.current = 0
+        } else {
+            clippedExtentIndex.current = clippedExtentIndex.current + 1
+        }
+        updateClippedState(clippedExtentIndex.current)
+    }
+
+
+    const handleBaseChange = (event) => {
+        setBaseSelected(event.target.value);
+        changedBaseMap(event.target.value);
+    };
+
+
+    function changedBaseMap(key) {
+        for (let key_ of Object.keys(baseMapSwitch)) {
+            if (key == key_) {
+                getLayerById(mapRef.current, key_).setVisible(true);
+
+            } else {
+                getLayerById(mapRef.current, key_).setVisible(false);
+            }
+        }
+    }
+
 
     return (
         <>
             <Modal
-                open={open}
+                open={openReview}
                 onClose={handleClose}
                 aria-labelledby="modal-title"
                 aria-describedby="modal-description"
@@ -373,7 +458,7 @@ function MapPage({ mapData }) {
             <div className="flex-container" >
                 <div className="flexChild">
                     <div className="control_panel" id="control-panel">
-                        <Box sx={{ width: 200 }}>
+                        <Box sx={{ width: 220 }}>
                             <Typography id="continuous-slider" gutterBottom>
                                 Map Opacity
                             </Typography>
@@ -382,9 +467,21 @@ function MapPage({ mapData }) {
                                 defaultValue={100}
                                 step={10}
                                 valueLabelDisplay="auto"
-                                onChange={(e) => handleOpacityChange(e, map)}
+                                onChange={(e) => handleOpacityChange(e, mapRef.current)}
                                 valueLabelFormat={valuetext}
                             />
+
+                            {baseMapSwitch &&
+
+                                <Select value={baseSelected} onChange={handleBaseChange} displayEmpty
+                                    style={{ margin: "5px" }}>
+                                    <MenuItem value="" disabled>Select an Option</MenuItem>
+                                    {Object.keys(baseMapSwitch).map((key) => (
+                                        <MenuItem key={key} value={key}>{key}</MenuItem>
+                                    ))}
+                                </Select>
+                            }
+
                         </Box>
                     </div>
                     <div
@@ -395,21 +492,21 @@ function MapPage({ mapData }) {
                             height: "100%",
                             position: "relative",
                         }} />
-                </div>
+                </div >
                 <div className="flexChild scrollableContent">
                     <div className="left-panel">
 
-                        <Button onClick={(e) => navigate("/")}>Home</Button>
-                        <Button onClick={(e) => nextProjection(map)}>Next Projection ({String(proj_index.current + 1)}/{mapData['proj_info'].length})</Button>
+                        <Button onClick={(e) => { navigate("/"); navigate(0); }}>Home</Button>
+                        <Button onClick={(e) => nextProjection()}>Next Projection ({String(proj_index.current + 1)}/{mapData['proj_info'].length})</Button>
                         <Button
                             color="warning"
-                            onClick={(e) => navigate("/points/" + mapData['map_info']['map_id'])}>
+                            onClick={(e) => { navigate("/points/" + mapData['map_info']['map_id']); navigate(0); }}>
                             Redo From Scratch
                         </Button>
                         <Button
                             className="nextButton"
                             color="success"
-                            onClick={() => setOpen(true)}
+                            onClick={() => setOpenReview(true)}
                         >
                             Review Map
                         </Button>
@@ -422,25 +519,59 @@ function MapPage({ mapData }) {
                             Next Map
                         </Button>
                         <br />
-                        <Link href={`${TIFF_URL}/tiles/${map_name}/${map_name}_${mapData['proj_info'][proj_index.current]['proj_id']}.pro.cog.tif`}>DOWNLOAD PROJECTION</Link>
+                        <Link href={`${TIFF_URL}/cogs/${map_name}/${map_name}_${mapData['proj_info'][proj_index.current]['proj_id']}.pro.cog.tif`}>DOWNLOAD PROJECTION</Link>
 
                         <Typography variant="body2" style={{ fontSize: "1.2rem", marginBottom: "5px" }}>
                             Projection code: {mapData['proj_info'][proj_index.current]['epsg_code']}
                         </Typography>
+                        <FormControlLabel control={<Switch checked={!showGCPs} onChange={() => { switchRightPanel() }} />} label={showGCPs ? "Compare Clipped Areas" : "View GCPs"} />
 
                         <div>
-                            {gcps &&
-                                gcps.map((gcp, i) => {
-                                    return <div key={gcp.gcp_id}>
-                                        <div className="container_card">
-                                            <GCPCardSummary gcp={gcp} />
-                                            <SmallMapImage map_name={map_name} gcp={gcp} />
-                                        </div>
-                                    </div>
-                                })
+                            {showGCPs ?
+                                <>
+                                    {gcps &&
+                                        gcps.map((gcp, i) => {
+                                            return <div key={gcp.gcp_id}>
+                                                <div className="container_card">
+                                                    <GCPCardSummary gcp={gcp} />
+                                                    <SmallMapImage map_name={map_name} gcp={gcp} />
+                                                </div>
+                                            </div>
+                                        })
+                                    }
+                                </>
+                                :
+                                <>
+                                    {showButtonForClip == true ?
+                                        <>
+                                            <Button onClick={() => { viewClippedArea() }}>Process Clipped Area</Button>
+                                            <Button onClick={() => { clearClippedArea() }}>Clear</Button>
+                                            <Button onClick={() => { nextClippedPolygon() }}>Next Clipped Polygon</Button>
+                                        </>
+                                        :
+                                        <p>Select an area to view for all projections</p>
+                                    }
+
+                                    {showClippedMaps &&
+                                        mapData['proj_info'].map((proj_info, i) => {
+                                            return <div key={proj_info.proj_id}>
+                                                <div className="container_card">
+                                                    <SmallMapImageClipped
+                                                        map_id={map_id}
+                                                        proj_info={proj_info}
+                                                        clippedState={clippedState}
+                                                        baseMapSources={baseMapSources}
+                                                        parentBaseMap={baseSelected}
+                                                    />
+                                                    <Button onClick={() => nextProjection(i)}>View in Main Window</Button>
+                                                </div>
+                                            </div>
+                                        })
+                                    }
+                                </>
                             }
                         </div>
-                    </div >
+                    </div>
                 </div>
             </div >
         </>
@@ -456,21 +587,14 @@ function GCPCardSummary({ gcp }) {
                 <Typography variant="body2" style={{ fontSize: "1.2rem", marginBottom: "5px" }}>
                     <b>CRS:</b> {gcp.crs}
                 </Typography>
-                <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                        <Typography variant="caption" display="block" gutterBottom style={{ fontWeight: 'bold', fontSize: "1.2rem" }}>
-                            X, Y Coordinates:
-                        </Typography>
-                        <Typography variant="body2" style={{ fontSize: '1.2rem', backgroundColor: "#E0E0E0", borderRadius: "10px", padding: "10px" }}>
-                            {gcp.x},  {gcp.y}
-                        </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
+                <Grid>
+                    <Grid item xs={4}>
                         <Typography variant="caption" display="block" gutterBottom style={{ fontWeight: 'bold', fontSize: "1.2rem" }}>
                             Coords DMS:
                         </Typography>
                         <Typography variant="body2" style={{ fontSize: '1.2rem', backgroundColor: "#E0E0E0", borderRadius: "10px", padding: "10px" }}>
-                            {LocationInput("x_dms", gcp)}, {LocationInput("y_dms", gcp)}
+                            <>X: {LocationInput("x_dms", gcp)} , </>
+                            <>Y: {LocationInput("y_dms", gcp)} </>
                         </Typography>
                     </Grid>
                 </Grid>

@@ -157,7 +157,7 @@ function Landing() {
       })
       console.log(data)
       if (data['results'].length > 0) {
-        navigate(nav_path + data["results"][0]['map_name'])
+        navigate(nav_path + data["results"][0]['map_id'])
       }
 
     } catch (error) {

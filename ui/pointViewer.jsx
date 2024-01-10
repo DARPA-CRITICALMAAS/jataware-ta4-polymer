@@ -18,7 +18,7 @@ function PointViewer() {
         try {
             axios({
                 method: 'GET',
-                url: "/api/map/maps/" + map_id,
+                url: "/api/map/" + map_id,
                 headers: _APP_JSON_HEADER
             }).then((response) => {
                 let mapper = {}
@@ -33,14 +33,28 @@ function PointViewer() {
                     response.data['all_gcps'][index]['x_dms'] = dec2dms(response.data["all_gcps"][index]['x'])
                     response.data['all_gcps'][index]['y_dms'] = dec2dms(response.data["all_gcps"][index]['y'])
                 });
-                response.data["proj_info"].forEach((element, index) => {
 
-                    element['gcps'].forEach((point, index_) => {
-                        point['color'] = mapper[point['gcp_id']]['color']
-                        point['x_dms'] = mapper[point['gcp_id']]['x_dms']
-                        point['y_dms'] = mapper[point['gcp_id']]['y_dms']
+                if (response.data["proj_info"].length < 1) {
+                    response.data["latest_proj"] = { "gcps": response.data["all_gcps"] }
+                } else {
+                    let latestDate = new Date(response.data["proj_info"][0]["created"])
+                    response.data["latest_proj"] = response.data["proj_info"][0]
+                    response.data["proj_info"].forEach((element, index) => {
+                        element['gcps'].forEach((point, index_) => {
+                            point['color'] = mapper[point['gcp_id']]['color']
+                            point['x_dms'] = mapper[point['gcp_id']]['x_dms']
+                            point['y_dms'] = mapper[point['gcp_id']]['y_dms']
+                        })
+                        let currentDate = new Date(element['created']);
+                        if (currentDate > latestDate) {
+                            latestDate = currentDate;
+                            response.data["latest_proj"] = element
+                        }
                     })
-                })
+
+                }
+
+
                 setMapData(response.data)
             })
         } catch {

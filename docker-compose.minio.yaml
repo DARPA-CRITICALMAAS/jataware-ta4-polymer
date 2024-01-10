@@ -53,11 +53,13 @@ services:
       - |
         mc alias set local http://minio:9000 miniouser miniopass;
         mc cp --recursive /tiles local/polymer-rocks;
+        mc cp --recursive /cogs local/polymer-rocks;
     depends_on:
       minio_mc:
         condition: service_completed_successfully
     volumes:
       - ${PWD}/load:/tiles
+      - ${PWD}/load_cogs:/cogs
     networks:
       - nylon
 

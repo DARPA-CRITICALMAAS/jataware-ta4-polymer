@@ -16,7 +16,7 @@ function ProjectionViewer() {
     try {
       axios({
         method: 'get',
-        url: "/api/map/maps/" + map_id,
+        url: "/api/map/" + map_id,
         headers: _APP_JSON_HEADER
       }).then((response) => {
         let mapper = {}
@@ -31,14 +31,17 @@ function ProjectionViewer() {
           response.data['all_gcps'][index]['x_dms'] = dec2dms(response.data["all_gcps"][index]['x'])
           response.data['all_gcps'][index]['y_dms'] = dec2dms(response.data["all_gcps"][index]['y'])
         });
-        response.data["proj_info"].forEach((element, index) => {
 
+        response.data['proj_info'] = response.data['proj_info'].filter(item => item.status != "failed")
+
+        response.data["proj_info"].forEach((element, index) => {
           element['gcps'].forEach((point, index_) => {
             point['color'] = mapper[point['gcp_id']]['color']
             point['x_dms'] = mapper[point['gcp_id']]['x_dms']
             point['y_dms'] = mapper[point['gcp_id']]['y_dms']
           })
         })
+
         setMapData(response.data)
       })
     } catch {

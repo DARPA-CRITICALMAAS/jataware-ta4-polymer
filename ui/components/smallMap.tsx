@@ -17,7 +17,7 @@ const TIFF_URL = import.meta.env.VITE_TIFF_URL;
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 const BUFFER = 250;
 
-function SmallMap({ map_name, gcp, updateGCP }) {
+function SmallMap({ map_id, gcp, updateGCP }) {
     const mapTargetElement = useRef<HTMLDivElement>(null)
     const [showMap, setShowMap] = useState(true)
     const [imageUrl, setImageUrl] = useState("")
@@ -28,7 +28,7 @@ function SmallMap({ map_name, gcp, updateGCP }) {
     const map_source = new GeoTIFF({
         sources: [
             {
-                url: `${TIFF_URL}/tiles/${map_name}/${map_name}.cog.tif`,
+                url: `${TIFF_URL}/cogs/${map_id}/${map_id}.cog.tif`,
                 nodata: 0,
             }
         ],
@@ -100,7 +100,6 @@ function SmallMap({ map_name, gcp, updateGCP }) {
 
             } else {
                 const mapCanvas = map.getViewport().getElementsByTagName('canvas')[0];
-                // console.log('made it wowowo', map.getRenderer())
                 if (mapCanvas) {
                     const image = mapCanvas.toDataURL();
                     setImageUrl(image);

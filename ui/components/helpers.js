@@ -1,10 +1,11 @@
 // helpers.js
 
 import { register } from 'ol/proj/proj4.js';
-import { applyTransform } from 'ol/extent.js';
-import { get as getProjection, getTransform } from 'ol/proj.js';
+import WMTS, { optionsFromCapabilities } from 'ol/source/WMTS.js';
+import WMTSCapabilities from 'ol/format/WMTSCapabilities.js';
 import GeoJSON from 'ol/format/GeoJSON.js';
 import { transform } from 'ol/proj';
+import TileLayer from 'ol/layer/WebGLTile.js';
 
 import proj4 from 'proj4';
 
@@ -17,7 +18,6 @@ export const handleOpacityChange = function (e, map) {
 }
 
 export const gcp2pt = function ({ coll, rowb, x, y, crs, gcp_id, color }, map_crs) {
-    // console.log(coll, rowb, x, y, crs, color, map_crs)
 
     let coords = [x, y];  // A point in EPSG:4326
 
@@ -35,8 +35,8 @@ export const gcp2pt = function ({ coll, rowb, x, y, crs, gcp_id, color }, map_cr
         },
         properties: {
             color: color,
-            coll: Math.floor(coll),
-            rowb: Math.floor(rowb),
+            coll: coll,
+            rowb: rowb,
             x: x,
             y: y,
             gcp_id: gcp_id,
@@ -66,8 +66,8 @@ export const gcp2box = function ({ coll, rowb, x, y, crs, gcp_id, color }) {
         },
         properties: {
             color: color,
-            coll: Math.floor(coll),
-            rowb: Math.floor(rowb),
+            coll: coll,
+            rowb: rowb,
             x: x,
             y: y,
             gcp_id: gcp_id,
@@ -145,53 +145,106 @@ export const dms2dec = function (dms) {
 // --
 // Projection helpers
 
-function _register_proj(code, wkt, bbox) {
+function modifyProj4String(input) {
+    if (input.includes('+ellps=clrk66')) {
+        const params = input.split(' ');
+        // Filter out the '+nadgrids=' parameter and value
+        const filteredParams = params.filter(param => !param.startsWith('+nadgrids='));
+        // add '+towgs84=-8,160,176,0,0,0,0'
+        return filteredParams.join(' ') + ' +towgs84=-8,160,176,0,0,0,0';
+    }
+    return input;
+}
+function _register_proj(code, wkt, bbox, proj4_) {
     let extent_wgs = [bbox[1], bbox[2], bbox[3], bbox[0]];
     if (bbox[1] > bbox[3])
         extent_wgs = [bbox[1], bbox[2], bbox[3] + 360, bbox[0]];
 
-    // console.log(code, wkt);
-    proj4.defs(code, wkt);
-    register(proj4);
-
-    const new_proj = getProjection(code);
-    const extent = applyTransform(extent_wgs, getTransform('EPSG:4326', new_proj), undefined, 8);
-    new_proj.setExtent(extent);
-    return new_proj
+    proj4_ = modifyProj4String(proj4_)
+    proj4.defs(code, proj4_);
+    register(proj4)
 }
 
-export const register_proj = function (query) {
-    return (
-        fetch('https://epsg.io/?format=json&q=' + query)
-            .then(function (response) {
-                return response.json();
-            })
-            .then(function (json) {
-                const results = json['results'];
-                if (results && results.length > 0) {
-                    for (let i = 0, ii = results.length; i < ii; i++) {
-                        const result = results[i];
-                        if (result) {
-                            const auth = result['authority'];
-                            const code = result['code'];
-                            const wkt = result['wkt'];
-                            const bbox = result['bbox'];
-                            if (
-                                code && code.length > 0 &&
-                                wkt && wkt.length > 0 &&
-                                bbox && bbox.length == 4
-                            ) {
-                                // console.log(`register_proj: ${auth}:${code}`)
-                                return _register_proj(`${auth}:${code}`, wkt, bbox);
+export const register_proj = async function (query) {
 
-                            }
-                        }
+    const response = await fetch('https://epsg.io/?format=json&q=' + query);
+    const json = await response.json();
+    const results = json['results'];
+    if (results && results.length > 0) {
+        const results = json['results'];
+        if (results && results.length > 0) {
+            for (let i = 0, ii = results.length; i < ii; i++) {
+                const result = results[i];
+                if (result) {
+                    const auth = result['authority'];
+                    const code = result['code'];
+                    const wkt = result['wkt'];
+                    const proj4_ = result['proj4']
+                    const bbox = result['bbox'];
+                    if (
+                        code && code.length > 0 &&
+                        wkt && wkt.length > 0 &&
+                        bbox && bbox.length == 4
+                    ) {
+                        await _register_proj(`${auth}:${code}`, wkt, bbox, proj4_);
                     }
                 }
-            })
-    );
+            }
+        }
+    }
 }
-
 export const valuetext = function (value) {
     return `${Math.round(value)}%`;
+}
+
+export const basemapURLS = [
+    "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/WMTS/1.0.0/WMTSCapabilities.xml",
+    "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/WMTS/1.0.0/WMTSCapabilities.xml",
+    // "https://basemap.nationalmap.gov/arcgis/rest/services/USGSHydroCached/MapServer/WMTS/1.0.0/WMTSCapabilities.xml",
+    "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/WMTS/1.0.0/WMTSCapabilities.xml",
+    "https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/WMTS/1.0.0/WMTSCapabilities.xml"
+
+]
+
+const WMTSParser = new WMTSCapabilities();
+
+
+export async function loadWMTSLayer(url) {
+    try {
+
+        const response = await fetch(url);
+        const text = await response.text();
+
+        // Parse the WMTS capabilities
+        const result = WMTSParser.read(text);
+
+        let layers_ = {}
+        let sources_ = {}
+        for (let layer_ of result["Contents"]['Layer']) {
+            let Layers_ = {}
+
+            Layers_['layer'] = layer_['Identifier']
+            const options = optionsFromCapabilities(result, Layers_);
+            // Set additional options
+            options.attributions = 'USGS' + new Date().getFullYear();
+            options.crossOrigin = '';
+            options.projection = 'EPSG:3857';
+            options.wrapX = false;
+
+            // Set the WMTS source
+            let layer = new TileLayer({
+                id: layer_['Identifier'],
+                visible: false
+            });
+            let layer_source = new WMTS(options)
+            layer.setSource(layer_source);
+            layers_[layer_['Identifier']] = layer
+            sources_[layer_['Identifier']] = layer_source
+        }
+
+        return [layers_, sources_]
+    } catch (error) {
+        console.error('Error loading WMTS layer:', error);
+        return {}
+    }
 }

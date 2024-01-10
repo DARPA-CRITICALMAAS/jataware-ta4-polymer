@@ -6,7 +6,12 @@ class Settings(BaseSettings):
     open_ai_key: str = None
     s3_tiles_bucket: str = "common.polymer.rocks"
     s3_tiles_prefix: str = "tiles"
-    es_endpoint_url: str = "http://localhost:9200/"
+    s3_tiles_prefix_v2: str = "cogs"
+    es_endpoint_url: str = "http://elastic:9200"
+    maps_index: str = "maps2"
+    gcps_index: str = "gcps2"
+    epsgs_index: str = "epsgs2"
+    proj_files_index: str = "proj_files2"
 
     class Config:
         case_sensitive = False

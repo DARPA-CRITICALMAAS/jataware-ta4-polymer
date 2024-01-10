@@ -12,3 +12,5 @@ albumentations
 torch
 torchvision
 segmentation_models_pytorch
+imagehash
+osgeo

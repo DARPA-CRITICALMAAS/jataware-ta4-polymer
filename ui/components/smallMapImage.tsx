@@ -23,11 +23,10 @@ function SmallMapImage({ map_name, gcp }) {
 
     // --
     // MAP layer
-
     const map_source = new GeoTIFF({
         sources: [
             {
-                url: `${TIFF_URL}/tiles/${map_name}/${map_name}.cog.tif`,
+                url: `${TIFF_URL}/cogs/${map_name}/${map_name}.cog.tif`,
                 nodata: 0,
             }
         ],
@@ -78,6 +77,7 @@ function SmallMapImage({ map_name, gcp }) {
 
 
     useEffect(() => {
+
         const map = new Map({
             layers: [map_layer, vector_layer],
             controls: [],
@@ -92,7 +92,6 @@ function SmallMapImage({ map_name, gcp }) {
         map.once('rendercomplete', () => {
 
             const mapCanvas = map.getViewport().getElementsByTagName('canvas')[0];
-            // console.log('made it wowowo', map.getRenderer())
             if (mapCanvas) {
                 const image = mapCanvas.toDataURL();
                 setImageUrl(image);
@@ -101,10 +100,8 @@ function SmallMapImage({ map_name, gcp }) {
             if (showMap) {
                 setShowMap(false)
             }
-
-
-
         });
+
         return () => map.setTarget("")
     }, [gcp])
 
