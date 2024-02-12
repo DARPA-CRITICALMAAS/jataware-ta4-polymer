@@ -1,12 +1,20 @@
-
-
 services:
 
   elastic:
     ports:
       - 9200:9200
 
+  postgis:
+    ports:
+      - 5432:5432
+
+  silk:
+    ports:
+      - 8000:3000
+    configs:
+      - source: aws_creds
+        target: /home/apps/.aws/credentials
 
 configs:
   aws_creds:
-    file: ./aws/credentials
+    file: ~/.aws/credentials

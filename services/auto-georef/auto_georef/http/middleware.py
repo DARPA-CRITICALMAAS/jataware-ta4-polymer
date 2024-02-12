@@ -14,8 +14,11 @@ origins = [
     "http://localhost:8080/",
     "http://localhost:8080/",
     "http://localhost:8080",
+    "https://ngmdb.usgs.gov",
     "*",  # Change this to your frontend's URL
 ]
+
+
 
 
 def setup_middleware(api: FastAPI) -> None:

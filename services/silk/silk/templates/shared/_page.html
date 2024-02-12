@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+  {% include "shared/_head.html"  %}
+  <body class="h-screen">
+    {% include  "shared/_nav.html" %}
+    <div class="h-[calc(100vh-64px)] overflow-auto flex flex-initial">
+      <div class="space-x-4 justify-center overflow-auto w-full flex">
+        {% block main_content %}{% endblock %}
+      </div>
+    </div>
+  </body>
+</html>

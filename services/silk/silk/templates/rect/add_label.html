@@ -1,0 +1,73 @@
+{% if label %}
+
+<div hx-swap-oob="beforeend:#labels">
+  {% include "rect/label.html" %}
+</div>
+
+{% endif %}
+
+<div hx-ext="response-targets">
+  <form
+    hx-post="/partial/r/labels"
+    hx-target="closest div"
+    hx-swap="outerHTML"
+    >
+    <div class="flex flex-row mt-4">
+
+      <input name="annotation_id" value="{{ annotation_id or '' }}" type="hidden" />
+      <input name="annotation_type" value="{{ annotation_type }}" type="hidden" />
+      <input name="doc_id" value="{{ doc_id }}" type="hidden" />
+      <input name="page" value="{{ page }}" type="hidden" />
+      <input name="x0" value="{{ x0 }}" type="hidden" />
+      <input name="x1" value="{{ x1 }}" type="hidden" />
+      <input name="y0" value="{{ y0 }}" type="hidden" />
+      <input name="y1" value="{{ y1 }}" type="hidden" />
+
+      <div class="w-1/2 mr-4">
+        <label class="form-control w-full">
+          <div class="label">
+            <span class="label-text text-xs">Label</span>
+          </div>
+          <input name="label" type="text" placeholder="Type here"
+                 value="{{ form_data.get('label', '') }}"
+                 class="input input-bordered w-full {{ invalid.get('label') and 'input-error' }}"
+
+                 />
+        </label>
+      </div>
+      <div class="w-1/2 mr-4">
+        <label class="form-control w-full">
+          <div class="label">
+            <span class="label-text text-xs">Value</span>
+          </div>
+          <input name="value" type="text" placeholder="Type here"
+                 value="{{ form_data.get('value', '') }}"
+                 class="input input-bordered w-full {{ invalid.get('value') and 'input-error' }}"
+                 />
+        </label>
+      </div>
+    </div>
+
+    <div class="flex flex-row">
+      <div class="w-full mr-4">
+        <label class="form-control w-full">
+          <div class="label">
+            <span class="label-text text-xs">Comment</span>
+          </div>
+          <textarea name="comment"
+                    placeholder="Comment"
+                    class="textarea textarea-bordered h-24 {{ invalid.get('comment') and 'textarea-error' }}"
+                    >{{ form_data.get('comment', '') }}</textarea>
+        </label>
+      </div>
+    </div>
+
+    <div class="flex flex-row">
+      <label class="form-control w-full mr-4">
+        <div class="label"></div>
+        <button class="btn w-full btn-primary">Add New Label</button>
+      </label>
+    </div>
+  </form>
+
+</div>

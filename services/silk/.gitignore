@@ -1,0 +1,11 @@
+
+tmp/*
+node_modules
+
+static/js/*.js
+static/css/*.css
+
+data/docs/*.pdf
+data/*.db
+data/*.db-shm
+data/*.db-wal

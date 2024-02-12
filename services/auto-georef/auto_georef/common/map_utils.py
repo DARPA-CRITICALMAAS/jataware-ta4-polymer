@@ -21,6 +21,9 @@ import shutil
 logger: Logger = logging.getLogger(__name__)
 from PIL import Image
 import imagehash
+from shapely.geometry import shape
+from shapely.ops import transform
+from shapely import to_geojson
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -89,6 +92,8 @@ def extract_gcps_(AGR, img):
     for cp in cps:
         cp["rowb"] = height - cp["row"]
         cp["coll"] = cp["col"]
+        cp['provenance'] = "jataware_extraction"
+        cp['gcp_reference_id'] = None
 
         del cp["row"]
         del cp["col"]
@@ -169,7 +174,8 @@ def prepare_gcps_for_es(
             "map_id": map_id,
             "modified": datetime.now(),
             "created": datetime.now(),
-            "provenance": provenance,
+            "gcp_reference_id": gcp.get("gcp_reference_id",None),
+            "provenance": gcp.get("provenance",provenance),
             "extraction_model": extraction_model,
             "extraction_model_version": extraction_model_version,
             "rowb": float(gcp["rowb"]),
@@ -249,7 +255,9 @@ def updateGCPs(es, map_id, gcps):
 
     gcp_ids = []
     new_gcps = []
-    for gcp in gcps:
+    for gcp in gcps:            
+        new_gcp = copy.deepcopy(gcp)
+
         if gcp["gcp_id"] in all_gcps.keys():
             
             if compare_dicts(
@@ -258,9 +266,12 @@ def updateGCPs(es, map_id, gcps):
                 print("Point has stayed the same")
                 gcp_ids.append(gcp["gcp_id"])
                 continue
+            
+            new_gcp['gcp_reference_id']=new_gcp.get("gcp_id",None)
+        
 
         print("New point being created/saved")
-        new_gcp = copy.deepcopy(gcp)
+        
         new_gcp["gcp_id"] = uuid.uuid4()
         gcp_ids.append(new_gcp["gcp_id"])
         new_gcps.append(new_gcp)
@@ -321,18 +332,13 @@ def return_crs(temp_file_path):
     else:
         return None
 
+
 def is_cog(file_path):
     dataset = gdal.Open(file_path)
-
-    # Check if the dataset is tiled
     tiled = dataset.GetMetadataItem('TIFFTAG_TILEWIDTH') is not None
-
-    # Check for overviews
     overviews = dataset.GetRasterBand(1).GetOverviewCount() > 0
-
-    # Additional checks can be added here (like checking for specific metadata related to COGs)
-
     return tiled and overviews
+
 
 def saveTifasCog(file_path, cog_path):
     ds = gdal.Open(file_path)
@@ -468,6 +474,7 @@ def boundsFromGCPS(gcps):
     west, south, east, north = multi_point.bounds  # returns (minx, miny, maxx, maxy)
     return create_boundary_polygon(south=south, west=west, north=north, east=east)
 
+
 def generateCrsListFromGCPs(gcps):
     shapely_points = [Point(p["x"], p["y"]) for p in gcps]
     multi_point = MultiPoint(shapely_points)
@@ -485,7 +492,7 @@ def generateCrsListFromGCPs(gcps):
     return all_crs
 
 
-def filterCRSList(crs_list, max_projections=3):
+def filterCRSList(crs_list, max_projections=1):
     codes = []
     for crs in crs_list:
         # currently we are assuming NAD27 but this can change
@@ -494,13 +501,9 @@ def filterCRSList(crs_list, max_projections=3):
             if "/ UTM zone" in crs.name:
                 codes.append(f"EPSG:{crs.code}")
 
-            # state projections
-            if crs.code.startswith("32"):
-                codes.append(f"EPSG:{crs.code}")
-
             if crs.code.startswith("26"):
                 codes.append(f"EPSG:{crs.code}")
-
+    
     unique_codes = list(set(codes))
     return unique_codes[:max_projections]
 
@@ -537,3 +540,29 @@ def get_document_id_by_key_value( es,index_name, key, value):
         return response['hits']['hits'][0]['_id']
     return None
     
+def apply_custom_transform(geom, custom_transform):
+    def affine_transform(x, y, z=None):
+        x, y = custom_transform * (x, y)
+        return x, y
+    
+    return transform(affine_transform, geom)
+
+def project_vector_(es, feature, projection_id, crs):
+    #  look up info for projection
+    proj_info = es.get(index=app_settings.proj_files_index, id=projection_id)
+    map_id = proj_info['_source']['map_id']
+    map_info = es.get(index=app_settings.maps_index, id=map_id)
+    height = map_info['_source']['height']
+    width = map_info['_source']['width']
+    gcps = []
+    for gcp in proj_info['_source']['gcps_ids']:
+        gcps.append( es.get(index=app_settings.gcps_index, id=gcp)['_source'])
+
+    geo_transform = cps_to_transform(gcps, height=height, to_crs=crs)
+    bounds = riot.array_bounds(height, width, geo_transform)
+    pro_transform, pro_width, pro_height = calculate_default_transform(
+            crs, crs, width, height, *tuple(bounds)
+        )
+    geom = shape(feature['geometry'])
+    transformed_geom = apply_custom_transform(geom, pro_transform)
+    return to_geojson(transformed_geom)

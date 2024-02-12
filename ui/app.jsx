@@ -5,10 +5,11 @@ import { BrowserRouter } from 'react-router-dom';
 
 import ProjectionViewer from './ProjectionViewer.jsx'
 import PointViewer from './pointViewer.jsx'
-import Landing from './landing.jsx'
+import Landing from './landing.tsx'
 import ExploreTable from './explore_table.jsx';
 
 function App() {
+
 
   return (
     <BrowserRouter>

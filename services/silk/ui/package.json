@@ -1,0 +1,42 @@
+{
+  "type": "module",
+  "dependencies": {
+    "@alpinejs/morph": "^3.13.0",
+    "@alpinejs/persist": "^3.13.0",
+    "alpinejs": "^3.13.0",
+    "filesize": "^10.1.0",
+    "font-proxima-nova": "^1.0.1",
+    "htmx.org": "^1.9.10",
+    "ol": "^8.1.0",
+    "theme-change": "^2.5.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-inject": "^5.0.3",
+    "bun-types": "latest",
+    "daisyui": "latest",
+    "esbuild": "^0.19.3",
+    "eslint": "^8.52.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-n": "^16.2.0",
+    "eslint-plugin-promise": "^6.1.1",
+    "tailwindcss": "^3.3.3",
+    "vite": "^4.4.9"
+  },
+  "scripts": {
+    "css": "tailwindcss build -i input.css -o ../static/css/output.css",
+    "css-watch": "tailwindcss -i input.css -o ../static/css/output.css --watch",
+    "build": "vite build",
+    "build-watch": "vite build --watch",
+    "lint": "eslint src/*.js",
+    "esbuild": "esbuild --bundle src/*.js --format=cjs --outdir=../static/js/ --minify --sourcemap --target=es2020",
+    "esbuild-watch": "esbuild --bundle src/*.js --outdir=../static/js/ --format=cjs --target=es2020 --watch"
+  },
+  "name": "ui",
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

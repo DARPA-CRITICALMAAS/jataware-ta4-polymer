@@ -1,0 +1,43 @@
+
+services:
+  postgis:
+    profiles:
+      - postgis
+    image: postgis/postgis:16-3.4
+    hostname: postgis.ny.lon
+    user: postgres
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: polymer
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+
+    configs:
+      - source: init_db
+        target: /docker-entrypoint-initdb.d/init.sql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-d", "polymer"]
+      interval: "3s"
+      timeout: "3s"
+      retries: 30
+    networks:
+      - nylon
+
+  postgis-migrate:
+    profiles:
+      - postgis
+    image: migrate/migrate:v4.17.0
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+
+configs:
+  init_db:
+    file: ./init.sql
+
+volumes:
+  postgis_data:
+

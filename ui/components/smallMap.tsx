@@ -11,7 +11,7 @@ import { Circle as CircleStyle, Stroke, Style } from 'ol/style.js';
 import { Vector as VectorLayer } from 'ol/layer.js';
 import { Button } from '@mui/material';
 
-import { expand_resolutions } from "./helpers"
+import { returnImageUrl, expand_resolutions } from "./helpers"
 
 const TIFF_URL = import.meta.env.VITE_TIFF_URL;
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
@@ -19,9 +19,9 @@ const BUFFER = 250;
 
 function SmallMap({ map_id, gcp, updateGCP }) {
     const mapTargetElement = useRef<HTMLDivElement>(null)
-    const [showMap, setShowMap] = useState(true)
-    const [imageUrl, setImageUrl] = useState("")
+    const [showMap, setShowMap] = useState(false)
     const [clicked, setClicked] = useState(false)
+    const [clipUrl, setClipUrl] = useState(returnImageUrl(map_id, gcp))
     // --
     // MAP layer
 
@@ -93,25 +93,10 @@ function SmallMap({ map_id, gcp, updateGCP }) {
             let new_gcp = { ...gcp };
             new_gcp["coll"] = e.coordinate[0];
             new_gcp["rowb"] = e.coordinate[1];
+            new_gcp['just_edited'] = true
             updateGCP(new_gcp);
         })
-        map.once('rendercomplete', () => {
-            if (clicked) {
 
-            } else {
-                const mapCanvas = map.getViewport().getElementsByTagName('canvas')[0];
-                if (mapCanvas) {
-                    const image = mapCanvas.toDataURL();
-                    setImageUrl(image);
-
-                }
-                if (showMap) {
-                    setShowMap(false)
-                }
-            }
-
-
-        });
         return () => map.setTarget("")
     }, [gcp])
 
@@ -141,42 +126,53 @@ function SmallMap({ map_id, gcp, updateGCP }) {
         if (showMap) return "180px"
         return "200px"
     }
+
     return (
         <>
-            <div className='borderBox' style={{ display: "grid", justifyContent: "center", alignContent: "center", width: returnHeight(), height: "220px", background: returnColor(gcp.color) }}>
-                {showMap ?
-                    <>
-                        <div
-                            ref={mapTargetElement}
-                            className="map"
-                            style={{
-                                border: "1px solid",
-                                borderColor: "red",
-                                width: "200px",
-                                height: returnHeightMap(),
-                                position: "relative"
-                            }} >
-                        </div >
-                        <Button variant="contained" color="success" onClick={() => finishEdit()}>Finish Edits</Button>
-                    </>
+            {clipUrl &&
 
-                    :
+                <div className='borderBox' style={{ display: "grid", justifyContent: "center", alignContent: "center", width: returnHeight(), height: "220px", background: returnColor(gcp.color) }}>
+                    {showMap ?
+                        <>
+                            <div
+                                ref={mapTargetElement}
+                                className="map"
+                                style={{
+                                    border: "1px solid",
+                                    borderColor: "red",
+                                    width: "200px",
+                                    height: returnHeightMap(),
+                                    position: "relative"
+                                }} >
+                            </div >
+                            <Button variant="contained" color="success" onClick={() => finishEdit()}>Finish Edits</Button>
+                        </>
 
-                    <img
-                        src={imageUrl}
-                        alt="Static Map"
-                        style={{
+                        :
+                        <>
 
-                            width: '200px',
-                            height: '200px',
-                            cursor: 'pointer'
-                        }}
-                        onClick={() => show_rerender()}
-                    />
-                }
+                            <img
+                                src={clipUrl}
+                                alt="Loading Clipped Map..."
+                                style={{
+
+                                    width: '200px',
+                                    height: '200px',
+                                    cursor: 'pointer'
+                                }}
+                                onClick={() => show_rerender()}
+                            />
+
+                        </>
 
 
-            </div>
+                    }
+
+
+                </div>
+
+            }
+
         </>
     )
 }

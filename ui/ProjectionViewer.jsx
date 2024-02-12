@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import MapPage from './components/georefViewer.tsx'
-// import MapPage from './components/code_test.tsx';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { dec2dms } from './components/helpers.js'
+
 const _APP_JSON_HEADER = {
   "Access-Control-Allow-Origin": "*",
   'Content-Type': 'application/json',
@@ -12,7 +12,32 @@ function ProjectionViewer() {
   const { map_id } = useParams();
   const [georeferenced, _] = useState(false)
   const [mapData, setMapData] = useState(null)
+
+
+  const getProjectionNames = async (mapper) => {
+    try {
+      const requests = Object.keys(mapper).map(code =>
+        axios.get(`/api/map/get_projection_name/${parseInt(code.split("EPSG:")[1])}`, { headers: _APP_JSON_HEADER })
+      );
+
+      const responses = await Promise.all(requests);
+      responses.forEach(response => {
+        const epsgCode = "EPSG:" + response.config.url.split('/').pop();
+        const projectionName = response.data.projection_name;
+        mapper[epsgCode] = projectionName;
+
+
+      });
+      return mapper
+
+    } catch (error) {
+      console.error('Error fetching projection names:', error);
+    }
+  };
   useEffect(() => {
+    fetchData(map_id)
+  }, [map_id]);
+  function fetchData(map_id) {
     try {
       axios({
         method: 'get',
@@ -20,8 +45,11 @@ function ProjectionViewer() {
         headers: _APP_JSON_HEADER
       }).then((response) => {
         let mapper = {}
+        let crs_name_mapper = {}
+
         response.data["all_gcps"].forEach((element, index) => {
           let color_ = [Math.floor(Math.random() * 255), Math.floor(Math.random() * 255), Math.floor(Math.random() * 255)]
+          crs_name_mapper[element['crs']] = null
           mapper[element['gcp_id']] = {
             "color": color_,
             "x_dms": dec2dms(response.data["all_gcps"][index]['x']),
@@ -32,9 +60,10 @@ function ProjectionViewer() {
           response.data['all_gcps'][index]['y_dms'] = dec2dms(response.data["all_gcps"][index]['y'])
         });
 
-        response.data['proj_info'] = response.data['proj_info'].filter(item => item.status != "failed")
+        response.data['proj_info'] = response.data['proj_info'].filter(item => item.status !== "failed" && item.status !== "duplicate");
 
         response.data["proj_info"].forEach((element, index) => {
+          crs_name_mapper[element['epsg_code']] = null
           element['gcps'].forEach((point, index_) => {
             point['color'] = mapper[point['gcp_id']]['color']
             point['x_dms'] = mapper[point['gcp_id']]['x_dms']
@@ -42,20 +71,28 @@ function ProjectionViewer() {
           })
         })
 
-        setMapData(response.data)
+        getProjectionNames(crs_name_mapper).then(updatedMapper => {
+          response.data["crs_names"] = updatedMapper
+          setMapData(response.data)
+        })
+
+
       })
     } catch {
       console.log('no file found for extracted gcps')
     }
+  }
 
-  }, [])
+
 
   return (
     <>
-      {mapData &&
-        <MapPage map_id={map_id} mapData={mapData} georeferenced={georeferenced} />
+      {mapData ?
+        <MapPage key={map_id} map_id={map_id} mapData={mapData} />
+        :
+        <div>Loading</div>
       }
-      <div>Loading</div>
+
     </>
   );
 }

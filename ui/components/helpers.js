@@ -6,18 +6,50 @@ import WMTSCapabilities from 'ol/format/WMTSCapabilities.js';
 import GeoJSON from 'ol/format/GeoJSON.js';
 import { transform } from 'ol/proj';
 import TileLayer from 'ol/layer/WebGLTile.js';
+import axios from "axios";
 
 import proj4 from 'proj4';
 
 // --
 // Map helpers
 
+export const provenance_mapper = {
+    "bulk_ngmdb_update": "NGMDB",
+    "api_endpoint": "Manual",
+    "bulk_upload": "Jataware Extraction Model",
+    "jataware_extraction": "Jataware Extraction Model",
+    "uncharted_bulk_upload": "Uncharted Extraction Model"
+}
+export const provenance_colors = {
+    "bulk_ngmdb_update": "#446100",
+    "api_endpoint": "#FF0000",
+    "bulk_upload": "#690fda",
+    "jataware_extraction": "#690fda",
+    "uncharted_bulk_upload": "#4B0082"
+}
+
+export function checkIfEdited(gcp) {
+    // if there is a gcp_reference_id that means this gcp was edited and used before
+    // if just_edited is true the user just edited this gcp and it will make a new gcp when used in georeferencing.
+    if (gcp['gcp_reference_id'] !== null && gcp['gcp_reference_id'] !== undefined) {
+        return true
+    } else if (gcp['just_edited'] === true) {
+        return true
+    } else {
+        return false
+    }
+}
+
+export function getColorForProvenance(provenance) {
+    return provenance_colors[provenance] || "#000000"; // Return black if the key is not found
+}
+
 export const handleOpacityChange = function (e, map) {
     const opacity = parseFloat(e.target.value) / 100;
     getLayerById(map, "map-layer").setOpacity(opacity)
 }
 
-export const gcp2pt = function ({ coll, rowb, x, y, crs, gcp_id, color }, map_crs) {
+export const gcp2pt = function ({ coll, rowb, x, y, crs, gcp_id, color, provenance, gcp_provenance_id }, map_crs) {
 
     let coords = [x, y];  // A point in EPSG:4326
 
@@ -42,12 +74,16 @@ export const gcp2pt = function ({ coll, rowb, x, y, crs, gcp_id, color }, map_cr
             gcp_id: gcp_id,
             crs: crs,
             minimize: false,
+            provenance: provenance,
+            gcp_provenance_id: gcp_provenance_id,
             description: 'This is a sample description',
         },
     });
 }
 
-export const gcp2box = function ({ coll, rowb, x, y, crs, gcp_id, color }) {
+
+export const gcp2box = function ({ coll, rowb, x, y, crs, gcp_id, color, provenance, gcp_provenance_id, just_edited }) {
+
     const BUFFER = 150;
 
     if (coll === undefined) console.log('!!! ERROR')
@@ -73,6 +109,9 @@ export const gcp2box = function ({ coll, rowb, x, y, crs, gcp_id, color }) {
             gcp_id: gcp_id,
             crs: crs,
             minimize: false,
+            provenance: provenance,
+            gcp_provenance_id: gcp_provenance_id,
+            just_edited: just_edited,
             description: 'This is a sample description',
         },
     });
@@ -80,7 +119,6 @@ export const gcp2box = function ({ coll, rowb, x, y, crs, gcp_id, color }) {
 
 export const getLayerById = function (map, layerId) {
     let layerFound = null;
-
     map.getLayers().forEach(function (layer) {
         if (layer.get('id') === layerId) {
             layerFound = layer;
@@ -246,5 +284,71 @@ export async function loadWMTSLayer(url) {
     } catch (error) {
         console.error('Error loading WMTS layer:', error);
         return {}
+    }
+}
+
+
+export function sortByGcpId(arrayOfGCPs) {
+    return arrayOfGCPs.slice().sort((a, b) => {
+        const gcpIdA = a.gcp_id;
+        const gcpIdB = b.gcp_id;
+        return gcpIdA.localeCompare(gcpIdB); // Use localeCompare for string comparison
+    });
+}
+
+export function returnImageUrl(map_id, gcp) {
+    return "/api/map/clip-tiff?map_id=" + map_id + "&coll=" + parseInt(gcp['coll']) + "&rowb=" + parseInt(gcp['rowb'])
+}
+
+export function createPath(status, dir) {
+    let path = dir + '/projections/'
+    if (status == "not_georeferenced") {
+        path = dir + '/points/'
+    }
+    if (status == "not_a_map") {
+        path = dir + '/points/'
+    }
+    return path
+}
+
+export const oneMap = async (status, navigate, nav_path) => {
+    let post_data = {
+        "query": "",
+        "page": 1,
+        "size": 1,
+        "georeferenced": true,
+        "validated": false,
+        "not_a_map": false,
+        "random": true
+    }
+    // let nav_path = './projections/'
+    if (status == "not_georeferenced") {
+        post_data["georeferenced"] = false
+    }
+    if (status == "validated") {
+        post_data["validated"] = true
+    }
+    if (status == "not_a_map") {
+        post_data["georeferenced"] = false
+        post_data["not_a_map"] = true
+    }
+
+    try {
+        let { data } = await axios({
+            method: "post",
+            url: "/api/map/maps_search",
+            headers: {
+                "Access-Control-Allow-Origin": "*",
+                "Content-Type": "application/json",
+            },
+            data: post_data
+        })
+        if (data['results'].length > 0) {
+            navigate(nav_path + data["results"][0]['map_id'])
+            navigate(0);
+        }
+
+    } catch (error) {
+        console.error("Error fetching data:", error);
     }
 }

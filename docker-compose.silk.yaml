@@ -1,0 +1,32 @@
+services:
+
+  silk:
+    profiles:
+      - silk
+    image: nylon_silk:dev
+    hostname: silk.ny.lon
+    entrypoint:
+      - uvicorn
+      - silk.http.api:api
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "3000"
+      - --log-config
+      - logging.yaml
+      - --workers
+      - "1"
+      - --root-path
+      - /
+    environment:
+      SILK_S3_ENDPOINT_URL: http://minio.ny.lon:9000
+      SILK_OPENAI_API_KEY: ${OPENAI_API_KEY}
+      AWS_PROFILE: minio
+      SILK_S3_AWS_PROFILE: default
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: "5"
+    networks:
+      - nylon

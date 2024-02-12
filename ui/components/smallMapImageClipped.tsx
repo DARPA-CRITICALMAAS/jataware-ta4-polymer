@@ -6,7 +6,7 @@ import TileLayer from 'ol/layer/WebGLTile.js';
 import GeoTIFF from 'ol/source/GeoTIFF.js';
 import XYZ from 'ol/source/XYZ.js';
 import { Typography, Slider } from '@mui/material';
-import { valuetext, handleOpacityChange, getLayerById } from "./helpers"
+import { getColorForProvenance, valuetext, handleOpacityChange, getLayerById, provenance_mapper } from "./helpers"
 import View from 'ol/View.js';
 import { transformExtent, get as getProjection } from 'ol/proj';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -15,7 +15,7 @@ import Switch from '@mui/material/Switch';
 const TIFF_URL = import.meta.env.VITE_TIFF_URL;
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
-function SmallMapImageClipped({ map_id, proj_info, clippedState, baseMapSources, parentBaseMap }) {
+function SmallMapImageClipped({ map_id, proj_info, clippedState, baseMapSources, parentBaseMap, crs_names }) {
     let bbox = clippedState['clipExentRef']
     let center = clippedState['clippedCenter']
     let sourceProjection = clippedState["clippedProjection"]
@@ -109,13 +109,28 @@ function SmallMapImageClipped({ map_id, proj_info, clippedState, baseMapSources,
         <>
             <div className='borderBox'
                 style={{
-                    display: "grid",
-                    justifyContent: "center",
-                    alignContent: "center",
-                    width: "400px", height: "420px"
+                    justifySelf: "center",
+                    alignSelf: "center",
+                    margin: "10px"
                 }}>
                 <Typography id="continuous-slider" gutterBottom>
-                    Map Projection: {proj_info['epsg_code']}
+                    Provenance:
+                    <span style={{ marginLeft: "5px", marginTop: "5px", color: getColorForProvenance(proj_info['provenance']) }}>
+                        {provenance_mapper[proj_info['provenance']]}
+                    </span>
+                </Typography>
+                <Typography id="continuous-slider"
+                    gutterBottom
+                    style={{ minWidth: "350px", maxWidth: "350px" }}>
+                    Map Projection:
+                    <span style={{ marginLeft: "5px" }}>
+                        {crs_names[proj_info['epsg_code']]}
+                    </span>
+                    <span style={{ marginLeft: "5px" }}>
+                        ({proj_info['epsg_code']})
+                    </span>
+
+
                 </Typography>
                 <Typography id="continuous-slider" gutterBottom>
                     GCPs: {proj_info['gcps'].length}
@@ -137,8 +152,8 @@ function SmallMapImageClipped({ map_id, proj_info, clippedState, baseMapSources,
                     style={{
                         border: "1px solid",
                         borderColor: "red",
-                        width: "300px",
-                        height: "300px",
+                        minWidth: "280px",
+                        height: "260px",
                         position: "relative"
                     }} >
                 </div >

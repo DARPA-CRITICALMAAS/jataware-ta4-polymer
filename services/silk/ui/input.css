@@ -1,0 +1,65 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+@layer base {
+  html {
+    font-family: Proxima Nova, system-ui, sans-serif;
+  }
+
+}
+
+.ol-control {
+  color: black;
+}
+
+
+.bg-pdf-base {
+  background-color: #fff;
+}
+
+
+
+#file-upload.active {
+  /* // When files dragged over
+   @apply shadow-outline-blue border-blue-300;
+ */
+  box-shadow: 0 0 0 3px rgba(164, 202, 254, 0.45);
+  border-color: #a4cafe;
+}
+
+
+.x-file-upload.active {
+  /* // When files dragged over
+   @apply shadow-outline-blue border-blue-300;
+ */
+  box-shadow: 0 0 0 3px rgba(164, 202, 254, 0.45);
+  border-color: #a4cafe;
+  border-color: red;
+}
+
+
+.label-container.htmx-swapping {
+  opacity: 0;
+  transition: opacity 1s ease-out;
+}
+
+.empty-hide:empty {
+  display: none;
+}
+
+.htmx-indicator{
+  opacity:0;
+  transition: opacity 500ms ease-in;
+}
+.htmx-request .htmx-indicator{
+  opacity:1;
+}
+.htmx-request.htmx-indicator{
+  opacity:1;
+}
+.htmx-request .inflight-none{
+  display:none;
+}

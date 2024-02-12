@@ -34,6 +34,7 @@ def s3_client():
 
 @timeit(logger)
 def load_tiff_cache(cache, s3_key):
+    
     if s3_key in cache:
         logger.debug("Loading image from cache: %s", s3_key)
         return cache[s3_key]

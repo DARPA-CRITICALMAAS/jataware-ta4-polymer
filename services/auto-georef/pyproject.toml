@@ -45,6 +45,7 @@ openpyxl = "^3.1.2"
 imagehash = "^4.3.1"
 pillow = "^10.1.0"
 cachetools = "^5.3.2"
+httpx = "^0.26.0"
 
 
 [tool.poetry.scripts]

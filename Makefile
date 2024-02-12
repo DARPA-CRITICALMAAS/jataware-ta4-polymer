@@ -1,4 +1,4 @@
-VERSION := 0.0.35
+VERSION := 0.1.61
 
 # make helpers
 null  :=
@@ -65,6 +65,11 @@ docker-build-ui:
 docker-build-georef:
 	(cd services/auto-georef && docker build -t nylon_georef:dev .)
 
+.PHONY: docker-build-silk
+docker-build-silk:
+	(cd services/silk && docker build -t nylon_silk:dev .)
+
+
 
 .PHONY: gitlab-docker-login
 gitlab-docker-login:| check-GITLAB_USER check-GITLAB_PASS
@@ -101,25 +106,20 @@ docker_buildx-ui:| gitlab-docker-login  ui/.env.production ## build and push ui
 		-f Dockerfile \
 		.)
 
+.PHONY: docker_buildx-silk
+docker_buildx-silk:| gitlab-docker-login  ## build and push silk
+	@echo "building silk"
+	(cd services/silk && \
+		docker buildx build \
+			--platform linux/amd64 \
+		-t registry.gitlab.com/jataware/nylon/silk:${VERSION} \
+		--output type=image,push=true \
+		-f Dockerfile \
+		.)
+
 
 .PHONY: docker_buildx-all
-docker_buildx-all:| docker_buildx-ui docker_buildx-georef
-
-
-.PHONY: docker_buildx-tiler
-docker_buildx-tiler:| gitlab-docker-login
-	(cd services/tiler && \
-		docker buildx build \
-			--platform linux/arm64,linux/amd64 \
-			-t registry.gitlab.com/jataware/nylon/tiler:${VERSION} \
-			--build-arg TILER_VERSION="${VERSION}" \
-			--build-arg TILER_BUILD_DATE="${DT}" \
-			--output type=image,push=true \
-			-f Dockerfile \
-			.)
-
-
-
+docker_buildx-all:| docker_buildx-ui docker_buildx-silk docker_buildx-georef
 
 .PHONY:
 ALL_DOCKER_COMPOSE_FILES:= $(wildcard docker-compose*.yaml)
@@ -134,21 +134,50 @@ endif
 DOCKER_COMPOSE_FILES:=docker-compose.network.yaml \
 	docker-compose.minio.yaml \
 	docker-compose.elastic.yaml \
-	docker-compose.auto_georef.yaml \
+	docker-compose.postgis.yaml \
+	docker-compose.silk.yaml \
+	docker-compose.autogeoref.yaml \
 	$(DOCKER_COMPOSE_LOCALS) \
 	docker-compose.dev.yaml
 
-ALL_PROFILES=default minio elastic
+ALL_PROFILES=default minio elastic postgis silk georef
 
 define all_profiles
 $(subst $(space),$(comma),$(ALL_PROFILES))
 endef
 
+STORAGE_PROFILES=default minio elastic postgis
+
+define storage_profiles
+$(subst $(space),$(comma),$(STORAGE_PROFILES))
+endef
+
+.PHONY: up
+up:
+	docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
+
+.PHONY: up.georef
+up.georef:
+	COMPOSE_PROFILES="georef" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
+
+.PHONY: up.silk
+up.silk:
+	COMPOSE_PROFILES="silk" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
 
 .PHONY: up.a
 up.a:
 	COMPOSE_PROFILES="$(all_profiles)" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
 
+.PHONY: up.s  ## start storage containers only
+up.s:
+	COMPOSE_PROFILES="$(storage_profiles)" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
+
+
 .PHONY: down.a
 down.a:
 	COMPOSE_PROFILES="*" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) down
+
+
+.PHONY: logs
+logs:
+	COMPOSE_PROFILES="$(all_profiles)" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) logs

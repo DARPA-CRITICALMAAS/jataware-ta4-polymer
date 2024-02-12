@@ -1,0 +1,21 @@
+<head>
+  <title>silk</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="{{ root_path }}/static/favicon.svg">
+  <link href="{{ root_path }}/static/css/output.css" rel="stylesheet">
+  <script src="{{ root_path }}/static/js/htmx.js" type="module"></script>
+  <script is:inline>
+    // ☝️ This script prevent the FART effect.
+    if (localStorage.getItem("theme") === null) {
+      document.documentElement.setAttribute("data-theme", "custom");
+    } else {
+      document.documentElement.setAttribute(
+        "data-theme",
+        localStorage.getItem("theme")
+      );
+    }
+  </script>
+  <script src="{{ root_path }}/static/js/themechanger.js"></script>
+</head>
+

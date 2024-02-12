@@ -18,17 +18,16 @@ import { useNavigate } from "react-router-dom";
 import axios from 'axios';
 
 import { Button, Modal, Switch } from '@mui/material';
-import { Card, CardContent, Grid, Typography, Slider, Box, Link } from '@mui/material';
+import { Card, CardContent, Typography, Slider, Box, Link } from '@mui/material';
 
 import "../css/georefViewer.css";
 import SmallMapImage from './smallMapImage'
 import SmallMapImageClipped from './smallMapImageClipped'
-import { register_proj, getLayerById, valuetext, basemapURLS, handleOpacityChange, loadWMTSLayer } from "./helpers"
+import { oneMap, createPath, checkIfEdited, getColorForProvenance, provenance_mapper, register_proj, getLayerById, valuetext, basemapURLS, handleOpacityChange, loadWMTSLayer } from "./helpers"
 
 import { transform, get as getProjection } from 'ol/proj';
 
 import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
 
 import Draw, { createBox } from 'ol/interaction/Draw'
 import { getCenter } from 'ol/extent';
@@ -44,18 +43,16 @@ const _APP_JSON_HEADER = {
     'Content-Type': 'application/json',
 }
 
-function MapPage({ mapData }) {
+function MapPage({ map_id, mapData }) {
     console.log('Map data', mapData)
     const navigate = useNavigate();
     const map_name = mapData['map_info']['map_id']
-    const map_id = mapData['map_info']['map_id']
 
-    document.title = "Nylon Georeferencer Projections -" + map_name;
+    document.title = "Polymer Georeferencer Projections -" + map_name;
 
-    const [map, setMap] = useState()
     const mapTargetElement = useRef<HTMLDivElement>(null)
     const proj_index = useRef(0)
-    const [gcps, setGCPS] = useState(mapData['proj_info'][0]['gcps'])
+    const [gcps, setGCPS] = useState()
     const mapRef = useRef()
     const currZoomRef = useRef()
 
@@ -69,39 +66,40 @@ function MapPage({ mapData }) {
     })
 
     const [openReview, setOpenReview] = useState(false);
-
     const [showGCPs, setShowGCPs] = useState(true);
     const [showClippedMaps, setShowClippedMaps] = useState(false)
     const [showButtonForClip, setShowButtonForClip] = useState(false)
 
-    const baseMapSwitchRef = useRef({})
     const [baseMapSwitch, setBaseMapSwitch] = useState()
     const [baseMapSources, setBaseMapSources] = useState()
+    const [baseSelected, setBaseSelected] = useState('USGSTopo');
+    const [currentProj, setCurrentProj] = useState()
 
-    const [baseSelected, setBaseSelected] = useState('Satellite');
-
-
-    const currCenterRef = useRef([mapData['proj_info'][0]['gcps'][0]['x'], mapData['proj_info'][0]['gcps'][0]['y']])
-
-    const [currentProj, setCurrentProj] = useState(mapData['proj_info'][0]['epsg_code'])
-    const Proj_Ref = useRef(mapData['proj_info'][0]['epsg_code'])
+    const currCenterRef = useRef()
+    const Proj_Ref = useRef()
+    const baseMapSwitchRef = useRef({})
 
     const handleClose = () => {
         setOpenReview(false);
     };
 
-    // add clip layer for comparing projections
-    const clip_source = new VectorSource({ wrapX: false });
-    const clip_layer = new VectorLayer({
-        id: "bounding-box",
-        source: clip_source,
+    const base_source = new XYZ({
+        url: `https://api.maptiler.com/tiles/satellite/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
+        crossOrigin: '',
     });
 
+    const base_layer = new TileLayer({
+        id: "Satellite",
+        source: base_source,
+        visible: false
+    });
+    const XYZ_base_layers = { "Satellite": base_layer };
+    const XYZ_source_layers = { "Satellite": base_source }
 
     const map_source = new GeoTIFF({
         sources: [
             {
-                url: `${TIFF_URL}/cogs/${map_id}/${map_id}_${mapData['proj_info'][proj_index.current]['proj_id']}.pro.cog.tif`,
+                url: `${TIFF_URL}/cogs/${map_id}/${map_id}_${mapData['proj_info'][0]['proj_id']}.pro.cog.tif`,
                 nodata: 0,
             }
         ],
@@ -113,23 +111,12 @@ function MapPage({ mapData }) {
         id: "map-layer",
         source: map_source,
     })
-
-
-    // BASE layer
-
-    const base_source = new XYZ({
-        url: `https://api.maptiler.com/tiles/satellite/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
-        crossOrigin: '',
+    const clip_source = new VectorSource({ wrapX: false });
+    const clip_layer = new VectorLayer({
+        id: "bounding-box",
+        source: clip_source,
     });
 
-    const base_layer = new TileLayer({
-        id: "Satellite",
-        source: base_source,
-        visible: true
-    });
-    const XYZ_base_layers = { "Satellite": base_layer };
-    const XYZ_source_layers = { "Satellite": base_source }
-    // historic base layer
 
     async function register_projs(codes) {
         for (let code of codes) {
@@ -142,6 +129,10 @@ function MapPage({ mapData }) {
         let allWMTSSourceLayers = {}
         for (let url of basemapURLS) {
             let [resp, sources] = await loadWMTSLayer(url)
+            if (url.includes("USGSTopo")) {
+                resp['USGSTopo'].setVisible(true)
+            }
+
             allWMTSBaseLayers = { ...allWMTSBaseLayers, ...resp };
             allWMTSSourceLayers = { ...allWMTSSourceLayers, ...sources };
 
@@ -157,12 +148,19 @@ function MapPage({ mapData }) {
         }
     }
 
-
     // Render map
     useEffect(() => {
+        // need to update values here when map_id changes
+        setGCPS(mapData['proj_info'][0]['gcps'])
+        mapRef.current = null
+        proj_index.current = 0
+        setCurrentProj(mapData['proj_info'][0]['epsg_code'])
+        Proj_Ref.current = mapData['proj_info'][0]['epsg_code']
+        currCenterRef.current = [mapData['proj_info'][0]['gcps'][0]['x'], mapData['proj_info'][0]['gcps'][0]['y']]
 
-        let codes = ["EPSG:4267", "EPSG:26711"]
+        let codes = ["EPSG:4267"]
         for (let proj_ of mapData['proj_info']) {
+
             codes.push(proj_['epsg_code'])
         }
 
@@ -173,7 +171,7 @@ function MapPage({ mapData }) {
                 return buildWMTSBaseLayers()
             }).then(([WMTS_base_layers, WMTS_source_layers]) => {
                 var sourceProjection = getProjection(mapData['proj_info'][0]['gcps'][0]['crs']);
-                var targetProjection = getProjection(mapData['proj_info'][proj_index.current]['epsg_code']);
+                var targetProjection = getProjection(mapData['proj_info'][0]['epsg_code']);
                 let all_layers = [
                     ...Object.values(XYZ_base_layers),
                     ...Object.values(WMTS_base_layers),
@@ -183,12 +181,13 @@ function MapPage({ mapData }) {
                 baseMapSwitchRef.current = { ...XYZ_base_layers, ...WMTS_base_layers }
                 setBaseMapSwitch({ ...XYZ_base_layers, ...WMTS_base_layers })
                 setBaseMapSources({ ...WMTS_source_layers })
+
                 const map = new Map({
                     layers: all_layers,
                     view: new View({
                         center: transform(currCenterRef.current, sourceProjection, targetProjection),
                         zoom: 10,
-                        projection: mapData['proj_info'][proj_index.current]['epsg_code']
+                        projection: mapData['proj_info'][0]['epsg_code']
                     })
                 })
                 currZoomRef.current = map.getView().getZoom();
@@ -227,9 +226,7 @@ function MapPage({ mapData }) {
             })
 
         return
-    }, [])
-
-
+    }, [map_id])
 
     function nextProjection(projIndex = null) {
         // update projection index
@@ -275,7 +272,13 @@ function MapPage({ mapData }) {
         var sourceProjection = getProjection(old_proj);
         var targetProjection = getProjection(proj_);
         newView.setCenter(transform(currCenterRef.current, sourceProjection, targetProjection))
-        newView.setZoom(currZoomRef.current)
+
+        // limit to zoom to 16.4 to work with base layers 
+        if (currZoomRef.current > 16.4) {
+            newView.setZoom(16.4)
+        } else {
+            newView.setZoom(currZoomRef.current)
+        }
 
     }
 
@@ -292,7 +295,7 @@ function MapPage({ mapData }) {
         }).then((response) => {
             handleClose();
             if (status == "success") {
-                next()
+                oneMap("georeferenced", navigate, createPath("georeferenced", '..'))
             } else {
                 setTimeout(() => {
                     window.location.reload()
@@ -303,26 +306,6 @@ function MapPage({ mapData }) {
             alert(e)
         })
 
-    }
-
-    function next() {
-        axios({
-            method: "get",
-            url: "/api/map/random",
-            params: { "georeferenced": true },
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Content-Type": "application/json",
-            },
-        })
-            .then((response) => {
-                let data = response.data;
-                navigate("../projections/" + data["map"]);
-                navigate(0);
-            })
-            .catch((error) => {
-                console.error("Error fetching data:", error);
-            });
     }
 
     const switchRightPanel = () => {
@@ -410,7 +393,6 @@ function MapPage({ mapData }) {
         }
     }
 
-
     return (
         <>
             <Modal
@@ -455,7 +437,7 @@ function MapPage({ mapData }) {
                 </Box>
             </Modal>
 
-            <div className="flex-container" >
+            <div key={'flex' + map_id} className="flex-container" >
                 <div className="flexChild">
                     <div className="control_panel" id="control-panel">
                         <Box sx={{ width: 220 }}>
@@ -485,6 +467,7 @@ function MapPage({ mapData }) {
                         </Box>
                     </div>
                     <div
+                        key={'map' + map_id}
                         ref={mapTargetElement}
                         className="map"
                         style={{
@@ -514,15 +497,36 @@ function MapPage({ mapData }) {
                         <Button
                             className="nextButton"
                             color="primary"
-                            onClick={() => next()}
+                            onClick={() => oneMap("georeferenced", navigate, createPath("georeferenced", '..'))}
                         >
                             Next Map
                         </Button>
                         <br />
-                        <Link href={`${TIFF_URL}/cogs/${map_name}/${map_name}_${mapData['proj_info'][proj_index.current]['proj_id']}.pro.cog.tif`}>DOWNLOAD PROJECTION</Link>
-
+                        <Link
+                            href={`${TIFF_URL}/cogs/${map_name}/${map_name}_${mapData['proj_info'][proj_index.current]['proj_id']}.pro.cog.tif`}
+                            style={{ marginBottom: "10px" }}
+                        >
+                            Download: Reprojected Image (tiff)
+                        </Link>
+                        <Typography variant="body2" style={{ fontSize: "1.2rem", marginBottom: "5px", marginTop: "5px" }}>
+                            Projection Provenance:
+                            <span style={{ color: getColorForProvenance(mapData['proj_info'][proj_index.current]['provenance']) }}>
+                                {" " + provenance_mapper[mapData['proj_info'][proj_index.current]['provenance']]}
+                            </span>
+                        </Typography>
                         <Typography variant="body2" style={{ fontSize: "1.2rem", marginBottom: "5px" }}>
-                            Projection code: {mapData['proj_info'][proj_index.current]['epsg_code']}
+                            Projection:
+                            <span style={{ marginLeft: "5px" }}>
+                                {mapData['crs_names'][mapData['proj_info'][proj_index.current]['epsg_code']]}
+                            </span>
+                            <span style={{ marginLeft: "5px" }}>
+                                <a href={`https://epsg.io/${mapData['proj_info'][proj_index.current]['epsg_code'].split("EPSG:")[1]}`} target="_blank" rel="noopener noreferrer">
+                                    ({mapData['proj_info'][proj_index.current]['epsg_code']})
+                                </a>
+                            </span>
+
+
+
                         </Typography>
                         <FormControlLabel control={<Switch checked={!showGCPs} onChange={() => { switchRightPanel() }} />} label={showGCPs ? "Compare Clipped Areas" : "View GCPs"} />
 
@@ -533,8 +537,8 @@ function MapPage({ mapData }) {
                                         gcps.map((gcp, i) => {
                                             return <div key={gcp.gcp_id}>
                                                 <div className="container_card">
-                                                    <GCPCardSummary gcp={gcp} />
-                                                    <SmallMapImage map_name={map_name} gcp={gcp} />
+                                                    <GCPCardSummary gcp={gcp} crs_names={mapData['crs_names']} />
+                                                    <SmallMapImage map_id={map_id} gcp={gcp} />
                                                 </div>
                                             </div>
                                         })
@@ -562,6 +566,7 @@ function MapPage({ mapData }) {
                                                         clippedState={clippedState}
                                                         baseMapSources={baseMapSources}
                                                         parentBaseMap={baseSelected}
+                                                        crs_names={mapData['crs_names']}
                                                     />
                                                     <Button onClick={() => nextProjection(i)}>View in Main Window</Button>
                                                 </div>
@@ -580,24 +585,66 @@ function MapPage({ mapData }) {
 
 export default MapPage;
 
-function GCPCardSummary({ gcp }) {
+function GCPCardSummary({ gcp, crs_names }) {
     return (
-        <Card variant="outlined" className="card" style={{ padding: '8px' }}>
+        <Card variant="outlined" style={{ padding: '8px', minWidth: "300px" }}>
             <CardContent>
-                <Typography variant="body2" style={{ fontSize: "1.2rem", marginBottom: "5px" }}>
-                    <b>CRS:</b> {gcp.crs}
+
+                <Typography variant="caption" display="block" gutterBottom style={{ fontWeight: 'bold', fontSize: "1.2rem" }}>
+                    Provenance:
                 </Typography>
-                <Grid>
-                    <Grid item xs={4}>
-                        <Typography variant="caption" display="block" gutterBottom style={{ fontWeight: 'bold', fontSize: "1.2rem" }}>
-                            Coords DMS:
-                        </Typography>
-                        <Typography variant="body2" style={{ fontSize: '1.2rem', backgroundColor: "#E0E0E0", borderRadius: "10px", padding: "10px" }}>
-                            <>X: {LocationInput("x_dms", gcp)} , </>
-                            <>Y: {LocationInput("y_dms", gcp)} </>
-                        </Typography>
-                    </Grid>
-                </Grid>
+                <Typography
+                    style={{
+                        fontSize: '1.2rem',
+
+                        padding: "5px",
+                        margin: "5px",
+                        maxWidth: "250px"
+                    }}>
+                    <span style={{ color: getColorForProvenance(gcp.provenance) }}>
+                        {" " + provenance_mapper[gcp.provenance]}
+                    </span>
+                    <span style={{ color: "#FF8C00" }}>{checkIfEdited(gcp) && " (edited)"}</span>
+                </Typography>
+                <Typography variant="body2" style={{ fontSize: "1.2rem", marginBottom: "5px" }}>
+                    <b>CRS:</b>
+                    <span style={{ marginLeft: "5px" }}>
+                        {crs_names[gcp.crs]}
+                    </span>
+                    <span style={{ marginLeft: "5px" }}>
+                        ({gcp.crs})
+                    </span>
+                </Typography>
+
+
+                <Typography variant="caption" display="block" gutterBottom style={{ fontWeight: 'bold', fontSize: "1.2rem" }}>
+                    Coords DMS:
+                </Typography>
+                <Typography
+                    variant="body2"
+                    style={{
+                        fontSize: '1.2rem',
+                        backgroundColor: "#E0E0E0",
+                        borderRadius: "10px",
+                        padding: "5px",
+                        margin: "5px",
+                        maxWidth: "250px"
+                    }}>
+                    <>X: {LocationInput("x_dms", gcp)}</>
+                </Typography>
+                <Typography
+                    variant="body2"
+                    style={{
+                        fontSize: '1.2rem',
+                        backgroundColor: "#E0E0E0",
+                        borderRadius: "10px",
+                        padding: "5px",
+                        margin: "5px",
+                        maxWidth: "250px"
+                    }}>
+                    <>Y: {LocationInput("y_dms", gcp)} </>
+                </Typography>
+
             </CardContent>
         </Card >
     );

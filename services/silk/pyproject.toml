@@ -1,0 +1,56 @@
+[tool.poetry]
+name = "silk"
+version = "0.1.0"
+description = ""
+authors = ["scott <scott@jataware.com>"]
+readme = "README.md"
+packages = [
+         {include = "silk"},
+         {include = "silk/**/*.py"}
+ ]
+
+[tool.poetry.dependencies]
+python = "^3.11 <3.12"
+uvicorn = "^0.23.2"
+fastapi = "^0.103.0"
+pydantic-settings = "^2.0.3"
+boto3 = "^1.28.52"
+pyyaml = "^6.0.1"
+pymupdf = "1.23.4"
+jinja2 = "^3.1.2"
+datasets = "^2.14.5"
+pillow = "^10.1.0"
+matplotlib = "^3.8.0"
+python-multipart = "^0.0.6"
+
+# img2table = "^1.2.2"
+# transformers = "^4.34.0"
+# torch = "^2.1.0"
+
+openai = "^0.28.1"
+sqlalchemy = "^2.0.25"
+httpx = "^0.26.0"
+aiofiles = "^23.2.1"
+pyzotero = "^1.5.18"
+cachetools = "^5.3.2"
+
+
+[tool.poetry.scripts]
+dev = "dev.run:main"
+format = "dev.script:format"
+lint = "dev.script:lint"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.7.0"
+flake8 = "^6.1.0"
+isort = "^5.12.0"
+flake8-print = "^5.0.0"
+autoflake = "^2.2.0"
+uvicorn = "^0.23.2"
+ipython = "^8.16.1"
+mypy = "^1.6.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

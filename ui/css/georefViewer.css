@@ -7,17 +7,17 @@
     z-index: 1;
     border-radius: 25px;
     background-color: #57799a;
-    color: white;
+    color: black;
     opacity: 0.8;
 }
 
 .container_card {
     width: 100%;
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: 3fr 1fr;
     grid-gap: 20px;
     margin-bottom: 10px;
-    align-items: center;
+    align-items: stretch;
 }
 
 

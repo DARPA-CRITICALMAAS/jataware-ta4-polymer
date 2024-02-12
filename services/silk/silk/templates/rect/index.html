@@ -1,0 +1,94 @@
+{% extends "shared/_page.html" %}
+{% block main_content %}
+<div class="container mx-4 flex flex-1" hx-ext="response-targets">
+  <div class="flex flex-row w-full">
+    <div class="flex flex-col m-4 w-7/12 max-h-[98%] overflow-scroll">
+      <div class="pb-2">
+        <a class="flex link link-primary no-underline" href="/d/{{ doc_id }}/{{ page_num }}">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"> <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>
+          <span class=""> Back</span>
+        </a>
+      </div>
+
+      <div class="mb-4 text-sm">Area Selection</div>
+      <div class="px-4 mb-4 w-full">
+        <img src="/svg/pdf/{{doc_id}}/{{page_num}}/{{x0}}/{{y0}}/{{x1}}/{{y1}}"
+             class="bg-pdf-base max-h-[600px]" loading="lazy">
+      </div>
+      <div class="mb-4 text-sm">Text Extracted</div>
+      <div class="flex flex-col px-4">
+        <pre class="p-2 text-xs font-mono bg-neutral text-neutral-content whitespace-normal">
+          {{ extract_text }}
+        </pre>
+      </div>
+
+      {% if annotation_type == "txt" %}
+      <div class="flex flex-col mt-4">
+        <form
+          hx-ext="json-enc"
+          hx-post="/doc/ask/gpt/stream"
+          hx-params="prompt,content"
+          hx-target="#gpt_response"
+          hx-swap="outerHTML"
+          class="flex-1">
+          <input type="hidden" name="content" value="{{ extract_text }}">
+          <textarea name="prompt" placeholder="Ask Assistant"
+                    class="textarea textarea-bordered textarea-lg w-full leading-normal text-sm"></textarea>
+          <button class="gpt-button btn btn-primary">Ask</button>
+        </form>
+
+        <div id="gpt_response"></div>
+
+      </div>
+
+      {% endif %}
+
+      {% if annotation_type == "tbl" %}
+      <div id="c" class="flex flex-col mt-4 px-4">
+        <button
+          hx-get="/partial/gpt/table/{{doc_id}}/{{page_num}}/{{x0}}/{{y0}}/{{x1}}/{{y1}}"
+          hx-trigger="click delay:50ms"
+          hx-swap="outerHTML"
+          hx-indicator="#c"
+          hx-target="closest div"
+          class="btn btn-primary inflight-none">Extract Table</button>
+        <div id="spinner" class="htmx-indicator">
+          <span class="loading loading-infinity loading-md"></span>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if annotation_type == "img" %}
+      <div class="flex flex-col mt-4 px-4">
+        ...
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="flex flex-col m-4 w-7/12">
+      <div class="labels-wrapper">
+        <div class="flex flex-col w-full">
+          <div class="flex flex-row w-full mr-4 mb-4">
+            <span class="text-sm">Labels</span>
+          </div>
+
+          <div class="flex flex-row w-full mr-4"
+               hx-get="/partial/r/{{ annotation_type }}/labels/{{ doc_id }}/{{ page_num }}/{{ x0 }}/{{ y0 }}/{{ x1 }}/{{ y1 }}"
+               hx-trigger="load"
+               hx-swap="outerHTML"
+               ></div>
+        </div>
+
+        <div
+          hx-get="/partial/r/{{ annotation_type }}/labels/form/{{ doc_id }}/{{ page_num }}/{{ x0 }}/{{ y0 }}/{{ x1 }}/{{ y1 }}"
+          hx-swap="outerHTML"
+          hx-trigger="load"
+          >
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ root_path }}/static/js/alpine.js" type="module"></script>
+{% endblock %}

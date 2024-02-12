@@ -1,0 +1,31 @@
+
+services:
+
+  georef:
+    profiles:
+      - georef
+    image: nylon_georef:dev
+    entrypoint:
+      - uvicorn
+      - auto_georef.http.api:api
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "3000"
+      - --log-config
+      - logging.yaml
+      - --workers
+      - "1"
+      - "--reload"
+    environment:
+      AUTOGEOREF_MAPBOX_KEY: ${MAPBOX_KEY}
+      AUTOGEOREF_TILES_SERVER: http://tiles.${INTERNAL_DOMAIN}/tiles
+      AUTOGEOREF_TILES_SERVER_API: http://tiles.${INTERNAL_DOMAIN}/api
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: "5"
+    networks:
+      - nylon
+

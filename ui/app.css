@@ -1,19 +1,19 @@
 body {
-    margin: 0;
-    font-family: monospace;
-    overflow: hidden;
+  margin: 0;
+  font-family: monospace;
+  overflow: hidden;
 }
 
 .flex-container {
-    position: absolute;
-    display: flex;
-    height: 100%;
-    width: 100%;
+  position: absolute;
+  display: flex;
+  height: 100%;
+  width: 100%;
 }
 
 .flex-child>ul>li {
-    border: 1px solid black;
-    padding: 5px;
+  border: 1px solid black;
+  padding: 5px;
 }
 
 .spinner {
@@ -31,17 +31,20 @@ body {
   0% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
+
   100% {
     background-position: 0% 50%;
   }
 }
 
-.spinner > div {
+.spinner>div {
   margin: 15px;
 }
-.spinner > div:nth-child(2) {
+
+.spinner>div:nth-child(2) {
   height: 200px;
 }

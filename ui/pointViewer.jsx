@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import MapPage from './components/mapExtraction.tsx'
-import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { dec2dms } from './components/helpers.js'
+import { useParams } from "react-router-dom";
 
 // import  dec2dms  from './components/helpers.js'
 
@@ -15,6 +15,10 @@ function PointViewer() {
     const [mapData, setMapData] = useState(null)
 
     useEffect(() => {
+        fetchData(map_id)
+    }, [map_id]);
+
+    function fetchData(map_id) {
         try {
             axios({
                 method: 'GET',
@@ -22,6 +26,7 @@ function PointViewer() {
                 headers: _APP_JSON_HEADER
             }).then((response) => {
                 let mapper = {}
+                response.data["provenances"] = []
                 response.data["all_gcps"].forEach((element, index) => {
                     let color_ = [Math.floor(Math.random() * 255), Math.floor(Math.random() * 255), Math.floor(Math.random() * 255)]
                     mapper[element['gcp_id']] = {
@@ -32,42 +37,28 @@ function PointViewer() {
                     response.data["all_gcps"][index]['color'] = color_
                     response.data['all_gcps'][index]['x_dms'] = dec2dms(response.data["all_gcps"][index]['x'])
                     response.data['all_gcps'][index]['y_dms'] = dec2dms(response.data["all_gcps"][index]['y'])
+
+                    response.data['all_gcps'][index]['just_edited'] = false
+
+                    if (response.data["provenances"].includes(response.data["all_gcps"][index]['provenance'])) {
+                        // pass
+                    } else {
+
+                        response.data["provenances"].push(response.data["all_gcps"][index]['provenance'])
+                    }
                 });
-
-                if (response.data["proj_info"].length < 1) {
-                    response.data["latest_proj"] = { "gcps": response.data["all_gcps"] }
-                } else {
-                    let latestDate = new Date(response.data["proj_info"][0]["created"])
-                    response.data["latest_proj"] = response.data["proj_info"][0]
-                    response.data["proj_info"].forEach((element, index) => {
-                        element['gcps'].forEach((point, index_) => {
-                            point['color'] = mapper[point['gcp_id']]['color']
-                            point['x_dms'] = mapper[point['gcp_id']]['x_dms']
-                            point['y_dms'] = mapper[point['gcp_id']]['y_dms']
-                        })
-                        let currentDate = new Date(element['created']);
-                        if (currentDate > latestDate) {
-                            latestDate = currentDate;
-                            response.data["latest_proj"] = element
-                        }
-                    })
-
-                }
-
-
                 setMapData(response.data)
             })
         } catch {
             console.log('AN ERROR OCCURED')
         }
 
-    }, [])
+    }
 
     return (
         <>
             {mapData &&
-                <MapPage mapData={mapData} />
-
+                <MapPage key={map_id} mapData={mapData} />
             }
         </>
     );

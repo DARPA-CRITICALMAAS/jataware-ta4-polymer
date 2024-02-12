@@ -1,0 +1,21 @@
+{% extends "shared/_page.html" %}
+{% block main_content %}
+
+
+<div class="flex flex-col w-1/2 my-8">
+  <div id="redirect"></div>
+  <div id="disconnect">
+    <div hx-ext="sse" sse-connect="{{ connect }}"
+      <span>Downloading please wait. Do not refresh or close your browser.</span>
+      <div sse-swap="progress">
+        <progress class="progress progress-warning w-56" value="0" max="100"></progress>
+      </div>
+      <div class="text-xs">bytes: <span sse-swap="bytes">0</span></div>
+      <span sse-swap="redirect" hx-target="#redirect"></span>
+      <span sse-swap="fin" hx-target="#disconnect"></span>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+

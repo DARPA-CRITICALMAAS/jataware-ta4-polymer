@@ -1,0 +1,82 @@
+{% extends "shared/_page.html" %}
+{% block main_content %}
+<div class="container mx-4 flex flex-1"
+     x-data="{
+             doc_id: '{{ doc_id }}',
+             page_num: {{ page_num }},
+             x0: {{ x0 }},
+             x1: {{ x1 }},
+             y0: {{ y0 }},
+             y1: {{ y1 }},
+             get svg_url() {
+               return `/svg/pdf/${this.doc_id}/${this.page_num}/${this.x0}/${this.y0}/${this.x1}/${this.y1}`
+             }
+             }">
+  <div class="flex flex-row w-full">
+    <div class="flex flex-col m-4 w-5/12 max-h-[98%] overflow-scroll">
+      <div class="pb-4">
+        <a class="flex link link-secondary no-underline" href="/d/{{ doc_id }}/{{ page_num }}">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"> <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>
+          <span class="">Back</span>
+        </a>
+      </div>
+
+      <div>Table Selection Area</div>
+      <div class="p-4 w-full">
+        <img :src="svg_url" class="bg-pdf-base max-h-[600px]" loading="lazy">
+      </div>
+
+      <div>Table Extracted</div>
+      <div hx-get="/gpt/table/{{doc_id}}/{{page_num}}/{{x0}}/{{y0}}/{{x1}}/{{y1}}"
+           hx-swap="outerHTML"
+           hx-trigger="load delay:50ms">
+        <span class="loading loading-spinner loading-md"></span>
+      </div>
+    </div>
+
+    <div class="flex flex-col m-4 grow">
+      <div class="w-96">
+        <label class="form-control w-full max-w-xs">
+          <div class="label">
+            <span class="label-text">Select</span>
+          </div>
+          <select class="select select-bordered">
+            <option disabled selected>Pick one</option>
+            <option>1</option>
+            <option>2</option>
+            <option>3</option>
+            <option>4</option>
+            <option>5</option>
+          </select>
+        </label>
+      </div>
+      <div class="w-96">
+        <label class="form-control w-full max-w-xs">
+          <div class="label">
+            <span class="label-text">Value</span>
+          </div>
+          <input type="text" placeholder="Type here" class="input input-bordered w-full max-w-xs" />
+        </label>
+      </div>
+      <div class="w-96">
+        <label class="form-control w-full max-w-xs">
+          <div class="label">
+            <span class="label-text">Comment</span>
+          </div>
+          <textarea class="textarea textarea-bordered h-24" placeholder="Comment"></textarea>
+        </label>
+      </div>
+      <div class="w-96">
+        <label class="form-control w-full max-w-xs">
+          <div class="label">
+
+          </div>
+          <button class="btn w-full btn-primary max-w-xs">Save</button>
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/static/js/alpine.js"></script>
+{% endblock %}

@@ -70,3 +70,8 @@ loggers:
     propagate: False
     handlers:
       - console
+  elasticsearch:
+    level: INFO
+    propagate: False
+    handlers:
+      - console

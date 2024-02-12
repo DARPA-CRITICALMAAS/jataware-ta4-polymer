@@ -1,0 +1,10 @@
+version: '3'
+services:
+  georef:
+    ports:
+      - 3000:3000
+    volumes:
+      - ./services/auto-georef:/home/apps/auto-georef
+      - ./aws/credentials:/home/apps/.aws/credentials
+    env_file:
+      - ./services/auto-georef/.env

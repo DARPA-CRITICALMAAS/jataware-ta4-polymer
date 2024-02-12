@@ -1,0 +1,50 @@
+<div class="mt-4 flex flex-col"
+     x-data="{
+             tocsv() {
+               let data = $refs.text.value;
+               let file = new Blob([data], { type: 'text/csv' });
+               let link = document.createElement('a');
+               link.download = 'data.csv';
+               let url = window.URL.createObjectURL(file);
+               link.href = url;
+               link.style.display = 'none';
+               document.body.appendChild(link);
+               link.click();
+               document.body.removeChild(link);
+             }
+             }">
+
+  <div class="mb-4 px-2 text-sm">csv</div>
+  <div class="px-4">
+    <textarea x-ref="text" name="extract_text" class="h-60 text-xs w-full">
+      {{ extract_text }}
+    </textarea>
+  </div>
+
+  <div class="flex flex-row justify-between px-4">
+    <div>
+      <button
+        hx-post="/partial/r/table/refresh"
+        hx-trigger="click delay:50ms"
+        hx-swap="innerHTML"
+        hx-target="#table"
+        hx-target-*="#table"
+        hx-include="[name='extract_text']"
+        class="btn btn-primary">Refresh Table</button>
+      <div id="any-errors"></div>
+    </div>
+
+    <div class="mb-2">
+      <a @click="tocsv" class="link link-primary text-sm">download csv</a>
+    </div>
+  </div>
+</div>
+
+<div class="divider mx-2 mb-2"></div>
+
+<div id="table" class="flex flex-col mr-2 px-4">
+  {{ extract_table|safe }}
+</div>
+
+
+

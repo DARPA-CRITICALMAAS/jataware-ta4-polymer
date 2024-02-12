@@ -19,15 +19,15 @@ import { useNavigate } from "react-router-dom";
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
-import { Button } from '@mui/material';
+import { Button, Modal } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
-import { Card, CardContent, TextField, Grid, Typography, Slider, Box, Link } from '@mui/material';
+import { Card, CardContent, TextField, Grid, Typography, Slider, Box } from '@mui/material';
 
 import "../css/mapExtraction.css";
 import epsg_data from '../assets/EPSG_CODES_verbose.json'
 import SmallMap from './smallMap'
-import { dec2dms, dms2dec, register_proj, getLayerById, expand_resolutions, valuetext, gcp2box, handleOpacityChange } from "./helpers"
-
+import { sortByGcpId, checkIfEdited, getColorForProvenance, provenance_mapper, dec2dms, dms2dec, register_proj, getLayerById, expand_resolutions, valuetext, gcp2box, handleOpacityChange, oneMap, createPath } from "./helpers"
+import { FormGroup, Checkbox, FormControlLabel } from '@mui/material';
 // Params
 const TIFF_URL = import.meta.env.VITE_TIFF_URL;
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
@@ -38,39 +38,6 @@ const _APP_JSON_HEADER = {
     'Content-Type': 'application/json',
 }
 
-// --
-// Helpers
-function gcp2pt_start({ coll, rowb, x, y, crs, gcp_id, color }) {
-    const BUFFER = 150;
-
-    if (coll === undefined) console.log('!!! ERROR')
-    if (rowb === undefined) console.log('!!! ERROR')
-
-    return {
-        type: 'Feature',
-        geometry: {
-            type: 'Polygon',
-            coordinates: [[
-                [coll - BUFFER, rowb - BUFFER],
-                [coll + BUFFER, rowb - BUFFER],
-                [coll + BUFFER, rowb + BUFFER],
-                [coll - BUFFER, rowb + BUFFER],
-                [coll - BUFFER, rowb - BUFFER]]]
-        },
-        properties: {
-            color: color,
-            coll: coll,
-            rowb: rowb,
-            x: x,
-            y: y,
-            gcp_id: gcp_id,
-            crs: crs,
-            minimize: false,
-            description: 'This is a sample description',
-        },
-    }
-}
-
 
 function MapPage({ mapData }) {
     console.log(mapData)
@@ -79,11 +46,12 @@ function MapPage({ mapData }) {
     const [loading, setLoading] = useState(false)
     const mapTargetElement = useRef<HTMLDivElement>(null)
     const [map, setMap] = useState<Map | undefined>()
-    const [gcps, setGCPs] = useState(mapData['latest_proj']['gcps']);
+    const [gcps, setGCPs] = useState([]);
     const [map_crs, setMapCRS] = useState(null);
-    const [showExtractButton, setShowExtractButton] = useState(true)
+    // const [showExtractButton, setShowExtractButton] = useState(true)
     const [georeferenced, setGeoreferenced] = useState(false)
     const [isProjected, setProjected] = useState(mapData['map_info']['georeferenced']);
+    const [provenanceOption, setProvenanceOption] = useState([])
 
     const [showOCR, setShowOCR] = useState(false)
     const [EPSGs, setEPSGs] = useState([])
@@ -92,6 +60,7 @@ function MapPage({ mapData }) {
     const navigate = useNavigate();
     const drawRef = useRef()
     const mapRef = useRef()
+
     let draw;
 
 
@@ -113,17 +82,6 @@ function MapPage({ mapData }) {
     let used_gcps = {
         'type': 'FeatureCollection',
         'features': []
-    }
-    for (let gcp of mapData['latest_proj']['gcps']) {
-        used_gcps['features'].push(gcp2pt_start({
-            "coll": gcp['coll'],
-            "rowb": gcp['rowb'],
-            "x": gcp['x'],
-            "y": gcp['y'],
-            "crs": gcp['crs'],
-            "gcp_id": gcp['gcp_id'],
-            "color": gcp['color']
-        }))
     }
     const vector_source = new VectorSource({
         features: new GeoJSON().readFeatures(used_gcps)
@@ -192,6 +150,11 @@ function MapPage({ mapData }) {
 
     }
 
+    function ensureString(value) {
+        return value === null || value === undefined ? '' : value;
+    }
+
+
     function project(gcps) {
         if (map_crs == null) {
             alert("Map CRS required!");
@@ -208,6 +171,9 @@ function MapPage({ mapData }) {
                 x: gcp.x,
                 y: gcp.y,
                 crs: gcp.crs.split("__")[0],
+                provenance: gcp.provenance,
+                gcp_reference_id: ensureString(gcp.gcp_reference_id),
+                map_id: map_id
             }))
 
             // project
@@ -261,7 +227,7 @@ function MapPage({ mapData }) {
     function map_onClick(e) {
         let [coll, rowb] = e.coordinate;
         if (drawRef.current.values_.active != true) {
-            setGCPs([...gcps, {
+            setGCPs(sortByGcpId([...gcps, {
                 gcp_id: "manual_" + uuidv4(),
                 rowb: Math.floor(rowb),
                 coll: Math.floor(coll),
@@ -270,14 +236,16 @@ function MapPage({ mapData }) {
                 x_dms: null,
                 y_dms: null,
                 crs: null,
+                provenance: "api_endpoint",
+                gcp_reference_id: null,
                 color: [Math.floor(Math.random() * 255), Math.floor(Math.random() * 255), Math.floor(Math.random() * 255)]
-            }])
+            }]))
         }
     }
 
     // Render map
     useEffect(() => {
-        document.title = "Nylon Georeferencer Extractions - " + map_name;
+        document.title = "Polymer Georeferencer Extractions - " + map_name;
         const _map = new Map({
             controls: [],
             layers: [base_layer, map_layer, vector_layer, ocr_vector],
@@ -302,21 +270,29 @@ function MapPage({ mapData }) {
         setMap(_map);
 
         return () => _map.setTarget("")
-    }, [])
+    }, [map_id])
 
+    useEffect(() => {
+        // Show jataware points to start
+        setGCPs([])
+        const checkboxes = document.querySelectorAll('input[type="checkbox"][name="bulk_upload"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.click();
+        });
+    }, [map_id]);
 
     // Propagate data
     useEffect(() => {
-        if (map === undefined) return;
+        if (mapRef.current === undefined) return;
 
         // On GCP change, need to update click to have new gcps
-        map.on('click', map_onClick);
+        mapRef.current.on('click', map_onClick);
 
         // On GCP change ... update map
-        getLayerById(map, "vector-layer").getSource().clear();
-        getLayerById(map, "vector-layer").getSource().addFeatures(gcps.map(gcp2box));
+        getLayerById(mapRef.current, "vector-layer").getSource().clear();
+        getLayerById(mapRef.current, "vector-layer").getSource().addFeatures(gcps.map(gcp2box));
 
-        return () => map.on('click', undefined);
+        return () => mapRef.current.on('click', undefined);
     }, [gcps])
 
 
@@ -333,6 +309,7 @@ function MapPage({ mapData }) {
                 for (const [key, value] of Object.entries(new_gcp)) {
                     feature.values_[key] = value;
                 }
+
                 if ("coll" in new_gcp && "rowb" in new_gcp) {
                     let BUFFER = 150
                     feature.getGeometry().setCoordinates([[
@@ -353,38 +330,19 @@ function MapPage({ mapData }) {
                 "x_dms": dec2dms(feature.values_['x']),
                 "y_dms": dec2dms(feature.values_['y']),
                 "crs": feature.values_['crs'],
-                "color": feature.values_['color']
+                "color": feature.values_['color'],
+                "provenance": feature.values_['provenance'],
+                "gcp_reference_id": feature.values_['gcp_reference_id'],
+                "just_edited": feature.values_['just_edited']
             })
         }
-        setGCPs([...gcps_])
+        setGCPs(sortByGcpId([...gcps_]))
     }
 
     function deleteGCP(old_gcp) {
-        setGCPs([...gcps].filter((x) => (x.gcp_id !== old_gcp.gcp_id)));
-        setShowExtractButton(true)
+        setGCPs(sortByGcpId([...gcps].filter((x) => (x.gcp_id !== old_gcp.gcp_id))));
+        // setShowExtractButton(true)
     }
-
-
-    function next() {
-        axios({
-            method: "get",
-            url: "/api/map/random",
-            params: { "georeferenced": false },
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Content-Type": "application/json",
-            }
-        })
-            .then((response) => {
-                let data = response.data;
-                navigate("../points/" + data["map"]);
-                navigate(0);
-            })
-            .catch((error) => {
-                console.error("Error fetching data:", error);
-            });
-    }
-
 
     function turnOnDraw() {
         drawRef.current.setActive(!drawRef.current.values_.active)
@@ -460,45 +418,87 @@ function MapPage({ mapData }) {
         }
     }
 
-    function extract_gcps(map_name) {
+    // function extract_gcps(map_name) {
 
-        setLoading(true)
+    //     setLoading(true)
 
-        axios({
-            method: 'post',
-            url: "/api/map/extract_gcps",
-            data: { "map_id": map_id },
-            headers: _APP_JSON_HEADER
-        }).then((response) => {
+    //     axios({
+    //         method: 'post',
+    //         url: "/api/map/extract_gcps",
+    //         data: { "map_id": map_id },
+    //         headers: _APP_JSON_HEADER
+    //     }).then((response) => {
 
-            let new_data = response.data.map((gcp, _id) => ({
-                gcp_id: _id,
-                rowb: gcp.rowb,
-                coll: gcp.coll,
-                x: gcp.x,
-                y: gcp.y,
-                x_dms: dec2dms(gcp.x),
-                y_dms: dec2dms(gcp.y),
-                crs: gcp.crs,
-                color: [Math.floor(Math.random() * 255), Math.floor(Math.random() * 255), Math.floor(Math.random() * 255)]
-            }))
+    //         let new_data = response.data.map((gcp, _id) => ({
+    //             gcp_id: create_gcp_id(gcp),
+    //             rowb: gcp.rowb,
+    //             coll: gcp.coll,
+    //             x: gcp.x,
+    //             y: gcp.y,
+    //             x_dms: dec2dms(gcp.x),
+    //             y_dms: dec2dms(gcp.y),
+    //             provenance: gcp.provenance,
+    //             gcp_reference_id: gcp.gcp_reference_id,
+    //             crs: gcp.crs,
+    //             color: [Math.floor(Math.random() * 255), Math.floor(Math.random() * 255), Math.floor(Math.random() * 255)]
+    //         }))
 
-            setGCPs([...new_data, ...gcps])
-            setLoading(false)
-            setShowExtractButton(false)
+    //         setGCPs(sortByGcpId([...new_data, ...gcps]))
+    //         setLoading(false)
+    //         // setShowExtractButton(false)
 
-        }).catch((error) => {
-            console.error('Error fetching data:', error);
-        });
-    }
+    //     }).catch((error) => {
+    //         console.error('Error fetching data:', error);
+    //     });
+    // }
 
 
     function viewprojects() {
         navigate('/projections/' + map_id)
     }
 
+    const handleProvenanceChange = (event) => {
+        const option = event.target.name;
+        let newOptions = [...provenanceOption];
+
+        if (event.target.checked) {
+            // Add the checked option
+            newOptions.push(option);
+        } else {
+            // Remove the unchecked option
+            newOptions = newOptions.filter(item => item !== option);
+        }
+        const filteredGCPS = mapData['all_gcps'].filter((gcp) => newOptions.includes(gcp.provenance));
+        setGCPs(sortByGcpId(filteredGCPS))
+
+        setProvenanceOption(newOptions);
+    };
+
+
+
+    function saveMapStatus(map_id, not_a_map) {
+        not_a_map = !not_a_map
+        axios({
+            method: 'put',
+            url: "/api/map/map_info",
+            data: {
+                "map_id": map_id,
+                "key": "not_a_map",
+                "value": not_a_map
+            },
+            headers: _APP_JSON_HEADER
+        }).then((response) => {
+            oneMap("not_georeferenced", navigate, createPath("not_georeferenced", '..'))
+        }).catch((e) => {
+            alert(e)
+        })
+
+    }
+
     return (
         <>
+
+
             {loading &&
                 <div className="loading">
                     <CircularProgress />
@@ -507,25 +507,52 @@ function MapPage({ mapData }) {
             <div className="flex-container" >
 
                 <div className="flexChild">
-                    {georeferenced &&
 
-                        <div className="control_panel" id="control-panel">
-                            <Box sx={{ width: 200 }}>
-                                <Typography id="continuous-slider" gutterBottom>
-                                    Map Opacity
-                                </Typography>
-                                <Slider
-                                    aria-label="Continuous slider"
-                                    defaultValue={100}
-                                    step={10}
-                                    valueLabelDisplay="auto"
-                                    onChange={(e) => handleOpacityChange(e, map)}
-                                    valueLabelFormat={valuetext}
-                                />
-                            </Box>
 
-                        </div>
-                    }
+                    <div className="control_panel" id="control-panel">
+                        <Box sx={{ width: 200 }}>
+                            <h4 style={{ "padding": "0px", "margin": "4px" }}>Select GCPs</h4>
+                            <FormGroup style={{ width: '200px' }}>
+                                {mapData['provenances'].map((option, index) => (
+                                    <FormControlLabel
+                                        key={index}
+                                        control={
+                                            <Checkbox
+                                                checked={provenanceOption.includes(option)}
+                                                onChange={handleProvenanceChange}
+                                                name={option}
+                                            />
+                                        }
+                                        label={
+                                            <Typography style={{
+                                                color: getColorForProvenance(option),
+                                            }}>
+                                                {provenance_mapper[option]}
+                                            </Typography>}
+                                    />
+                                ))}
+                            </FormGroup>
+                            {
+                                georeferenced &&
+                                <>
+                                    <Typography id="continuous-slider" gutterBottom>
+                                        Map Opacity
+                                    </Typography>
+                                    <Slider
+                                        aria-label="Continuous slider"
+                                        defaultValue={100}
+                                        step={10}
+                                        valueLabelDisplay="auto"
+                                        onChange={(e) => handleOpacityChange(e, map)}
+                                        valueLabelFormat={valuetext}
+                                    />
+                                </>
+
+                            }
+                        </Box >
+
+                    </div >
+
                     <div
                         ref={mapTargetElement}
                         className="map"
@@ -534,24 +561,30 @@ function MapPage({ mapData }) {
                             height: "100%",
                             position: "relative",
                         }} />
-                </div>
-                <div className="flexChild scrollableContent">
+                </div >
+                <div key={"scroll" + map_id} className="flexChild scrollableContent">
                     <div className="left-panel">
                         <Button onClick={(e) => navigate("/")}>Home</Button>
 
                         <Button
                             className="nextButton"
                             color="primary"
-                            onClick={() => next()}
+                            onClick={() => oneMap("not_georeferenced", navigate, createPath("not_georeferenced", '..'))}
                         >
                             Next Map
                         </Button>
-                        {showExtractButton &&
+                        {/* {showExtractButton &&
                             <Button onClick={() => extract_gcps(map_name)}> EXTRACT GCPs </Button>
-
-                        }
+                        } */}
                         <Button onClick={() => project(gcps)} > GEOREFERENCE </Button>
                         {isProjected && <Button onClick={() => viewprojects()} > VIEW PROJECTIONS </Button>}
+                        <Button
+                            color={mapData['map_info']['not_a_map'] ? "warning" : "error"}
+                            onClick={(e) => saveMapStatus(
+                                mapData['map_info']['map_id'], mapData['map_info']['not_a_map']
+                            )}>
+                            {mapData['map_info']['not_a_map'] ? "Mark as Map" : "Not A Map"}
+                        </Button>
                         <Autocomplete
                             value={map_crs}
                             className="autoComplete"
@@ -562,6 +595,7 @@ function MapPage({ mapData }) {
                                 setMapCRS(value.split("__")[0])
                             }}
                         />
+
                         <Button onClick={() => { setShowOCR(!showOCR); turnOnDraw() }}> {showOCR ? "Hide Map CRS" : "Find Map CRS"}</Button>
                         {showOCR &&
                             <div style={{ background: '#E8E8E8', borderRadius: "10px", padding: "10px" }}>
@@ -615,7 +649,7 @@ function MapPage({ mapData }) {
                                 gcps.map((gcp, i) => {
                                     return <div key={gcp.gcp_id}>
                                         <div className="container_card">
-                                            <GCPCard gcp={gcp} updateGCP={updateGCP} deleteGCP={deleteGCP} />
+                                            <GCPCard gcp={gcp} updateGCP={updateGCP} deleteGCP={deleteGCP} provenance={provenance_mapper} />
                                             <SmallMap map_id={map_id} gcp={gcp} updateGCP={updateGCP} />
                                         </div>
                                     </div>
@@ -624,13 +658,18 @@ function MapPage({ mapData }) {
                         </div>
                     </div >
                 </div>
-            </div>
+            </div >
         </>
     )
 }
 
-function GCPCard({ gcp, updateGCP, deleteGCP }) {
+function GCPCard({ gcp, updateGCP, deleteGCP, provenance }) {
+    const [isFirstRender, setIsFirstRender] = useState(true);
+
     function _onChange(key_, val_) {
+        if (isFirstRender) {
+            return;
+        }
         let new_gcp = { ...gcp };
         if (["x", "y", "rowb", "coll"].includes(key_))
             val_ = parseFloat(val_);
@@ -641,6 +680,10 @@ function GCPCard({ gcp, updateGCP, deleteGCP }) {
         if (key_ == "y") new_gcp["y_dms"] = dec2dms(val_);
         if (key_ == "x_dms") new_gcp["x"] = dms2dec(val_);
         if (key_ == "y_dms") new_gcp["y"] = dms2dec(val_);
+
+        // new_gcp["provenance"] = "api_endpoint";
+        new_gcp['just_edited'] = true
+
         updateGCP(new_gcp);
     }
 
@@ -648,10 +691,18 @@ function GCPCard({ gcp, updateGCP, deleteGCP }) {
         _onChange(key, value)
     }
 
+    useEffect(() => {
+        setIsFirstRender(false)
+    }, []);
+
+
+
     return (
         <Card variant="outlined" className="card">
             <CardContent>
                 <form>
+                    <h4>Provenance: <span style={{ color: getColorForProvenance(gcp['provenance']) }}>{provenance[gcp['provenance']]}</span>
+                        <span style={{ color: "#FF8C00" }}>{checkIfEdited(gcp) && " (edited)"}</span></h4>
                     <Grid container spacing={2}>
                         <Grid item xs={6}>
                             <TextField type="number" label="Row from Bottom" value={gcp.rowb} onChange={(e) => _onChange("rowb", e.target.value)} />

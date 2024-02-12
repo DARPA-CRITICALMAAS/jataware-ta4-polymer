@@ -4,7 +4,7 @@ import random
 import tempfile
 from logging import Logger
 from time import perf_counter
-from typing import Optional
+from typing import Optional, List, Any
 from elasticsearch import Elasticsearch
 import uuid
 from datetime import datetime
@@ -16,13 +16,26 @@ from fastapi import (
     APIRouter,
     HTTPException,
     UploadFile,
+    File,
+    Response,
+    Form
 )
+from fastapi.responses import JSONResponse
+
 from osgeo import gdal
+from io import BytesIO
+import pyproj
+from pyproj import Transformer
+import rasterio.transform as riot
+from rasterio.warp import Resampling, calculate_default_transform, reproject
+import json
+from shapely.geometry import shape, mapping
+from shapely.ops import transform
+from shapely import to_geojson
 
 from wand.image import Image as wandImage
-from PIL import Image
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageDraw
 from pydantic import BaseModel
 from starlette.status import (
     HTTP_201_CREATED,
@@ -32,7 +45,10 @@ from starlette.status import (
 )
 Image.MAX_IMAGE_PIXELS = None
 from cachetools import TTLCache
-cache = TTLCache(maxsize=50, ttl=500)  
+
+cache = TTLCache(maxsize=2, ttl=500)  
+from starlette.background import BackgroundTasks
+
 
 
 from auto_georef.common.utils import time_since, s3_client, load_tiff_cache, upload_s3_file
@@ -55,10 +71,12 @@ from auto_georef.common.map_utils import (
     saveTifasCog,
     return_crs,
     hash_file_sha256,
-    generate_map_id
+    generate_map_id,
+    project_vector_
 )
 
 logger: Logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.ERROR)
 
 AGR = AutoGeoreferencer()
 
@@ -78,11 +96,40 @@ class OCRRequest(BaseModel):
     map_id: str
     bboxes: Optional[list]
 
+class GCP(BaseModel):
+    map_id: str
+    gcp_id: Optional[str]
+    gcp_reference_id: Optional[str]
+    provenance: str
+    rowb: float
+    coll: float
+    x: Optional[float]
+    y: Optional[float]
+    crs: str
+
 class ProjectMapRequest(BaseModel):
     map_id: str
     map_name: str
     crs: Optional[str]
-    gcps: Optional[list]
+    gcps: List[GCP]
+
+class ProjectVectorRequest(BaseModel):
+    feature: Any
+    projection_id: str
+    crs: Optional[str]
+
+class SearchMapInBox(BaseModel):
+    georeferenced: bool
+    not_georeferenced: bool
+    validated: bool
+    bounding_box_polygon: Any 
+    scale_min: int
+    scale_max: int
+    search_text: Optional[str]
+    page_number: int
+    page_size: int
+
+
 
 
 class Proj_Status(Enum):
@@ -96,7 +143,10 @@ class SaveProjInfo(BaseModel):
     proj_id: str
     status: Proj_Status
 
-
+class UpdateMapInfo(BaseModel):
+    map_id: str
+    key: str
+    value: Any
 
 class PromptRequest(BaseModel):
     prompt: str
@@ -108,34 +158,77 @@ class SearchMapsReq(BaseModel):
     size: int = 10
     georeferenced: bool = False
     validated: bool = False
+    not_a_map: bool = False
     random: bool = False
+
+class MapsLookup(BaseModel):
+    map_publication_id: str
+
+class MapsFind(BaseModel):
+    map_publication_id: str
+    publisher: str
 
 
 ########################### GETs ###########################
 
+@router.get("/clip-tiff")
+async def clip_tiff(map_id: str, coll: int, rowb: int):
+    try:
+        size = 225
+        s3_key = f"{app_settings.s3_tiles_prefix_v2}/{map_id}/{map_id}.cog.tif"
+
+        img = load_tiff_cache(cache, s3_key)
+
+        y = img.height - rowb   
+
+        box = (coll-(size/2), y-(size/2), coll + (size/2), y + (size/2))
+        clipped_img = img.crop(box)
+        if clipped_img.mode != 'RGB':
+            clipped_img = clipped_img.convert('RGB')
+
+        center_x, center_y = int(size/2), int(size/2)  # Center of a 200x200 image
+
+        for i in range(center_y - 5, center_y + 5):
+            for j in range(center_x - 5, center_x + 5):
+                try:
+                    clipped_img.putpixel((j, i), (255, 0, 0))  # Red 
+                except Exception as e:
+                    logging.error(e)
+
+        img_byte_arr = BytesIO()
+        clipped_img.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
+
+        return Response(content=img_byte_arr, media_type="image/png")
+    except Exception as e:
+        logging.error(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @router.get("/maps", status_code=HTTP_200_OK)
-def maps(georeferenced=True, validated=False, size=10000):
+def maps(georeferenced=True, validated=False, not_a_map=False, size=10000):
     maps_loading = perf_counter()
     search_body = {
-        "_source": ["map_name", "map_id", "georeferenced", "validated"],
+        "_source": ["map_name", "map_id", "georeferenced", "validated","not_a_map"],
         "query": {
             "bool": {
                 "filter": [
                     {"term": {"georeferenced": georeferenced}},
                     {"term": {"validated": validated}},
+                    {"term": {"not_a_map": not_a_map}}
                 ]
             }
         },
     }
     response = es.search(index=app_settings.maps_index, body=search_body, size=size)
-
     maps = [
         {
             "map_name": hit["_source"]["map_name"],
             "map_id": hit["_source"]["map_id"],
             "validated": hit["_source"]["validated"],
             "georeferenced": hit["_source"]["georeferenced"],
+            "not_a_map": hit["_source"]["not_a_map"],
         }
         for hit in response["hits"]["hits"]
     ]
@@ -144,12 +237,15 @@ def maps(georeferenced=True, validated=False, size=10000):
     return {"maps": maps}
 
 
-@router.get("/random", status_code=HTTP_200_OK)
-def map_random(georeferenced: bool = False):
-    opts = maps(georeferenced)
-    choice = random.choice(opts.get("maps"))
-    logger.debug("select random: %s", choice)
-    return {"map": choice["map_id"]}
+@router.get("/get_projection_name/{epsg_code}")
+def get_projection_name(epsg_code: int):
+    try:
+        crs = pyproj.CRS.from_epsg(epsg_code)
+        # Extracting the projection name
+        projection_name = crs.name
+        return {"projection_name": projection_name}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/codes", status_code=HTTP_200_OK)
@@ -167,16 +263,61 @@ def codes():
     return {"codes": [{"label": crs[0] + ":" + crs[1]} for crs in all_crs]}
 
 
+def maps_scroll():
+    data ={
+        "georeferenced": 0,
+        "validated": 0,
+        "not_georeferenced": 0,
+        "not_a_map":0
+    }
+    search_query = {
+    "query": {
+        "match_all": {}
+    }
+    }
+    # Initial search request with scroll parameter
+    response = es.search(index=app_settings.maps_index, body=search_query, scroll='1m', size=1000)
+    # Total number of documents matching the query
+    total_docs = response['hits']['total']['value']
+    # Process the initial batch of results
+    for hit in response['hits']['hits']:
+        if hit['_source'].get('not_a_map',False)==True:
+            data['not_a_map']+=1
+        else:
+            if hit['_source']['validated']==True and hit['_source']['georeferenced'] == True:
+                data['validated'] +=1
+            elif hit['_source']['georeferenced'] == True:
+                data['georeferenced']+=1
+            else:
+                data['not_georeferenced']+=1
+        
+    while len(response['hits']['hits']) > 0:
+        scroll_id = response['_scroll_id']
+        response = es.scroll(scroll_id=scroll_id, scroll='1m')
+        # Process the next batch of results
+        for hit in response['hits']['hits']:
+            if hit['_source'].get('not_a_map',False) == True:
+                data['not_a_map']+=1
+            else:
+                if hit['_source']['validated']==True and hit['_source']['georeferenced'] == True:
+                    data['validated'] +=1
+                elif hit['_source']['georeferenced'] == True:
+                    data['georeferenced']+=1
+                else:
+                    data['not_georeferenced']+=1
+
+    # stats_cache['stats']=data
+    es.clear_scroll(scroll_id=scroll_id)
+    return data
+
+
 @router.get("/maps_stats", status_code=HTTP_200_OK)
 def map_stats_():
-    georeferenced = len(maps(georeferenced=True, validated=False)["maps"])
-    validated = len(maps(georeferenced=True, validated=True)["maps"])
-    not_georeferenced = len(maps(georeferenced=False, validated=False)["maps"])
-    return {
-        "georeferenced": georeferenced,
-        "validated": validated,
-        "not_georeferenced": not_georeferenced,
-    }
+    # todo needs a bit more testing.
+    # if "stats" in stats_cache:
+    #     return stats_cache['stats']
+    
+    return maps_scroll()
 
 
 @router.get("/{map_id}/gcps", status_code=HTTP_200_OK)
@@ -222,6 +363,150 @@ def map_info_(map_id: str):
 
 ########################### POSTs ###########################
 
+@router.post("/maps_in_bbox")
+def search_maps_in_box(query: SearchMapInBox):
+    logging.info(query)
+    page_number =  query.page_number + 1
+    page_size = query.page_size
+    offset = (page_number - 1) * page_size
+
+    es_query = {
+        "bool": {
+            "should": [],
+            "must":[],
+            "filter": []
+        }
+    }
+
+    if query.search_text and query.search_text != "":
+        es_query["bool"]["should"].append({
+            "multi_match": {
+                "query": query.search_text,
+                "fields": ["authors", "category", "organization", "mapKurator_all_text","map_name","map_id","citation"]  # Replace with actual fields to search
+            }
+        })
+    
+    def replace_single_quotes_with_double_quotes(data):
+        if isinstance(data, str):
+            return data.replace("'", '"')
+        elif isinstance(data, list):
+            return [replace_single_quotes_with_double_quotes(item) for item in data]
+        elif isinstance(data, dict):
+            return {replace_single_quotes_with_double_quotes(key): replace_single_quotes_with_double_quotes(value) for key, value in data.items()}
+        else:
+            return data  # R
+
+    if query.bounding_box_polygon:
+
+        if query.bounding_box_polygon["geometry"]["type"]=="Polygon":
+            elasticsearch_geojson = {
+                "type": "Polygon",
+                "coordinates": query.bounding_box_polygon["geometry"]["coordinates"]
+            }
+        else:
+            elasticsearch_geojson = {
+                "type": "MultiPolygon",
+                "coordinates": query.bounding_box_polygon["geometry"]["coordinates"]
+            }
+        
+
+        es_query["bool"]["filter"].append({
+            "bool": {
+                "should": [
+                    {
+                        "geo_shape": {
+                            "bounds": {
+                                "shape": elasticsearch_geojson,
+                                "relation": "intersects"
+                            }
+                        }
+                    },
+                    {
+                        "geo_shape": {
+                            "centroid": {  # Replace 'centroid' with your actual geo-shape field
+                                "shape": elasticsearch_geojson,
+                                "relation": "intersects"
+                            }
+                        }
+                    }
+                ]
+            }
+        })
+
+    
+    if query.validated and query.georeferenced and query.not_georeferenced:
+        es_query["bool"]["filter"].append({
+            "bool": {
+                "should": [
+                    {"term": {"validated": True}},
+                    {"term": {"georeferenced": True}},
+                    {"term": {"georeferenced": False}}
+                    ]}})
+    elif query.validated and not query.georeferenced and not query.not_georeferenced:
+        es_query["bool"]["filter"].append({"term": {"validated": True}})
+
+    elif query.validated and query.not_georeferenced and not query.georeferenced:
+
+        es_query["bool"]["filter"].append({
+            "bool": {
+                "should": [
+                    {"term": {"validated": True}},
+                    {"term": {"georeferenced": False}},
+                    ]}})
+    elif query.validated and query.georeferenced and not query.not_georeferenced:
+        es_query["bool"]["filter"].append({
+            "bool": {
+                "should": [
+                    {"term": {"validated": True}},
+                    {"term": {"georeferenced": True}},
+                    ]}})
+    else:
+        if query.georeferenced and query.not_georeferenced:
+            es_query["bool"]["filter"].append({"term": {"validated": False}})
+
+        elif query.georeferenced:
+            es_query["bool"]["filter"].append({"term": {"validated": False}})
+            es_query["bool"]["filter"].append({"term": {"georeferenced": True}})
+        elif  query.not_georeferenced:
+            es_query["bool"]["filter"].append({"term": {"validated": False}})
+            es_query["bool"]["filter"].append({"term": {"georeferenced": False}})
+        else:
+            pass
+
+
+    es_query['bool']['filter'].append( {
+        "bool": {
+          "should": [
+            {
+              "range": {
+                "scale": {  
+                  "gte": query.scale_min,  
+                  "lte": query.scale_max  
+                }
+              }
+            },
+            {
+              "bool": {
+                "must_not": {
+                  "exists": {
+                    "field": "scale"
+                  }
+                }
+              }
+            }
+          ],
+          "minimum_should_match": 1
+        }
+      })
+
+    if query.search_text and query.search_text != "":
+        response = es.search(index=app_settings.maps_index, body={"query": es_query,"from":offset,"size":page_size, "min_score":0.1})
+    else:
+        response = es.search(index=app_settings.maps_index, body={"query": es_query,"from":offset,"size":page_size})
+
+    maps = [x["_source"] for x in response['hits']['hits']]        
+
+    return {"maps": maps, "total_hits":response['hits']['total']['value']}
 
 @router.post("/extract_gcps")
 def extract_gcps(req: ExtractPointsRequest):
@@ -239,7 +524,7 @@ def extract_gcps(req: ExtractPointsRequest):
     return cps
 
 
-@router.post("/proj_info", status_code=HTTP_201_CREATED)
+@router.post("/proj_info", status_code=HTTP_200_OK)
 def save_proj_info(req: SaveProjInfo):
     map_id = req.map_id
     proj_id = req.proj_id
@@ -265,8 +550,45 @@ def save_proj_info(req: SaveProjInfo):
     if status == Proj_Status.FAILED:
         # maybe delete files on s3?
         pass
-
+    
+    # update stats
+    maps_scroll()
     return {"message": "projection updated"}
+
+@router.put("/map_info", status_code=HTTP_200_OK)
+def update_map_info(req: UpdateMapInfo):
+    map_id = req.map_id
+    key = req.key
+    value = req.value
+    update_documents(
+        es=es,
+        index_name=app_settings.maps_index,
+        search_dict={"map_id": map_id},
+        update_body={key: value},
+    )
+    if key in ['not_a_map', "georeferenced", 'validated']:
+        maps_scroll()
+    
+
+    return {"message": "Map updated"}
+
+
+
+@router.post("/maps_lookup")
+async def lookup_maps(req: MapsLookup):
+    query = {
+        "query": {
+            "wildcard": {
+                "map_name": f"*_{req.map_publication_id}"  # Replace with the actual ID
+            }
+        }
+    }
+    response = es.search(index=app_settings.maps_index, body=query, size=5)
+    map=None
+    for doc in response['hits']['hits']:
+        map= doc['_source']
+
+    return map
 
 
 @router.post("/maps_search")
@@ -276,6 +598,7 @@ async def search_maps(req: SearchMapsReq):
     q = req.query
     georeferenced = req.georeferenced
     validated = req.validated
+    not_a_map = req.not_a_map
     random_ = req.random
 
     if page < 1:
@@ -296,6 +619,7 @@ async def search_maps(req: SearchMapsReq):
                             "filter": [
                                 {"term": {"georeferenced": georeferenced}},
                                 {"term": {"validated": validated}},
+                                {"term": {"not_a_map": not_a_map}},
                             ]
                         }
                     },
@@ -325,13 +649,28 @@ async def search_maps(req: SearchMapsReq):
         "size": size,
     }
 
+def convert_gcps_to_dict(gcp):
+    gcp_ = gcp.dict()
+    if gcp_['gcp_reference_id']=="":
+        gcp_['gcp_reference_id'] = None
+    return gcp_
+
+
+
+
+@router.post('/project_vector')
+def project_vector(req:ProjectVectorRequest):
+    return project_vector_(es, req.feature, req.projection_id, req.crs)
+
+
 
 @router.post("/project")
 def project(req: ProjectMapRequest):
     map_name = req.map_name
     map_id = req.map_id
-    cps = req.gcps
-    gcps = req.gcps
+    cps = [convert_gcps_to_dict(gcp) for gcp in req.gcps]
+    gcps = [convert_gcps_to_dict(gcp) for gcp in req.gcps]
+
     crs = req.crs
 
     s3_key = f"{app_settings.s3_tiles_prefix_v2}/{map_id}/{map_id}.cog.tif"
@@ -408,7 +747,6 @@ def project(req: ProjectMapRequest):
                 "status": "created",
                 "provenance": "api_endpoint",
                 "transformation": "polynomial_1"
-
             },
             id=None,
         )
@@ -425,6 +763,7 @@ def project(req: ProjectMapRequest):
     return {
         "pro_cog_path": f"{app_settings.s3_endpoint_url}/{app_settings.s3_tiles_bucket}/{s3_pro_key}"
     }
+
 
 
 @router.post("/tif_ocr")
@@ -451,29 +790,55 @@ def send_prompt(req: PromptRequest):
 
 
 @router.post("/processMap")
-async def upload_file(file: UploadFile):
-    #  Only tif files supported
+async def upload_file(file: UploadFile, 
+               map_name: Optional[str] = Form(None), 
+    title: Optional[str] = Form(None),
+    organization: Optional[str] = Form(None), 
+    scale: Optional[int] = Form(None),
+    year: Optional[int] = Form(None),
+    authors:Optional[str]=Form(None)):
 
-    if not file.filename.endswith(".tif"):
+    if not file.filename.endswith(".tif") and not file.filename.endswith(".pdf") and not file.filename.endswith(".tiff"):
         raise HTTPException(
-            status_code=400, detail="Invalid file type. Only TIFF files are allowed."
+            status_code=400, detail="Invalid file type. Only TIFF or PDF files are allowed."
         )
 
-    #  map name with . replaced with _ incase . is in filename
-    map_name = file.filename.split(".tif")[0].replace(".", "_")
+    if file.filename.endswith(".pdf"):
+        map_name_ = file.filename.split(".pdf")[0].replace(".", "_")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+            content = await file.read()
+            temp_pdf.write(content)
+            temp_pdf_path = temp_pdf.name
+        
+
+        # Open the temporary PDF with GDAL
+        pdf_ds = gdal.Open(temp_pdf_path, gdal.GA_ReadOnly)
+
+        # Use another temporary file for the output TIFF
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".tif") as temp_tif:
+            # Translate to TIFF using the temporary file name
+            gdal.Translate(temp_tif.name, pdf_ds, format='GTiff')
+            temp_file_path = temp_tif.name
+        with open(temp_file_path, 'rb') as f:
+            file_contents = f.read()
+
+    elif file.filename.endswith(".tif") or file.filename.endswith(".tiff"):
+        #  map name with . replaced with _ incase . is in filename
+        map_name_ = file.filename.split(".tif")[0].replace(".", "_")
+        
+        # read uploaded file and save to temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".tif") as temp_file:
+            # Read and write to a temporary file
+            file_contents = file.file.read()
+            temp_file.write(file_contents)
+            temp_file_path = temp_file.name
     
-    # read uploaded file and save to temp file
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".tif") as temp_file:
-        # Read and write to a temporary file
-        file_contents = file.file.read()
-        temp_file.write(file_contents)
-        temp_file_path = temp_file.name
 
     # Now open it with GDAL to save crs info
     original_crs = return_crs(temp_file_path)
     # save a version of the uploaded file with no crs info
     with tempfile.TemporaryDirectory() as tmpdir:
-        output_path = os.path.join(tmpdir, map_name + ".tif")
+        output_path = os.path.join(tmpdir, map_name_ + ".tif")
         with wandImage(blob=file_contents) as img:
             img.strip()
             img.save(filename=output_path)
@@ -484,9 +849,7 @@ async def upload_file(file: UploadFile):
         saveTifasCog(file_path=output_path, cog_path=cog_path)
         map_id = generate_map_id(cog_path)
         if document_exists(es, app_settings.maps_index, map_id):
-            raise HTTPException(
-                status_code=400, detail="Map has already been uploaded."
-            )
+            return {"message": "Map has already been uploaded.","map_id":map_id,"georeferenced": False}
         
         s3_key = f"{app_settings.s3_tiles_prefix_v2}/{map_id}/{map_id}"+'.cog.tif'
 
@@ -507,6 +870,7 @@ async def upload_file(file: UploadFile):
             map_id=map_id,
             extraction_model="jataware_gcp_extractor",
             extraction_model_version="0.0.1",
+            provenance="jataware_extraction"
         )
         try:
             for gcp_data in gcps_:
@@ -516,6 +880,10 @@ async def upload_file(file: UploadFile):
                             id=gcp_data['gcp_id'])
         except Exception as e:
             print(f"Error indexing gcp data: {e}")
+        
+        # if map_name is not supplied set to file name
+        if map_name is None:
+            map_name = map_name_
 
         if len(gcps) < 4:
             logging.info("Failed to find enough gcps")
@@ -524,9 +892,11 @@ async def upload_file(file: UploadFile):
                 index=app_settings.maps_index,
                 info={
                     "map_id": map_id,
+                    "organization":organization,
                     "map_name": map_name,
                     "height": height,
                     "width": width,
+                    "title": title,
                     "finished_proj_id": None,
                     "georeferenced": False,
                     "validated": False,
@@ -535,11 +905,16 @@ async def upload_file(file: UploadFile):
                     "finished": None,
                     "source": f"{app_settings.s3_endpoint_url}/{app_settings.s3_tiles_bucket}/{app_settings.s3_tiles_prefix}/{map_id}/{map_id}.cog.tif",
                     "original_crs": original_crs,
+                    "scale":scale,
+                    "year": year,
+                    "authors":authors
                 },
                 id=map_id,
             )
             return {
-                "message": "File uploaded successfully, unable to georeference due to lack of gcps"
+                "message": "File uploaded successfully, unable to georeference due to lack of gcps",
+                "map_id": map_id,
+                "georeferenced": False
             }
         CRSs = []
         all_crs = generateCrsListFromGCPs(gcps=gcps)
@@ -555,7 +930,7 @@ async def upload_file(file: UploadFile):
                     "map_id": map_id,
                     "epsg_code": crs_id,
                     "created": datetime.now(),
-                    "provenance": "api_endpoint",
+                    "provenance": "jataware_extraction",
                     "extraction_model": None,
                     "extraction_model_version": None,
                 },
@@ -588,7 +963,7 @@ async def upload_file(file: UploadFile):
                     "source": f"{app_settings.s3_endpoint_url}/{app_settings.s3_tiles_bucket}/{s3_pro_key}",
                     "gcps_ids": [gcp["gcp_id"] for gcp in gcps],
                     "status": "created",
-                    "provenance": "api_endpoint",
+                    "provenance": "jataware_extraction",
                     "transformation": "polynomial_1"
 
                 },
@@ -600,9 +975,11 @@ async def upload_file(file: UploadFile):
             index=app_settings.maps_index,
             info={
                 "map_id": map_id,
+                "organization":organization,
                 "map_name": map_name,
                 "height": height,
                 "width": width,
+                "title": title,
                 "finished_proj_id": None,
                 "georeferenced": True,
                 "validated": False,
@@ -611,9 +988,14 @@ async def upload_file(file: UploadFile):
                 "finished": None,
                 "source": f"{app_settings.s3_endpoint_url}/{app_settings.s3_tiles_bucket}/{app_settings.s3_tiles_prefix_v2}/{map_id}/{map_id}.cog.tif",
                 "original_crs": original_crs,
+                "scale":scale,
+                "year": year,
+                "authors":authors
             },
             id=map_id,
         )
 
-    return {"message": "File uploaded and georeferenced without errors"}
-
+    return {"message": "File uploaded and georeferenced without errors",
+            "map_id":map_id,
+            "georeferenced": True
+    }
