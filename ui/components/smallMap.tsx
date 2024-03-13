@@ -11,7 +11,7 @@ import { Circle as CircleStyle, Stroke, Style } from 'ol/style.js';
 import { Vector as VectorLayer } from 'ol/layer.js';
 import { Button } from '@mui/material';
 
-import { returnImageUrl, expand_resolutions } from "./helpers"
+import { returnImageBufferUrl, expand_resolutions } from "./helpers"
 
 const TIFF_URL = import.meta.env.VITE_TIFF_URL;
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
@@ -21,7 +21,7 @@ function SmallMap({ map_id, gcp, updateGCP }) {
     const mapTargetElement = useRef<HTMLDivElement>(null)
     const [showMap, setShowMap] = useState(false)
     const [clicked, setClicked] = useState(false)
-    const [clipUrl, setClipUrl] = useState(returnImageUrl(map_id, gcp))
+    const [clipUrl, setClipUrl] = useState(returnImageBufferUrl(map_id, gcp))
     // --
     // MAP layer
 
@@ -29,7 +29,7 @@ function SmallMap({ map_id, gcp, updateGCP }) {
         sources: [
             {
                 url: `${TIFF_URL}/cogs/${map_id}/${map_id}.cog.tif`,
-                nodata: 0,
+                nodata: -1,
             }
         ],
         convertToRGB: true,

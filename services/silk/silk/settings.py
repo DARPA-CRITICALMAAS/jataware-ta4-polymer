@@ -12,11 +12,18 @@ class Settings(BaseSettings):
     sqlite_db: str = "/home/apps/db/silk.db"
     doc_cache: str = "/home/apps/docs"
 
+    authelia_user: str
+    authelia_pass: str
+
+    georef_api_host: str = "https://georef.polymer.rocks"
+
     # zotero_user: str = Field(validation_alias="zotero_user")
     # zotero_token: SecretStr = ""
 
     zotero_library_id: str = "4530692"
     zotero_library_type: str = "group"
+
+    xdd_api_key: str = ""
 
     class Config:
         case_sensitive = False

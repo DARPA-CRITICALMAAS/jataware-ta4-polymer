@@ -16,17 +16,18 @@ function ProjectionViewer() {
 
   const getProjectionNames = async (mapper) => {
     try {
-      const requests = Object.keys(mapper).map(code =>
-        axios.get(`/api/map/get_projection_name/${parseInt(code.split("EPSG:")[1])}`, { headers: _APP_JSON_HEADER })
-      );
+      const validRequests = Object.keys(mapper).map(code => {
+        let code_ = parseInt(code.split("EPSG:")[1]);
+        if (isNaN(code_)) return null; // Return null for invalid codes
+        return axios.get(`/api/map/get_projection_name/${code_}`, { headers: _APP_JSON_HEADER })
+          .catch(error => console.error(`Error fetching data for code ${code_}:`, error));
+      }).filter(request => request !== null);
 
-      const responses = await Promise.all(requests);
+      const responses = await Promise.all(validRequests);
       responses.forEach(response => {
         const epsgCode = "EPSG:" + response.config.url.split('/').pop();
         const projectionName = response.data.projection_name;
         mapper[epsgCode] = projectionName;
-
-
       });
       return mapper
 
@@ -70,7 +71,6 @@ function ProjectionViewer() {
             point['y_dms'] = mapper[point['gcp_id']]['y_dms']
           })
         })
-
         getProjectionNames(crs_name_mapper).then(updatedMapper => {
           response.data["crs_names"] = updatedMapper
           setMapData(response.data)

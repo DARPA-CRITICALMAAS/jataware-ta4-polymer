@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV PATH=/home/apps/bin:/home/apps/.local/bin:$PATH
 
 COPY . /home/apps/silk
-COPY --from=ui-dist /app/silk/static/css/*.css static/css/
-COPY --from=ui-dist /app/silk/static/js/*.js static/js/
+COPY --from=ui-dist /app/silk/static/css/*.css /home/apps/silk/static/css/
+COPY --from=ui-dist /app/silk/static/js/*.js /home/apps/silk/static/js/
 
 RUN mkdir -p /home/apps/db
 RUN mkdir -p /home/apps/docs

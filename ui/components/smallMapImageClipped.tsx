@@ -29,7 +29,7 @@ function SmallMapImageClipped({ map_id, proj_info, clippedState, baseMapSources,
         sources: [
             {
                 url: `${TIFF_URL}/cogs/${map_id}/${map_id}_${proj_info['proj_id']}.pro.cog.tif`,
-                nodata: 0,
+                nodata: -1,
             }
         ],
         convertToRGB: true,

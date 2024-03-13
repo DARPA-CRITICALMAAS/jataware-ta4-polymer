@@ -1,0 +1,157 @@
+<form
+  class="grid grid-cols-4 gap-4 mb-4"
+  hx-put="/partial/info/d/{{ doc_id }}" hx-target="this" hx-swap="outerHTML">
+
+  <div class="text-right">
+    <span class="label-text">name</span>
+  </div>
+  <div class="col-span-3">
+    <div>
+      <input name="name" type="text" placeholder=""
+             value="{{ doc_info.name }}"
+             class="input input-bordered w-full input-sm"
+             />
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">title</span>
+  </div>
+  <div class="col-span-3">
+    <div>
+      <input name="title" type="text" placeholder=""
+             value="{{ doc_info.title }}"
+             class="input input-bordered w-full input-sm"
+             />
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">doi</span>
+  </div>
+  <div class="col-span-3">
+    <div>
+      <input name="doi" type="text" placeholder=""
+             value="{{ doc_info.doi }}"
+             class="input input-bordered w-full input-sm"
+             />
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">authors</span>
+  </div>
+  <div class="col-span-3">
+    <div>
+      <input name="authors" type="text" placeholder=""
+             value="{{ doc_info.authors }}"
+             class="input input-bordered w-full input-sm"
+             />
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">journal</span>
+  </div>
+  <div class="col-span-3">
+    <div>
+      <input name="journal" type="text" placeholder=""
+             value="{{ doc_info.journal }}"
+             class="input input-bordered w-full input-sm"
+             />
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">uri</span>
+  </div>
+  <div class="col-span-3">
+    <div>
+      <input name="uri" type="text" placeholder=""
+             value="{{ doc_info.uri }}"
+             class="input input-bordered w-full input-sm"
+             />
+    </div>
+  </div>
+
+  <div class="text-right">
+    <span class="label-text">year</span>
+  </div>
+  <div class="col-span-3">
+    <div>
+      <input name="year" type="text" placeholder=""
+             value="{{ doc_info.year }}"
+             class="input input-bordered w-full input-sm"
+             />
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">month</span>
+  </div>
+  <div class="col-span-3">
+    <div>
+      <input name="month" type="text" placeholder=""
+             value="{{ doc_info.month }}"
+             class="input input-bordered w-full input-sm"
+             />
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">volume</span>
+  </div>
+  <div class="col-span-3">
+    <div>
+      <input name="volume" type="text" placeholder=""
+             value="{{ doc_info.volume }}"
+             class="input input-bordered w-full input-sm"
+             />
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">issue</span>
+  </div>
+  <div class="col-span-3">
+    <div>
+      <input name="issue" type="text" placeholder=""
+             value="{{ doc_info.issue }}"
+             class="input input-bordered w-full input-sm"
+             />
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">description</span>
+  </div>
+  <div class="col-span-3">
+    <div>
+      <input name="description" type="text" placeholder=""
+             value="{{ doc_info.description }}"
+             class="input input-bordered w-full input-sm"
+             />
+    </div>
+  </div>
+
+  <div class="text-right">
+    <button class="btn btn-outline btn-success btn-sm">
+      Submit
+    </button>
+  </div>
+  <div>
+    <button hx-get="/partial/info/d/{{ doc_id }}" class="btn btn-outline btn-error btn-sm">
+      Cancel
+    </button>
+  </div>
+
+</form>

@@ -1,0 +1,120 @@
+<div class="grid grid-cols-4 gap-4 mb-4"
+     hx-target="this" hx-swap="outerHTML">
+
+  <div class="text-right">
+    <span class="label-text">name</span>
+  </div>
+  <div class="col-span-3">
+    <div class="h-8 text-xs">
+      {{ doc_info.name }}
+    </div>
+  </div>
+
+  <div class="text-right">
+    <span class="label-text">title</span>
+  </div>
+  <div class="col-span-3">
+    <div class="h-8 text-xs">
+      {{ doc_info.title }}
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">doi</span>
+  </div>
+  <div class="col-span-3">
+    <div class="h-8 text-xs">
+      {{ doc_info.doi }}
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">authors</span>
+  </div>
+  <div class="col-span-3">
+    <div class="h-8 text-xs">
+      {{ doc_info.authors }}
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">journal</span>
+  </div>
+  <div class="col-span-3">
+    <div class="h-8 text-xs">
+      {{ doc_info.journal }}
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">uri</span>
+  </div>
+  <div class="col-span-3">
+    <div class="h-8 text-xs">
+      {{ doc_info.uri }}
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">year</span>
+  </div>
+  <div class="col-span-3">
+    <div class="h-8 text-xs">
+      {{ doc_info.year }}
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">month</span>
+  </div>
+  <div class="col-span-3">
+    <div class="h-8 text-xs">
+      {{ doc_info.month }}
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">volume</span>
+  </div>
+  <div class="col-span-3">
+    <div class="h-8 text-xs">
+      {{ doc_info.volume }}
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">issue</span>
+  </div>
+  <div class="col-span-3">
+    <div class="h-8 text-xs">
+      {{ doc_info.issue }}
+    </div>
+  </div>
+
+
+  <div class="text-right">
+    <span class="label-text">description</span>
+  </div>
+  <div class="col-span-3">
+    <div class="h-8 text-xs">
+      {{ doc_info.description }}
+    </div>
+  </div>
+
+  <div class="text-right">
+
+    <button hx-get="/partial/info/d/{{ doc_id }}/edit" class="btn btn-outline btn-primary btn-sm">
+      Click To Edit
+    </button>
+
+  </div>
+
+</div>

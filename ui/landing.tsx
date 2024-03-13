@@ -761,16 +761,18 @@ function MapScrollCard({ returnRowColor, item, updateMap }) {
             <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-evenly' }}>
 
                 {item.validated ?
-                    <Button variant="contained" onClick={() => { handleMapClick(item, "points") }}>Georeference</Button>
+                    <Button size="small" variant="contained" onClick={() => { handleMapClick(item, "points") }}>Georeference</Button>
                     :
-                    <Button variant="contained" onClick={() => { handleMapClick(item, "points") }}>Georeference</Button>
+                    <Button size="small" variant="contained" onClick={() => { handleMapClick(item, "points") }}>Georeference</Button>
                 }
                 {item.georeferenced ?
-                    <Button variant="contained" onClick={() => { handleMapClick(item, "projections") }}>Projections</Button>
+                    <Button size="small" variant="contained" onClick={() => { handleMapClick(item, "projections") }}>Projections</Button>
                     :
-                    <Button disabled variant="contained" onClick={() => { handleMapClick(item, "projections") }}>Projections</Button>
+                    <Button size="small" disabled variant="contained" onClick={() => { handleMapClick(item, "projections") }}>Projections</Button>
 
                 }
+                <Button size="small" variant="contained" onClick={() => { handleMapClick(item, "legendAnnotation") }}>Legend Annotations</Button>
+
                 <InfoIcon
                     aria-label="expand row"
                     size="small"

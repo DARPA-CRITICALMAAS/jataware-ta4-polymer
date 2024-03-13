@@ -35,6 +35,26 @@ class DbPdf(Base):
     doi = Column(String)
     created_date = Column(DateTime, default=datetime.datetime.utcnow)
     annotations: Mapped[List["DbAnnotation"]] = relationship(back_populates="doc", cascade="all,delete")
+    doc_info: Mapped["DbDocInfo"] = relationship(back_populates="doc", cascade="all,delete")
+
+
+class DbDocInfo(Base):
+    __tablename__ = "pdf_info"
+    id: Mapped[String] = mapped_column(String, primary_key=True, default=_uuid)
+    doc: Mapped[DbPdf] = relationship(back_populates="doc_info")
+    doc_id: Mapped[String] = mapped_column(ForeignKey("pdfs.id"))
+    doi = Column(String, default="")
+    name = Column(String, default="")
+    authors = Column(String, default="")
+    journal = Column(String, default="")
+    uri = Column(String, default="")
+    title = Column(String, default="")
+    year = Column(String, default="")
+    month = Column(String, default="")
+    volume = Column(String, default="")
+    issue = Column(String, default="")
+    description = Column(String, default="")
+    xdd_id = Column(String, default="")
 
 
 class DbAnnotation(Base):

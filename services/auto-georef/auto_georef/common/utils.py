@@ -8,6 +8,14 @@ import boto3
 from auto_georef.settings import app_settings
 import numpy as np
 from PIL import Image
+from fastapi.concurrency import run_in_threadpool
+
+import fitz
+
+import io
+
+from osgeo import gdal
+import tempfile
 
 logger: Logger = logging.getLogger(__name__)
 
@@ -33,20 +41,19 @@ def s3_client():
 
 
 @timeit(logger)
-def load_tiff_cache(cache, s3_key):
-    
+async def load_tiff_cache(cache, s3_key):
+
     if s3_key in cache:
         logger.debug("Loading image from cache: %s", s3_key)
         return cache[s3_key]
 
     logger.debug("Loading image from S3: %s", s3_key)
-    s3 = s3_client()
-    img = s3.get_object(Bucket=app_settings.s3_tiles_bucket, Key=s3_key)
-    img_data = img.get("Body").read()
+    img_data =  await run_in_threadpool(lambda:read_s3_contents(s3_key))
     image = Image.open(io.BytesIO(img_data))
 
     cache[s3_key] = image
     return image
+
 
 @timeit(logger)
 def load_tiff(s3_key):
@@ -115,3 +122,19 @@ def open_tiff(fname, as_np=True):
 def time_since(logger, msg, start):
     fin = perf_counter() - start
     logger.debug(f"{msg} - completed in %.8f", fin)
+
+
+@timeit(logger)
+def pdf_to_hd_tif(filepath, temp_file):
+
+    doc = fitz.open(filepath)
+
+    page = doc.load_page(0)
+
+    pixels = page.get_pixmap(matrix=fitz.Matrix(5.0, 5.0))
+
+    img = Image.open(io.BytesIO(pixels.tobytes()))
+    tiff = io.BytesIO()
+    img.save(tiff, format="TIFF")
+
+    temp_file.write(tiff.getvalue())

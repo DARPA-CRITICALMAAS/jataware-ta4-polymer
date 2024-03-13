@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import Extra
 
 
 class Settings(BaseSettings):
@@ -12,8 +13,10 @@ class Settings(BaseSettings):
     gcps_index: str = "gcps2"
     epsgs_index: str = "epsgs2"
     proj_files_index: str = "proj_files2"
+    features_index: str = "features"
 
     class Config:
+        extra = Extra.allow
         case_sensitive = False
         env_prefix = "autogeoref_"
         env_file = ".env"

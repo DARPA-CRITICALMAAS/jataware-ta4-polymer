@@ -9,6 +9,7 @@
              get url() {
                return '/png/pdf/' + this.doc_id + '/' + this.pageNum + '?bbox=' + this.bbox.join(',');
              },
+             preview_url: '',
              imgH: {{ page_height }},
              imgW: {{ page_width }},
              scale_factor: {{ scale_factor }},
@@ -51,7 +52,10 @@
 
                 let url = '/r/' + types[type] +  '/' + this.doc_id + '/' + this.pageNum + '/' + sel.x0 + '/' + sel.y0 + '/' + sel.x1 + '/' + sel.y1;
 
+                this.preview_url = '/png/pdf/' + this.doc_id + '/' + this.pageNum + '/' + sel.x0 + '/' + sel.y0 + '/' + sel.x1 + '/' + sel.y1;
+                console.log('preview url: ', this.preview_url)
                 window.location = url;
+
              },
              enable_selection(type) {
                return () => {
@@ -74,17 +78,22 @@
   <div class="flex flex-row w-full">
     <div class="flex flex-col m-4">
       <div class="mx-4 mt-4">
-        <a class="link link-secondary" href="/doc/download/{{ doc_id }}" target="_blank">Download Document</a>
+        <a class="link link-primary" href="/a/{{ doc_id }}" target="_blank">Annotations Overview</a>
       </div>
-      <div class="mx-4 my-2">
-        <a class="link link-secondary" href="/doc/annotations/download/{{ doc_id }}" target="_blank">Download Annotations</a>
+      <div class="mx-4">
+        <a class="link link-secondary text-sm" href="/doc/download/{{ doc_id }}" target="_blank">Download Document</a>
       </div>
-
+      <div class="mx-4 mb-2">
+        <a class="link link-secondary text-sm" href="/doc/annotations/download/{{ doc_id }}" target="_blank">Download Annotations</a>
+      </div>
       <div class="mx-4 text-xs">
         Jump to Page:
         <input
-               x-on:change.debounce="document.querySelector('.carousel-item-' + ($event.target.value - 1)).scrollIntoView()"
-               type="text" placeholder="" class="input-xs w-10 max-w-xs" /> / {{ page_count }}
+               x-on:change.debounce="document.querySelector('.carousel-item-' + ($event.target.value)).scrollIntoView()"
+               type="text" placeholder="" class="input-xs w-10 max-w-xs" /> / {{ page_count - 1}}
+      </div>
+      <div class="mx-4 text-xs">
+        <a class="link link-secondary no-underline" href="/info/d/{{ doc_id }}">.</a>
       </div>
       <div class="divider mx-2 mb-2"></div>
       <div class="w-[188px] carousel carousel-vertical"
@@ -93,7 +102,7 @@
         {% for i in range(page_count) %}
         <div class="carousel-item m-4 carousel-item-{{ i }}">
           <div class="flex flex-col">
-            <div class="text-xs"> <span>{{ i + 1 }} / {{ page_count }}<span></div>
+            <div class="text-xs"> <span>{{ i }} / {{ page_count - 1 }}<span></div>
             <a href="/d/{{ doc_id }}/{{ i }}">
               <img src="/thumb/pdf/{{ doc_id }}/{{ i }}" class="h-[200px] w-auto max-w-none bg-pdf-base" loading="lazy">
             </a>

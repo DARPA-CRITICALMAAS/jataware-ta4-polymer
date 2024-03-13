@@ -6,8 +6,7 @@ import { BrowserRouter } from 'react-router-dom';
 import ProjectionViewer from './ProjectionViewer.jsx'
 import PointViewer from './pointViewer.jsx'
 import Landing from './landing.tsx'
-import ExploreTable from './explore_table.jsx';
-
+import LegendAnnotationPage from './components/legendAnnotation.tsx';
 function App() {
 
 
@@ -21,8 +20,8 @@ function App() {
         <Route path="/points/:map_id"
           element={<PointViewer />}
         />
-        <Route path="/explore"
-          element={<ExploreTable />}
+        <Route path="/legendAnnotation/:map_id"
+          element={<LegendAnnotationPage />}
         />
 
       </Routes>

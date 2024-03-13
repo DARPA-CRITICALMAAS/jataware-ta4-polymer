@@ -18,14 +18,16 @@ export const provenance_mapper = {
     "api_endpoint": "Manual",
     "bulk_upload": "Jataware Extraction Model",
     "jataware_extraction": "Jataware Extraction Model",
-    "uncharted_bulk_upload": "Uncharted Extraction Model"
+    "uncharted_bulk_upload": "Uncharted Georeferencing Model",
+    "bulk_upload_hackathon": "Uncharted Georeferencing Model"
 }
 export const provenance_colors = {
     "bulk_ngmdb_update": "#446100",
     "api_endpoint": "#FF0000",
     "bulk_upload": "#690fda",
     "jataware_extraction": "#690fda",
-    "uncharted_bulk_upload": "#4B0082"
+    "uncharted_bulk_upload": "#4B0082",
+    "bulk_upload_hackathon": "#4B0082"
 }
 
 export function checkIfEdited(gcp) {
@@ -296,17 +298,21 @@ export function sortByGcpId(arrayOfGCPs) {
     });
 }
 
-export function returnImageUrl(map_id, gcp) {
+export function returnImageBufferUrl(map_id, gcp) {
     return "/api/map/clip-tiff?map_id=" + map_id + "&coll=" + parseInt(gcp['coll']) + "&rowb=" + parseInt(gcp['rowb'])
 }
 
 export function createPath(status, dir) {
+    console.log(status)
     let path = dir + '/projections/'
     if (status == "not_georeferenced") {
         path = dir + '/points/'
     }
     if (status == "not_a_map") {
         path = dir + '/points/'
+    }
+    if (status == "legendAnnotation") {
+        path = dir + '/legendAnnotation/'
     }
     return path
 }
@@ -351,4 +357,12 @@ export const oneMap = async (status, navigate, nav_path) => {
     } catch (error) {
         console.error("Error fetching data:", error);
     }
+}
+
+export const findFeatureByAttribute = function (source, attributeName, attributeValue) {
+    return source.getFeatures().find(feature => feature.get(attributeName) === attributeValue);
+}
+
+export const returnImageUrl = function (map_id, extent) {
+    return "/api/map/clip-bbox?map_id=" + map_id + "&minx=" + parseInt(extent[0]) + "&miny=" + parseInt(extent[1]) + "&maxx=" + parseInt(extent[2]) + "&maxy=" + parseInt(extent[3])
 }

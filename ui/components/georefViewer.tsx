@@ -74,6 +74,7 @@ function MapPage({ map_id, mapData }) {
     const [baseMapSources, setBaseMapSources] = useState()
     const [baseSelected, setBaseSelected] = useState('USGSTopo');
     const [currentProj, setCurrentProj] = useState()
+    const [loadedTiff, setLoadedTiff] = useState(false)
 
     const currCenterRef = useRef()
     const Proj_Ref = useRef()
@@ -100,7 +101,7 @@ function MapPage({ map_id, mapData }) {
         sources: [
             {
                 url: `${TIFF_URL}/cogs/${map_id}/${map_id}_${mapData['proj_info'][0]['proj_id']}.pro.cog.tif`,
-                nodata: 0,
+                nodata: -1,
             }
         ],
         convertToRGB: true,
@@ -147,6 +148,19 @@ function MapPage({ map_id, mapData }) {
             console.error("An error occurred:", error);
         }
     }
+    useEffect(() => {
+        axios({
+            method: 'get',
+            url: `/api/map/clip-tiff?map_id=${map_id}&coll=${1}&rowb=${1}`,
+            headers: _APP_JSON_HEADER
+        }).then((response) => {
+            setLoadedTiff(true)
+
+        }).catch((error) => {
+            console.error('Error fetching data:', error);
+        });
+        return
+    }, [])
 
     // Render map
     useEffect(() => {
@@ -245,7 +259,7 @@ function MapPage({ map_id, mapData }) {
             sources: [
                 {
                     url: `${TIFF_URL}/cogs/${map_id}/${map_id}_${mapData['proj_info'][proj_index.current]['proj_id']}.pro.cog.tif`,
-                    nodata: 0,
+                    nodata: -1,
                 }
             ],
             convertToRGB: true,
@@ -533,17 +547,27 @@ function MapPage({ map_id, mapData }) {
                         <div>
                             {showGCPs ?
                                 <>
-                                    {gcps &&
-                                        gcps.map((gcp, i) => {
-                                            return <div key={gcp.gcp_id}>
-                                                <div className="container_card">
-                                                    <GCPCardSummary gcp={gcp} crs_names={mapData['crs_names']} />
-                                                    <SmallMapImage map_id={map_id} gcp={gcp} />
-                                                </div>
-                                            </div>
-                                        })
+                                    {loadedTiff ?
+                                        <>
+                                            {gcps &&
+                                                gcps.map((gcp, i) => {
+                                                    return <div key={gcp.gcp_id}>
+                                                        <div className="container_card">
+                                                            <GCPCardSummary gcp={gcp} crs_names={mapData['crs_names']} />
+                                                            <SmallMapImage map_id={map_id} gcp={gcp} />
+                                                        </div>
+                                                    </div>
+                                                })
+                                            }
+                                        </>
+                                        :
+                                        <>
+                                            <div>Looking for gcps...</div>
+                                        </>
                                     }
+
                                 </>
+
                                 :
                                 <>
                                     {showButtonForClip == true ?

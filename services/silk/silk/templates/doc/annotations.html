@@ -48,12 +48,12 @@
     <div class="px-2 mb-2 text-xs h-16 max-w-24">
       <img
         loading="lazy"
-        src="/svg/pdf/{{ annotation.doc_id }}/{{ annotation.page }}/{{ annotation.x0 }}/{{ annotation.y0 }}/{{ annotation.x1 }}/{{ annotation.y1}}" />
-      </div>
+        src="/png/pdf/{{ annotation.doc_id }}/{{ annotation.page }}/{{ annotation.x0 }}/{{ annotation.y0 }}/{{ annotation.x1 }}/{{ annotation.y1}}" />
+    </div>
 
     <div class="px-2 mb-2 text-xs">
       {% for label in annotation.tags %}
-      <div class="flex flex-row">
+      <div class="flex flex-row mb-2">
         <div class="mr-2">
         {{ label.label }}
         </div>

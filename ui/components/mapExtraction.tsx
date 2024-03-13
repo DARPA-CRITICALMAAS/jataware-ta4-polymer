@@ -52,7 +52,7 @@ function MapPage({ mapData }) {
     const [georeferenced, setGeoreferenced] = useState(false)
     const [isProjected, setProjected] = useState(mapData['map_info']['georeferenced']);
     const [provenanceOption, setProvenanceOption] = useState([])
-
+    const [loadedTiff, setLoadedTiff] = useState(false)
     const [showOCR, setShowOCR] = useState(false)
     const [EPSGs, setEPSGs] = useState([])
     const [extractedText, setExtractedText] = useState("")
@@ -105,7 +105,7 @@ function MapPage({ mapData }) {
         sources: [
             {
                 url: `${TIFF_URL}/cogs/${map_id}/${map_id}.cog.tif`,
-                nodata: 0,
+                nodata: -1,
             }
         ],
         convertToRGB: true,
@@ -193,9 +193,8 @@ function MapPage({ mapData }) {
                 const new_map_source = new GeoTIFF({
                     sources: [
                         {
-
                             url: proj_url,
-                            nodata: 0,
+                            nodata: -1,
                         }
                     ],
                     convertToRGB: true,
@@ -296,6 +295,21 @@ function MapPage({ mapData }) {
     }, [gcps])
 
 
+    useEffect(() => {
+        axios({
+            method: 'get',
+            url: `/api/map/clip-tiff?map_id=${map_id}&coll=${1}&rowb=${1}`,
+            headers: _APP_JSON_HEADER
+        }).then((response) => {
+            setLoadedTiff(true)
+
+        }).catch((error) => {
+            console.error('Error fetching data:', error);
+        });
+        return
+    }, [])
+
+
     // Update GCPs
     function updateGCP(new_gcp) {
 
@@ -369,7 +383,11 @@ function MapPage({ mapData }) {
             data: { "map_id": map_id, "bboxes": bboxes },
             headers: _APP_JSON_HEADER
         }).then((response) => {
-            setExtractedText(response.data['extracted_text'])
+            let all_text = ""
+            for (let text of response.data['extracted_text']) {
+                all_text = all_text + " " + text
+            }
+            setExtractedText(all_text)
 
         }).catch((error) => {
             console.error('Error fetching data:', error);
@@ -646,14 +664,24 @@ function MapPage({ mapData }) {
                         <div>
 
                             {
-                                gcps.map((gcp, i) => {
-                                    return <div key={gcp.gcp_id}>
-                                        <div className="container_card">
-                                            <GCPCard gcp={gcp} updateGCP={updateGCP} deleteGCP={deleteGCP} provenance={provenance_mapper} />
-                                            <SmallMap map_id={map_id} gcp={gcp} updateGCP={updateGCP} />
-                                        </div>
-                                    </div>
-                                })
+                                loadedTiff ?
+                                    <>
+                                        {
+                                            gcps.map((gcp, i) => {
+                                                return <div key={gcp.gcp_id}>
+                                                    <div className="container_card">
+                                                        <GCPCard gcp={gcp} updateGCP={updateGCP} deleteGCP={deleteGCP} provenance={provenance_mapper} />
+                                                        <SmallMap map_id={map_id} gcp={gcp} updateGCP={updateGCP} />
+                                                    </div>
+                                                </div>
+                                            })
+                                        }
+                                    </>
+                                    :
+                                    <>
+                                        <div>Looking for gcps...</div>
+                                    </>
+
                             }
                         </div>
                     </div >

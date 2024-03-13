@@ -1,0 +1,40 @@
+
+{% for page, annotations in page_annotations %}
+<div class="flex flex-col">
+  <div>
+    <a class="link link-primary text-xs"href="/d/{{ doc_id }}/{{ page }}">go to page: {{ page }}</a>
+  </div>
+
+  <div class="flex flex-col">
+    {% for annotation in annotations %}
+    <div class="flex flex-row overflow-hidden border-b mb-2">
+      <div class="mb-2 text-xs h-16 max-w-24">
+        <a href="/r/txt/{{ doc_id }}/{{ page }}/{{ annotation.x0 }}/{{ annotation.y0 }}/{{ annotation.x1 }}/{{ annotation.y1}}" >
+          <img
+            class="h-16 max-w-24"
+            loading="lazy"
+            src="/png/pdf/{{ annotation.doc_id }}/{{ annotation.page }}/{{ annotation.x0 }}/{{ annotation.y0 }}/{{ annotation.x1 }}/{{ annotation.y1}}" />
+        </a>
+      </div>
+
+      <div class="flex flex-col px-2 mb-2 text-xs">
+
+        {% for label in annotation.tags %}
+        <div class="flex flex-row mb-2">
+          <div class="mr-2">
+            {{ label.label }}
+          </div>
+          <div>
+            {{ label.value }}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% endfor %}
+  </div>
+
+</div>
+
+{% endfor %}

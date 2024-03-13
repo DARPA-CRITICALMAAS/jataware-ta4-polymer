@@ -1,5 +1,7 @@
 import logging
 import uuid
+from collections import defaultdict
+from itertools import groupby
 from logging import Logger
 from pathlib import Path
 from typing import Dict, List
@@ -19,6 +21,7 @@ from ...settings import app_settings
 from ...templates import templates
 
 openai.api_key = app_settings.openai_api_key
+
 
 logger: Logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -59,6 +62,162 @@ async def index(doc_id: str, page: int, request: Request, bbox: str = ""):
             "scale_factor": 4.0,
             "rotation": rotation,
             "selection": selection,
+        },
+    )
+
+
+def recoverpix(doc, item):
+    xref = item[0]  # xref of PDF image
+    smask = item[1]  # xref of its /SMask
+
+    # special case: /SMask or /Mask exists
+    if smask > 0:
+        pix0 = fitz.Pixmap(doc.extract_image(xref)["image"])
+        if pix0.alpha:  # catch irregular situation
+            pix0 = fitz.Pixmap(pix0, 0)  # remove alpha channel
+        mask = fitz.Pixmap(doc.extract_image(smask)["image"])
+
+        try:
+            pix = fitz.Pixmap(pix0, mask)
+        except:  # fallback to original base image in case of problems
+            pix = fitz.Pixmap(doc.extract_image(xref)["image"])
+
+        if pix0.n > 3:
+            ext = "pam"
+        else:
+            ext = "png"
+
+        return {  # create dictionary expected by caller
+            "ext": ext,
+            "colorspace": pix.colorspace.n,
+            "image": pix.tobytes(ext),
+        }
+
+    # special case: /ColorSpace definition exists
+    # to be sure, we convert these cases to RGB PNG images
+    if "/ColorSpace" in doc.xref_object(xref, compressed=True):
+        pix = fitz.Pixmap(doc, xref)
+        pix = fitz.Pixmap(fitz.csRGB, pix)
+        return {  # create dictionary expected by caller
+            "ext": "png",
+            "colorspace": 3,
+            "image": pix.tobytes("png"),
+        }
+    return doc.extract_image(xref)
+
+
+@router.get("/partials/d/img/{doc_id}/{page_num}/{xref}", response_class=Response)
+async def index_overview_image(doc_id: str, page_num: int, xref: int, request: Request):
+    with db_session() as session:
+        pdf = session.query(DbPdf).filter_by(id=doc_id).one()
+    doc = cache_open_pdf(pdf.id)
+
+    img = next((img for img in doc[page_num].get_images() if img[0] == xref), None)
+    if not img:
+        return Response(status_code=status.HTTP_404_NOT_FOUND, content="")
+
+    image = recoverpix(doc, img)
+    image["colorspace"]
+    imgdata = image["image"]
+
+    return Response(content=imgdata, media_type="image/png")
+
+
+@router.get("/i/{doc_id}")
+async def image_overview(doc_id: str, request: Request):
+    with db_session() as session:
+        pdf = session.query(DbPdf).filter_by(id=doc_id).one()
+
+    doc = cache_open_pdf(pdf.id)
+
+    imgs = []
+
+    # for i, page in enumerate(doc):
+    #     if xs := page.get_images():
+    #         for img in xs:
+    #             imgs.append((i, img))
+
+    for i, page in enumerate(doc):
+        if xs := page.get_image_info():
+            for img in xs:
+                x0, y0, x1, y1 = img["bbox"]
+                imgs.append(
+                    {
+                        "page": i,
+                        "x0": x0,
+                        "y0": y0,
+                        "x1": x1,
+                        "y1": y1,
+                    }
+                )
+
+    return templates.TemplateResponse(
+        "doc/images.html",
+        {
+            "doc_id": doc_id,
+            "request": request,
+            "imgs": imgs,
+        },
+    )
+
+
+@router.get("/partials/t/search/{doc_id}")
+async def index_text_search_results(doc_id: str, request: Request, term: str = ""):
+    with db_session() as session:
+        pdf = session.query(DbPdf).filter_by(id=doc_id).one()
+
+    results = defaultdict(list)
+
+    doc = cache_open_pdf(pdf.id)
+
+    if term and len(term) > 2:
+        for p in doc:
+            page_search_results = [
+                fitz.Rect(float(r[0]), float(r[1]), float(r[2]), float(r[3])) for r in p.search_for(term)
+            ]
+
+            blocks = p.get_text("blocks")
+
+            for block in blocks:
+                x0, y0, x1, y1, *_ = block
+                r = fitz.Rect(x0, y0, x1, y1)
+
+                if any(term for term in page_search_results if r.contains(term)):
+                    results[p.number].append(
+                        {
+                            "page": p.number,
+                            "x0": x0,
+                            "y0": y0,
+                            "x1": x1,
+                            "y1": y1,
+                        }
+                    )
+
+    return templates.TemplateResponse(
+        "doc/text_search_results.html",
+        {
+            "doc_id": doc_id,
+            "request": request,
+            "results": results,
+            "term": term,
+        },
+    )
+
+
+@router.get("/t/{doc_id}")
+async def index_text_search(doc_id: str, request: Request):
+    with db_session() as session:
+        pdf = session.query(DbPdf).filter_by(id=doc_id).one()
+
+    cache_open_pdf(pdf.id)
+
+    return templates.TemplateResponse(
+        "doc/text_search.html",
+        {
+            "doc_id": doc_id,
+            "request": request,
+            "results": [],
+            "imgs": [],
         },
     )
 
@@ -159,7 +318,7 @@ async def doc_id_annotations_download(doc_id: str, request: Request):
     with db_session() as session:
         pdf = (
             session.query(DbPdf)
-            .options(joinedload(DbPdf.annotations).joinedload(DbAnnotation.tags))
+            .options(joinedload(DbPdf.doc_info), joinedload(DbPdf.annotations).joinedload(DbAnnotation.tags))
             .filter_by(id=doc_id)
             .one()
         )
@@ -267,3 +426,42 @@ def delete_annotations(annotation_id, request: Request):
             session.commit()
 
     return HTMLResponse(status_code=status.HTTP_200_OK, content="")
+
+
+@router.get("/a/{doc_id}")
+def annotations_overview(doc_id: str, request: Request):
+    return templates.TemplateResponse(
+        "doc/annotation_overview.html",
+        {
+            "doc_id": doc_id,
+            "request": request,
+        },
+    )
+
+
+@router.get("/partial/a/search/{doc_id}")
+def annotations_overview_filtered(doc_id: str, request: Request, q: str = ""):
+    with db_session() as session:
+        annotations = (
+            session.query(DbAnnotation)
+            .options(joinedload(DbAnnotation.tags))
+            .filter_by(doc_id=doc_id)
+            .order_by(DbAnnotation.page)
+            .all()
+        )
+
+    if q:
+        annotations = [
+            annotation for annotation in annotations for tag in annotation.tags if q.lower() in tag.value.lower()
+        ]
+
+    page_annotations = groupby(annotations, lambda a: a.page)
+
+    return templates.TemplateResponse(
+        "doc/component_annotation_overview_filtered.html",
+        {
+            "doc_id": doc_id,
+            "request": request,
+            "page_annotations": page_annotations,
+        },
+    )

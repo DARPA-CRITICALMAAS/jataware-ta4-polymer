@@ -8,3 +8,8 @@ services:
       - ./aws/credentials:/home/apps/.aws/credentials
     env_file:
       - ./services/auto-georef/.env
+  jataware_georef:
+    ports: 
+      - 3001:3000
+    volumes:
+      - ./services/jataware_georef:/home/apps/jataware_georef

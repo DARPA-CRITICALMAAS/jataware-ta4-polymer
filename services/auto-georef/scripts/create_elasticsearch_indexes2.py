@@ -153,6 +153,31 @@ projection_file_mapping = {
 }
 
 
+features_mapping = {
+    "settings": {"number_of_shards": 1, "number_of_replicas": 0},
+    "mappings": {
+        "properties": {
+            "map_id": {"type": "keyword"},
+            "parent_id":{"type":"keyword"}, # optional - for swatch descriptions can connect to swatch legend item
+            "feature_id": {"type": "keyword"},
+            "reference_id":{"type":"keyword"},
+            "image_url": {"type": "text"},
+            "extent_from_bottom": {"type": "float"},
+            "points_from_top": {"type": "float"},  
+            "geom_pixel_from_bottom": {"type": "geo_shape"},
+            "text": {"type": "text"},
+            "provenance": {"type": "text"}, 
+            "model": {"type": "text"},  
+            "model_version": {"type": "text"},  
+            "category": {"type": "text"},   # legend_swatch, legend_description, legend_area, 
+            "confidence": {"type": "float"},
+            "status":{"type":"text"},
+            "notes": {"type":"text"}
+        }
+    },
+}
+
+
 def create_index(es_instance, index_name, mapping):
     """Creates an index in Elasticsearch if it doesn't exist."""
     if not es_instance.indices.exists(index=index_name):
@@ -173,10 +198,11 @@ def main():
         )
 
     indices_to_create = [
-        ("maps2", maps_mapping),
-        ("gcps2", gcps__mapping),
-        ("epsgs2", epsg__mapping),
-        ("proj_files2", projection_file_mapping),
+        # ("maps2", maps_mapping),
+        # ("gcps2", gcps__mapping),
+        # ("epsgs2", epsg__mapping),
+        # ("proj_files2", projection_file_mapping),
+        ("features", features_mapping)
     ]
 
     for index, mapping in indices_to_create:

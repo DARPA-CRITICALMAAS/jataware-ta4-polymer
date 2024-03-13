@@ -1,9 +1,11 @@
 import logging
+from io import BytesIO
 from logging import Logger
 
 import fitz
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import PlainTextResponse
+from PIL import Image
 
 from ...db.db import db_session
 from ...db.models import DbPdf
@@ -141,8 +143,8 @@ def png_thumb(request: Request, doc_id: str, page: int, term: str = "", blocks: 
     return Response(content=pix.tobytes(), media_type="image/png")
 
 
-@router.get("/svg/pdf/{doc_id}/{page}/{x0}/{y0}/{x1}/{y1}", response_class=Response)
-def crop(request: Request, doc_id: str, page: int, x0: float, y0: float, x1: float, y1: float):
+@router.get("/png/pdf/{doc_id}/{page}/{x0}/{y0}/{x1}/{y1}", response_class=Response)
+def png_crop(request: Request, doc_id: str, page: int, x0: float, y0: float, x1: float, y1: float):
     # cache?
 
     with db_session() as session:
@@ -153,9 +155,19 @@ def crop(request: Request, doc_id: str, page: int, x0: float, y0: float, x1: flo
     doc = cache_open_pdf(pdf.id)
 
     p = doc[page]
-    logger.debug(
-        "p.mediabox= %s, p.rotation= %s, p.cropbox= %s, p.rect = %s", p.mediabox, p.rotation, p.cropbox, p.rect
-    )
+
+    # blue = (0, 0, 1)
+    # red = (1, 0, 0)
+    # gold = (1, 1, 0)
+    # if term:
+    #     logger.debug(term)
+    #     for r in p.search_for(term):
+    #         logger.debug(r)
+    #         annot = p.add_rect_annot(r)
+    #         annot.set_border(width=1, dashes=[1, 2])
+    #         annot.set_colors(stroke=blue, fill=gold)
+    #         annot.update(opacity=0.5)
+
     mb = p.mediabox
     r = fitz.Rect(x0, y0, x1, y1)
     logger.debug("r= %s", r)
@@ -180,9 +192,41 @@ def crop(request: Request, doc_id: str, page: int, x0: float, y0: float, x1: flo
         p.cropbox,
         p.rect,
     )
-    r * p.rotation_matrix
+    # r = r * p.rotation_matrix
     pix = p.get_pixmap(matrix=fitz.Matrix(zoom_x, zoom_y), clip=r)
     return Response(content=pix.tobytes(), media_type="image/png")
+
+
+@router.get("/tiff/pdf/{doc_id}/{page}/{x0}/{y0}/{x1}/{y1}", response_class=Response)
+def tiff_crop(request: Request, doc_id: str, page: int, x0: float, y0: float, x1: float, y1: float):
+    # cache?
+
+    with db_session() as session:
+        pdf = session.query(DbPdf).filter_by(id=doc_id).one()
+
+    # cache
+    doc = cache_open_pdf(pdf.id)
+
+    p = doc[page]
+
+    mb = p.mediabox
+    r = fitz.Rect(x0, y0, x1, y1)
+    x0 = max(mb.x0, r.x0)
+    x1 = min(mb.x1, r.x1)
+    y0 = max(mb.y0, r.y0)
+    y1 = min(mb.y1, r.y1)
+
+    p.set_cropbox(p.mediabox)
+
+    zoom_x = 4.0  # horizontal zoom
+    zoom_y = 4.0  # vertical zoom
+    # r = r * p.rotation_matrix
+    pix = p.get_pixmap(matrix=fitz.Matrix(zoom_x, zoom_y), clip=r)
+    img = Image.open(BytesIO(pix.tobytes()))
+    tiff = BytesIO()
+    img.save(tiff, format="TIFF")
+    headers = {"Content-Disposition": f"inline; filename=silk_{doc_id}_{page}.tiff"}
+    return Response(content=tiff.getvalue(), media_type="image/tiff", headers=headers)
 
 
 @router.get("/txt/pdf/{doc_id}/{page}/{x0}/{y0}/{x1}/{y1}", response_class=Response)

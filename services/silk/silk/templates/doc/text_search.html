@@ -1,0 +1,31 @@
+{% extends "shared/_page.html" %}
+{% block main_content %}
+<div class="container mx-4 flex flex-1">
+  <div class="flex flex-row w-full">
+    <div class="flex flex-col m-4 w-full">
+
+      <div class="flex flex-col">
+
+        <div>
+
+          <input class="input input-bordered w-full"
+                 type="search"
+                 name="term"
+                 placeholder="Begin Typing To Search..."
+                 hx-get="/partials/t/search/{{ doc_id }}"
+                 hx-trigger="input changed delay:150ms, search, do-search"
+                 hx-target="#search-results"
+                 hx-indicator=".htmx-indicator">
+        </div>
+      </div>
+
+      <div id="search-results" class="grid grid-cols-3 gap-4">
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+{% endblock %}

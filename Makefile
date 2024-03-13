@@ -1,4 +1,4 @@
-VERSION := 0.1.61
+VERSION := 0.1.81
 
 # make helpers
 null  :=
@@ -65,10 +65,13 @@ docker-build-ui:
 docker-build-georef:
 	(cd services/auto-georef && docker build -t nylon_georef:dev .)
 
+.PHONY: docker-build-jataware-georef
+docker-build-jataware-georef:
+	(cd services/jataware_georef && docker build -t jataware_georef:dev .)
+
 .PHONY: docker-build-silk
 docker-build-silk:
 	(cd services/silk && docker build -t nylon_silk:dev .)
-
 
 
 .PHONY: gitlab-docker-login
@@ -117,9 +120,19 @@ docker_buildx-silk:| gitlab-docker-login  ## build and push silk
 		-f Dockerfile \
 		.)
 
+.PHONY: docker_buildx-jataware_georef
+docker_buildx-jataware_georef:| gitlab-docker-login  ## build and push jataware-georef
+	@echo "building jataware_georef"
+	(cd services/jataware_georef && \
+		docker buildx build \
+			--platform linux/amd64 \
+		-t registry.gitlab.com/jataware/nylon/jataware_georef:${VERSION} \
+		--output type=image,push=true \
+		-f Dockerfile \
+		.)
 
 .PHONY: docker_buildx-all
-docker_buildx-all:| docker_buildx-ui docker_buildx-silk docker_buildx-georef
+docker_buildx-all:| docker_buildx-ui docker_buildx-silk docker_buildx-georef docker_buildx-jataware_georef
 
 .PHONY:
 ALL_DOCKER_COMPOSE_FILES:= $(wildcard docker-compose*.yaml)
@@ -137,10 +150,11 @@ DOCKER_COMPOSE_FILES:=docker-compose.network.yaml \
 	docker-compose.postgis.yaml \
 	docker-compose.silk.yaml \
 	docker-compose.autogeoref.yaml \
+	docker-compose.jataware_georef.yaml \
 	$(DOCKER_COMPOSE_LOCALS) \
 	docker-compose.dev.yaml
 
-ALL_PROFILES=default minio elastic postgis silk georef
+ALL_PROFILES=default minio elastic postgis silk georef jataware_georef
 
 define all_profiles
 $(subst $(space),$(comma),$(ALL_PROFILES))
@@ -159,6 +173,10 @@ up:
 .PHONY: up.georef
 up.georef:
 	COMPOSE_PROFILES="georef" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
+
+.PHONY: up.jataware_georef
+up.georef:
+	COMPOSE_PROFILES="jataware_georef" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
 
 .PHONY: up.silk
 up.silk:

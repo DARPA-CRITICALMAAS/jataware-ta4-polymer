@@ -84,12 +84,16 @@ async def _download_events(url):
         logger.debug("downloading: %s", url)
 
         try:
-            async with http.stream("GET", url, timeout=None) as resp:
+            # HACK
+            headers = {"X-Api-Key": app_settings.xdd_api_key}
+
+            async with http.stream("GET", url, headers=headers, timeout=None) as resp:
                 resp.raise_for_status()
                 l = int(resp.headers.get("Content-Length", -1))
                 doc_cache = Path(app_settings.doc_cache)
                 doc_cache.mkdir(parents=True, exist_ok=True)
                 output_file = str(Path(doc_cache).joinpath(f"{uuid}.pdf"))
+
                 async with aiofiles.open(output_file, mode="wb") as f:
                     async for chunk in resp.aiter_bytes():
                         await f.write(chunk)

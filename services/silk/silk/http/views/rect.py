@@ -1,14 +1,16 @@
 import logging
 from functools import reduce
-from io import StringIO
+from io import BytesIO, StringIO
 from logging import Logger
 from typing import Annotated
 
 import fitz
+import httpx
 import openai
 import pandas
 from fastapi import APIRouter, Form, Request, status
 from fastapi.responses import HTMLResponse
+from PIL import Image
 
 from ...db.db import db_session
 from ...db.models import DbAnnotation, DbAnnotationTag, DbPdf
@@ -332,3 +334,61 @@ def refresh_table(extract_text: Annotated[str, Form()], request: Request):
         return HTMLResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content="failed to parse to table")
 
     return HTMLResponse(status_code=status.HTTP_200_OK, content=tbl)
+
+
+async def send_to_georeferencer(doc_id: str, page: int, x0: float, y0: float, x1: float, y1: float):
+    try:
+        with db_session() as session:
+            pdf = session.query(DbPdf).filter_by(id=doc_id).one()
+        doc = cache_open_pdf(pdf.id)
+
+        p = doc[page]
+
+        mb = p.mediabox
+        r = fitz.Rect(x0, y0, x1, y1)
+        x0 = max(mb.x0, r.x0)
+        x1 = min(mb.x1, r.x1)
+        y0 = max(mb.y0, r.y0)
+        y1 = min(mb.y1, r.y1)
+
+        p.set_cropbox(p.mediabox)
+
+        zoom_x = 4.0  # horizontal zoom
+        zoom_y = 4.0  # vertical zoom
+        r = r * p.rotation_matrix
+        pix = p.get_pixmap(matrix=fitz.Matrix(zoom_x, zoom_y), clip=r)
+        img = Image.open(BytesIO(pix.tobytes()))
+        tiff = BytesIO()
+        img.save(tiff, format="TIFF")
+
+        url = f"{app_settings.georef_api_host}/api/map/processMap"
+        files = {"file": (f"silk_{doc_id}_{page}.tiff", tiff.getvalue())}
+
+        async with httpx.AsyncClient(timeout=None) as client:
+            logger.debug("login")
+            await client.post(
+                "https://auth.polymer.rocks/api/firstfactor",
+                json={"username": app_settings.authelia_user, "password": app_settings.authelia_pass},
+            )
+
+            logger.debug("post")
+            r = await client.post(url, files=files)
+            r.raise_for_status()
+
+            j = r.json()
+            map_id = j.get("map_id")
+
+            return map_id
+
+    except Exception:
+        logger.exception("failed")
+
+
+@router.get("/partial/georef/img/{doc_id}/{page}/{x0}/{y0}/{x1}/{y1}")
+async def georef_image(request: Request, doc_id: str, page: int, x0: float, y0: float, x1: float, y1: float):
+    map_id = await send_to_georeferencer(doc_id, page, x0, y0, x1, y1)
+
+    html = f"""
+    <a target="_blank" class="link link-primary text-sm" href="https://georef.polymer.rocks/points/{map_id}">View Georeferenced</a>
+    """  # noqa: E501
+    return HTMLResponse(status_code=status.HTTP_200_OK, content=html)

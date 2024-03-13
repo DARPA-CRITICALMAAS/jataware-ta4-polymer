@@ -153,8 +153,9 @@ function addDrawInteraction (imgH, imgW, scale, rotation, cb) {
     // const link = document.getElementById('image-download');
     // link.href = mapCanvas.toDataURL();
     // link.click();
+    console.log('tl: ', x0 / 4, y0 / 4, (w) / 4, (h) / 4);
 
-    console.log('xyxy4:', x0 / 4, y0 / 4, (x0 + w) / 4, (y0 + h) / 4);
+    console.log('xyxy4:', x0 / 4, '/', y0 / 4, '/', (x0 + w) / 4, '/',(y0 + h) / 4);
     const sel = {
       x0: x0 / scale,
       y0: y0 / scale,

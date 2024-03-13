@@ -29,6 +29,7 @@ PyYAML="6.0.1"
 python-dotenv = "1.0.0"
 pytesseract="0.3.10"
 elasticsearch="^7.0"
+pymupdf = "1.23.4"
 
 
 

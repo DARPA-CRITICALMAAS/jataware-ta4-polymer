@@ -105,13 +105,15 @@ function addDrawInteraction (imgH, imgW, scale, rotation, cb) {
     let h = Math.abs(minY - maxY);
     let ext = f.getGeometry().getExtent();
 
-    const xy = getCenter(ext);
-    const geo = f.getGeometry();
-    console.log('rotation', rotation);
-    geo.rotate(rotation * (Math.PI / 180), xy);
-    console.log('ext', ext);
-    ext = geo.getExtent();
-    console.log('rotated', ext);
+
+    // Rotation
+    //const xy = getCenter(ext);
+    //const geo = f.getGeometry();
+    //console.log('rotation', rotation);
+    //geo.rotate(rotation * (Math.PI / 180), xy);
+    //console.log('ext', ext);
+    //ext = geo.getExtent();
+    //console.log('rotated', ext);
 
     let [x0, y0] = getTopLeft(ext);
     y0 = imgBoundH - y0;

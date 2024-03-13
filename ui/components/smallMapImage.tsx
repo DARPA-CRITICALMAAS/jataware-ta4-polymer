@@ -1,14 +1,14 @@
 
 import React, { useState } from 'react';
 
-import { returnImageUrl } from "./helpers"
+import { returnImageBufferUrl } from "./helpers"
 
 const TIFF_URL = import.meta.env.VITE_TIFF_URL;
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 const BUFFER = 200;
 
 function SmallMapImage({ map_id, gcp }) {
-    const [clipUrl, setClipUrl] = useState(returnImageUrl(map_id, gcp))
+    const [clipUrl, setClipUrl] = useState(returnImageBufferUrl(map_id, gcp))
 
     function returnColor(arr) {
         return `rgb(${arr[0]},${arr[1]},${arr[2]} )`

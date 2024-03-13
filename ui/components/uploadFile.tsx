@@ -50,7 +50,7 @@ function FileUploadForm({ setLoading }) {
     <>
 
       <div style={{ display: "flex", alignItems: "center", margin: "10px" }}>
-        <h4>Upload a Map  </h4>
+        <h4>Upload a Map (.pdf, .tif)</h4>
         <input style={{ marginLeft: "5px", width: "200px" }} type="file" accept=".tif, .tiff, .pdf" onChange={handleFileChange} />
         <button style={{ margin: "2px" }} onClick={handleFileUpload}>Upload</button>
       </div>

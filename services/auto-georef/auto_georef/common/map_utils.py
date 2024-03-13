@@ -10,7 +10,7 @@ from elasticsearch import helpers
 import copy
 from auto_georef.settings import app_settings
 import uuid
-import requests
+import httpx
 import re
 from osgeo import gdal
 from shapely.geometry import Point, MultiPoint
@@ -42,7 +42,20 @@ def generate_map_id(file):
     
 
 def create_boundary_polygon(south, east, north, west):
+    
+    
     try:
+        if not -90 <= south <= 90:
+            raise ValueError("South latitude is out of valid range. Must be between -90 and 90.")
+        if not -90 <= north <= 90:
+            raise ValueError("North latitude is out of valid range. Must be between -90 and 90.")
+        if not -180 <= east <= 180:
+            raise ValueError("East longitude is out of valid range. Must be between -180 and 180.")
+        if not -180 <= west <= 180:
+            raise ValueError("West longitude is out of valid range. Must be between -180 and 180.")
+
+        if north <= south:
+            raise ValueError("North latitude must be greater than South latitude.")
         coordinates = [
             [west, south],  # Bottom-left
             [east, south],  # Bottom-right
@@ -309,7 +322,7 @@ def query_gpt4(prompt_text):
         "max_tokens": 550,
     }
 
-    response = requests.post(endpoint, headers=headers, json=data)
+    response = httpx.post(endpoint, headers=headers, json=data)
 
     if response.status_code == 200:
         choices = response.json()["choices"]
@@ -335,22 +348,23 @@ def return_crs(temp_file_path):
 
 def is_cog(file_path):
     dataset = gdal.Open(file_path)
-    tiled = dataset.GetMetadataItem('TIFFTAG_TILEWIDTH') is not None
+    tiled = dataset.GetMetadataItem("TIFFTAG_TILEWIDTH") is not None
     overviews = dataset.GetRasterBand(1).GetOverviewCount() > 0
     return tiled and overviews
 
 
 def saveTifasCog(file_path, cog_path):
     ds = gdal.Open(file_path)
-    
-    tiled = ds.GetMetadataItem('TIFFTAG_TILEWIDTH') is not None
+
+    tiled = ds.GetMetadataItem("TIFFTAG_TILEWIDTH") is not None
     overviews = ds.GetRasterBand(1).GetOverviewCount() > 0
     if tiled and overviews:
-        logger.info('Already a cog.')
+        logger.info("Already a cog.")
         shutil.copyfile(file_path, cog_path)
         return
     translate_options = gdal.TranslateOptions(
-        format="COG", creationOptions=["COMPRESS=LZW"]
+        format="COG",
+        creationOptions=["COMPRESS=DEFLATE", "LEVEL=1"],
     )
     gdal.Translate(cog_path, ds, options=translate_options)
 
@@ -566,3 +580,51 @@ def project_vector_(es, feature, projection_id, crs):
     geom = shape(feature['geometry'])
     transformed_geom = apply_custom_transform(geom, pro_transform)
     return to_geojson(transformed_geom)
+
+
+def inverse_geojson(geojson, image_height):
+
+    geom_type = geojson['type']
+
+    def transform_coord(coord):
+        return [coord[0], image_height - coord[1]]
+
+    if geom_type == 'Point':
+        geojson['coordinates'] = transform_coord(geojson['coordinates'])
+    elif geom_type in ['LineString', 'MultiPoint']:
+        geojson['coordinates'] = [transform_coord(coord) for coord in geojson['coordinates']]
+    elif geom_type in ['Polygon', 'MultiLineString']:
+        geojson['coordinates'] = [[transform_coord(coord) for coord in ring] for ring in geojson['coordinates']]
+    elif geom_type == 'MultiPolygon':
+        geojson['coordinates'] = [[[transform_coord(coord) for coord in ring] for ring in polygon] for polygon in geojson['coordinates']]
+    elif geom_type == 'GeometryCollection':
+        for geometry in geojson['geometries']:
+            inverse_geojson(geometry, image_height)
+    else:
+        raise ValueError(f"Unsupported geometry type: {geom_type}")
+    return geojson
+
+def updateChildFeatures(es, map_id, new_feature_id, old_feature_id):
+    response = es.search(index=app_settings.features_index, body={
+            "query": {
+                "bool": {
+                    "must": [
+                        {"match": {"map_id": map_id}},
+                        {"match":{"parent_id":old_feature_id}}
+                    ],
+                    "filter": [
+                        {"terms": {"category": ["legend_description"]}},
+                    ]
+                }
+            }
+        })
+    updates=[]
+    for hit in response['hits']['hits']:
+        action = {
+                    "_op_type": "update",
+                    "_index": app_settings.features_index,
+                    "_id": hit['_source']['feature_id'],
+                    "doc": {"parent_id":new_feature_id}
+                }
+        updates.append(action)
+    return updates

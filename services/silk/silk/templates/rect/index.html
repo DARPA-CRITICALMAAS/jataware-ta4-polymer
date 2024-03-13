@@ -12,9 +12,27 @@
 
       <div class="mb-4 text-sm">Area Selection</div>
       <div class="px-4 mb-4 w-full">
-        <img src="/svg/pdf/{{doc_id}}/{{page_num}}/{{x0}}/{{y0}}/{{x1}}/{{y1}}"
+        <img src="/png/pdf/{{doc_id}}/{{page_num}}/{{x0}}/{{y0}}/{{x1}}/{{y1}}"
              class="bg-pdf-base max-h-[600px]" loading="lazy">
       </div>
+
+      {% if annotation_type == "img" %}
+      <div class="flex flex-col mb-4 ">
+        <div id="m" class="flex flex-col mt-4 px-4">
+          <button
+            hx-get="/partial/georef/img/{{doc_id}}/{{page_num}}/{{x0}}/{{y0}}/{{x1}}/{{y1}}"
+            hx-trigger="click delay:50ms"
+            hx-swap="outerHTML"
+            hx-indicator="#m"
+            hx-target="closest div"
+            class="btn btn-primary inflight-none">Georef Map</button>
+          <div id="spinner" class="htmx-indicator">
+            <span class="loading loading-infinity loading-md"></span>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       <div class="mb-4 text-sm">Text Extracted</div>
       <div class="flex flex-col px-4">
         <pre class="p-2 text-xs font-mono bg-neutral text-neutral-content whitespace-normal">
@@ -58,12 +76,8 @@
       </div>
       {% endif %}
 
-      {% if annotation_type == "img" %}
-      <div class="flex flex-col mt-4 px-4">
-        ...
-      </div>
-      {% endif %}
     </div>
+
 
     <div class="flex flex-col m-4 w-7/12">
       <div class="labels-wrapper">
