@@ -1,0 +1,37 @@
+{
+    "manifest_version": 3,
+    "name": "Georef Extension",
+    "version": "1.0",
+    "description": "A chrome extension to connect USGS NGMDB MapView to Polymer Georeferencer",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "tabs"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "https://ngmdb.usgs.gov/*"
+            ],
+            "js": [
+                "scripts/content.js"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
+    "background": {
+        "service_worker": "scripts/background.js"
+    },
+    "icons": {
+        "16": "images/polymer-16.png",
+        "24": "images/polymer-24.png",
+        "32": "images/polymer-32.png",
+        "48": "images/polymer-48.png"
+    },
+    "web_accessible_resources": [
+        {
+          "resources": [ "images/*" ],
+          "matches": [ "https://ngmdb.usgs.gov/*" ]
+        }
+    ]
+}
