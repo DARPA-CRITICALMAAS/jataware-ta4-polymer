@@ -13,3 +13,4 @@ services:
       - 3001:3000
     volumes:
       - ./services/jataware_georef:/home/apps/jataware_georef
+      - ./aws/credentials:/home/apps/.aws/credentials

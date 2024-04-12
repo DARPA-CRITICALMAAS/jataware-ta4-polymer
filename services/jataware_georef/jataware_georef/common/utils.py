@@ -32,12 +32,10 @@ def s3_client():
     return s3
 
 
-
 @timeit(logger)
 def upload_s3_file(s3_key, bucket, fp):
     s3 = s3_client()
     s3.upload_file(fp, bucket, s3_key)
-
 
 
 def open_tiff(fname, as_np=True):

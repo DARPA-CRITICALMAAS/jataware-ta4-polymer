@@ -1,4 +1,4 @@
-VERSION := 0.1.81
+VERSION := 0.1.91
 
 # make helpers
 null  :=
@@ -175,8 +175,13 @@ up.georef:
 	COMPOSE_PROFILES="georef" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
 
 .PHONY: up.jataware_georef
-up.georef:
+up.jataware_georef:
 	COMPOSE_PROFILES="jataware_georef" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
+
+.PHONY: down.jataware_georef
+down.jataware_georef:
+	COMPOSE_PROFILES="jataware_georef" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) down 
+
 
 .PHONY: up.silk
 up.silk:

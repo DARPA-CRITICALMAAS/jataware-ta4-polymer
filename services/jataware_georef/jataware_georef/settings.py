@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     s3_endpoint_url: str = None
-    cdr_endpoint_url: str = "http://192.168.1.153:8333/v1/maps/publish/georef"
+    cdr_endpoint_url: str = "http://192.168.1.162:8333/v1/maps/publish/georef"
     cdr_bearer_token: str = "Bearer a0d45e47f4884fa5c3f9d13154a6ddf389373c184f224a1d4dbe88ed2e96b151"
     secret_token: str = ""
 
