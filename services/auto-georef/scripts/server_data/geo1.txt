@@ -1,2 +1,0 @@
-maps/ngmdb/geotiff/000001/15363_1.zip
-maps/ngmdb/geotiff/000003/15515_3.zip
