@@ -1,0 +1,25 @@
+
+{% for page, matches in results.items() %}
+
+<div class="flex flex-row">
+  <div class="p-4 w-5/12">
+    <a href="/d/{{ doc_id }}/{{ page }}" target="_blank" class="link link-primary text-xs">Page: {{ page }}</a>
+    <img class="min-h-48 max-h-48" loading="lazy" src="/thumb/pdf/{{ doc_id }}/{{ page }}" />
+  </div>
+
+  <div class="flex flex-col w-7/12 py-4">
+    <div class="">
+      <span class="text-xs">matches:  {{ matches|length }}</span>
+    </div>
+    {% for match in matches %}
+    <div class="pb-2">
+      <img class="max-h-32" loading="lazy" src="/png/pdf/{{ doc_id }}/{{ match.page }}/{{ match.x0 }}/{{ match.y0 }}/{{ match.x1 }}/{{ match.y1}}" />
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+{% endfor %}
+
+

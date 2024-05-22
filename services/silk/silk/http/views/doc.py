@@ -79,7 +79,7 @@ def recoverpix(doc, item):
 
         try:
             pix = fitz.Pixmap(pix0, mask)
-        except:  # fallback to original base image in case of problems
+        except Exception:  # fallback to original base image in case of problems
             pix = fitz.Pixmap(doc.extract_image(xref)["image"])
 
         if pix0.n > 3:

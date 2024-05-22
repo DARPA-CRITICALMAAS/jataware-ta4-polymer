@@ -19,8 +19,6 @@ origins = [
 ]
 
 
-
-
 def setup_middleware(api: FastAPI) -> None:
     api.add_middleware(
         CORSMiddleware,

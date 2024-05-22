@@ -23,10 +23,21 @@ class Base(DeclarativeBase):
     pass
 
 
+class DbJobTracker(Base):
+    __tablename__ = "jobs"
+    job_id = Column(String, primary_key=True)
+    file_name = Column(String)
+    title = Column(String)
+    result = Column(String, default="")
+    cdr_id = Column(String, default="")
+    error = Column(String, default="")
+    created_date = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+# deprecated
 class DbPdf(Base):
     __tablename__ = "pdfs"
     id: Mapped[String] = mapped_column(String, primary_key=True, default=_uuid)
-    s3_key = Column(String)
     file_name = Column(String)
     size = Column(Integer)
     source = Column(String)
@@ -59,7 +70,6 @@ class DbDocInfo(Base):
 
 class DbAnnotation(Base):
     __tablename__ = "annotations"
-
     id = Column(String, primary_key=True, default=_uuid)
     doc_id: Mapped[String] = mapped_column(ForeignKey("pdfs.id"))
     doc: Mapped[DbPdf] = relationship(back_populates="annotations")

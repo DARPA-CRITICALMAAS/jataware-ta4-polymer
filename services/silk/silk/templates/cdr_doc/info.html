@@ -1,0 +1,170 @@
+{% extends "shared/_page.html" %}
+{% block main_content %}
+<div class="container mx-4 flex flex-1">
+  <div class="flex flex-row w-full">
+    <div class="flex flex-col m-4 w-full">
+      <div class="mb-4">
+        <a href="/d/{{ doc_id }}/0" class="link link-primary text-xs">{{ doc_id }}</a>
+      </div>
+      <div class="flex flex-row">
+
+        <div class="w-5/12 mr-4">
+
+          {% include "doc/component_info.html" %}
+
+        </div>
+
+        <div class="flex flex-col">
+
+          <div class="flex flex-row">
+            <div class="w-48 mr-24">
+
+              <div class="text-sm">
+                Upload Mappable Criteria
+              </div>
+
+              <div class="flex flex-col w-full"
+                   x-data="{
+                           file: null,
+                           uploading: false,
+                           get uploadFile() {
+                           return this.file?.[0]?.name;
+                           },
+                           async do_upload() {
+                           this.loading = true;
+                           $refs['form-container'].classList.add('opacity-25');
+                           $refs['form-container'].classList.add('pointer-events-none');
+                           $refs['progress-container'].classList.remove('hidden');
+                           console.log('uploading...');
+                           await $nextTick();
+                           $refs['btn-submit'].click();
+                           },
+                           }"
+                   >
+
+                <div x-ref="form-container"
+                     class="flex items-center justify-center w-full pb-2 z-100">
+                  <form id='form' x-ref="upload-form" hx-encoding='multipart/form-data' hx-post="/partial/info/d/{{ doc_id}}/mc/upload" class="w-full">
+                    <label for="dropzone-file"
+                           x-ref="dropzone-file"
+                           class="x-file-upload flex flex-col items-center justify-center w-full h-38 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600 relative">
+                      <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg class="w-6 h-6 mb-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                        </svg>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                          <span class="font-semibold">Click</span>
+                        </p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                          or drag and drop
+                        </p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">to upload</p>
+                      </div>
+                      <input id="dropzone-file" name="file" type="file"
+                             class="absolute inset-0 z-50 m-0 p-0 w-full outline-none opacity-0 cursor-copy"
+                             x-on:change="file = $event.target.files; do_upload();"
+                             x-on:dragover="$refs['dropzone-file'].classList.add('active');"
+                             x-on:dragleave="$refs['dropzone-file'].classList.remove('active');"
+                             x-on:drop="$refs['dropzone-file'].classList.remove('active');"
+                             >
+                    </label>
+                    <button class="hidden" x-ref="btn-submit"></button>
+                  </form>
+                </div>
+
+                <div x-ref="progress-container" class="flex flex-col items-center justify-center mx-6 my-1 hidden">
+                  <div class="w-full bg-gray-200 rounded-full dark:bg-gray-700">
+                    <div id="pbar" class="bg-blue-600 text-sm font-medium text-blue-100 text-center p-0.5 leading-none rounded-full" style="width: 0%"> 0%</div>
+                  </div>
+                  <div class="mx-6 w-full">
+                    <progress class="progress progress-primary w-full"></progress>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            <div class="w-48">
+
+              <div class="text-sm">
+                Upload Mineral Site
+              </div>
+
+              <div class="flex flex-col w-full"
+                   x-data="{
+                           file: null,
+                           uploading: false,
+                           get uploadFile() {
+                           return this.file?.[0]?.name;
+                           },
+                           async do_upload() {
+                           this.loading = true;
+                           $refs['form-container'].classList.add('opacity-25');
+                           $refs['form-container'].classList.add('pointer-events-none');
+                           $refs['progress-container'].classList.remove('hidden');
+                           console.log('uploading...');
+                           await $nextTick();
+                           $refs['btn-submit'].click();
+                           },
+                           }"
+                   >
+
+                <div x-ref="form-container"
+                     class="flex items-center justify-center w-full pb-2 z-100">
+                  <form id='form' x-ref="upload-form" hx-encoding='multipart/form-data' hx-post="/partial/info/d/{{ doc_id}}/ms/upload" class="w-full">
+                    <label for="dropzone-file"
+                           x-ref="dropzone-file"
+                           class="x-file-upload flex flex-col items-center justify-center w-full h-38 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600 relative">
+                      <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg class="w-6 h-6 mb-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                        </svg>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                          <span class="font-semibold">Click</span>
+                        </p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                          or drag and drop
+                        </p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">to upload</p>
+                      </div>
+                      <input id="dropzone-file" name="file" type="file"
+                             class="absolute inset-0 z-50 m-0 p-0 w-full outline-none opacity-0 cursor-copy"
+                             x-on:change="file = $event.target.files; do_upload();"
+                             x-on:dragover="$refs['dropzone-file'].classList.add('active');"
+                             x-on:dragleave="$refs['dropzone-file'].classList.remove('active');"
+                             x-on:drop="$refs['dropzone-file'].classList.remove('active');"
+                             >
+                    </label>
+                    <button class="hidden" x-ref="btn-submit"></button>
+                  </form>
+                </div>
+
+                <div x-ref="progress-container" class="flex flex-col items-center justify-center mx-6 my-1 hidden">
+                  <div class="w-full bg-gray-200 rounded-full dark:bg-gray-700">
+                    <div id="pbar" class="bg-blue-600 text-sm font-medium text-blue-100 text-center p-0.5 leading-none rounded-full" style="width: 0%"> 0%</div>
+                  </div>
+                  <div class="mx-6 w-full">
+                    <progress class="progress progress-primary w-full"></progress>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4">
+
+            <button type="button" class="btn btn-error" hx-delete="/partial/info/d/{{ doc_id }}/clear"
+                    hx-confirm="Are you sure you wish to delete all Annotations?">
+              Delete All Annotations
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/static/js/info_page.js"></script>
+  {% endblock %}

@@ -58,7 +58,6 @@ def cps_to_transform(cps, height, to_crs):
 
     return riot.from_gcps(cps_p)
 
-
 def project_(raw_path, pro_cog_path, geo_transform, crs):
     with rio.open(raw_path) as raw:
         bounds = riot.array_bounds(raw.height, raw.width, geo_transform)
@@ -236,11 +235,11 @@ def create_buffered_map_area(points: List) -> Area_Extraction:
         coordinates=polygon_coordinates,
         type="Polygon",
         category="map_area",
-        bbox=None,
+        bbox=[],
         confidence=None,
         model="jataware_extraction",
         model_version="0.0.1",
-        text=None,
+        text=""
     )
 
 

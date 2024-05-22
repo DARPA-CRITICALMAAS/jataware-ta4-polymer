@@ -117,7 +117,7 @@ async def delete_all_annotations(doc_id: str, request: Request, response: Respon
 
 
 @router.post("/partial/info/d/{doc_id}/mc/upload")
-async def doc_info_upload(doc_id: str, file: Annotated[UploadFile, Form()], request: Request, response: Response):
+async def doc_info_upload_mc(doc_id: str, file: Annotated[UploadFile, Form()], request: Request, response: Response):
     with db_session() as session:
         pdf = session.query(DbPdf).options(joinedload(DbPdf.doc_info)).filter_by(id=doc_id).one()
 

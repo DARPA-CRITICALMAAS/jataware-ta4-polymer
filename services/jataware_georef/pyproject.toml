@@ -24,7 +24,7 @@ pillow = "^10.1.0"
 shapely="2.0.1"
 PyYAML="6.0.1"
 boto3 = "^1.28.52"
-cdr_schemas = { git = "https://github.com/DARPA-CRITICALMAAS/cdr_schemas.git", tag = "v0.2.0+draft" }
+cdr_schemas = { git = "https://github.com/DARPA-CRITICALMAAS/cdr_schemas.git", tag = "v0.2.6+draft" }
 albumentations="1.2.1"
 segmentation-models-pytorch="0.3.0"
 torch = [
@@ -38,6 +38,11 @@ torchvision = [
       {url = "https://download.pytorch.org/whl/cpu/torchvision-0.17.1-cp311-cp311-macosx_10_13_x86_64.whl", platform = "darwin", python = ">=3.11 <3.12", markers="platform_machine == \"x86_64\""}
 
 ]
+
+[tool.poetry.scripts]
+dev = "dev.run:main"
+format = "dev.script:format"
+lint = "dev.script:lint"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.7.0"

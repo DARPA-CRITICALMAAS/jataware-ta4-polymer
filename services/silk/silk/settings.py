@@ -1,7 +1,16 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        extra="ignore",
+        case_sensitive=False,
+        env_prefix="silk_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_nested_delimiter="__",
+    )
+
     s3_endpoint_url: str = "https://s3.amazonaws.com"
     s3_documents_bucket: str = "protected.polymer.rocks"
     s3_documents_prefix: str = "silk/pdfs"
@@ -24,12 +33,13 @@ class Settings(BaseSettings):
     zotero_library_type: str = "group"
 
     xdd_api_key: str = ""
+    cdr_api_key: str = ""
 
-    class Config:
-        case_sensitive = False
-        env_prefix = "silk_"
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    cdr_admin_authelia_user: str
+    cdr_admin_authelia_pass: str
+
+    cdr_system_name: str = "silk"
+    cdr_system_version: str = "0.1.0"
 
 
 app_settings = Settings()

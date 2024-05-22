@@ -2,6 +2,7 @@ import logging
 from logging import Logger
 
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 
 from ..settings import app_settings
 from .middleware import setup_middleware
@@ -11,7 +12,7 @@ logger: Logger = logging.getLogger(__name__)
 api = FastAPI(debug=True, openapi_tags=tags_metadata)
 setup_middleware(api)
 api.include_router(api_router)
-
+api.add_middleware(GZipMiddleware, minimum_size=100000)
 
 def print_debug_routes() -> None:
     max_len = max(len(route.path) for route in api.routes)

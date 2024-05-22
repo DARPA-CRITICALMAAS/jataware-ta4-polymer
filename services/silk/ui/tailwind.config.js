@@ -11,9 +11,14 @@ module.exports = {
   },
   safelist: [
     "text-red-500",
+    "text-success",
     {
       pattern: /bg-+/,
     },
+    {
+      pattern: /btn-+/,
+    },
+
     {
       pattern: /(m|w|h|p)(t|r|b|l)?-+/,
     },

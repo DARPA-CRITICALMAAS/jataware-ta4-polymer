@@ -1,0 +1,34 @@
+{% extends "shared/_page.html" %}
+{% block main_content %}
+<div class="container mx-4 flex flex-1">
+  <div class="flex flex-row w-full">
+    <div class="flex flex-col m-4 w-full">
+
+      <div class="flex flex-col">
+        <div class="w-96 mb-4">
+
+          <input class="input input-bordered w-full"
+                 type="search"
+                 name="q"
+                 placeholder="Filter annotations"
+                 hx-get="/partial/a/search/{{ doc_id }}"
+                 hx-trigger="input changed delay:150ms, search, do-search"
+                 hx-target="#search-results"
+                 hx-indicator=".htmx-indicator">
+
+        </div>
+      </div>
+
+      <div id="search-results"
+           class="grid grid-cols-3 gap-4"
+           hx-get="/partial/a/search/{{ doc_id }}"
+           hx-trigger="load"
+           hx-swap="innerHTML"
+           >
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{% endblock %}

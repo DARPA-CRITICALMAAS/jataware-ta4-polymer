@@ -1,0 +1,31 @@
+
+version: '3'
+
+services:
+  jataware_georef:
+    profiles:
+      - jataware_georef
+    image: jataware_georef:dev
+    entrypoint:
+      - uvicorn
+      - jataware_georef.http.api:api
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "3000"
+      - --log-config
+      - logging.yaml
+      - --workers
+      - "1"
+      - "--reload"
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./services/jataware_georef/.env
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: "5"
+
+

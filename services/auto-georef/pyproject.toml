@@ -23,26 +23,14 @@ rioxarray="0.15.0"
 shapely="2.0.1"
 shortuuid="1.0.11"
 albumentations="1.2.1"
-segmentation-models-pytorch="0.3.0"
 numpy="1.25.2"
 PyYAML="6.0.1"
 python-dotenv = "1.0.0"
 pytesseract="0.3.10"
 elasticsearch="^7.0"
 pymupdf = "1.23.4"
+cdr_schemas = { git = "https://github.com/DARPA-CRITICALMAAS/cdr_schemas.git", tag = "v0.2.6+draft" }
 
-
-torch = [
-      {url = "https://download.pytorch.org/whl/cpu/torch-2.2.1%2Bcpu-cp311-cp311-linux_x86_64.whl#sha256=6bc973d5632374b92b4b293817b4d2ff8c8ce1c784c748b471dba1fffcd9c333", platform = "linux", python = ">=3.11 <3.12" },
-      {url = "https://download.pytorch.org/whl/cpu/torch-2.2.1-cp311-none-macosx_11_0_arm64.whl", platform = "darwin", python = ">=3.11 <3.12", markers="platform_machine == \"arm64\""},
-      {url = "https://download.pytorch.org/whl/cpu/torch-2.2.1-cp311-none-macosx_10_9_x86_64.whl", platform = "darwin", python = ">=3.11 <3.12", markers="platform_machine == \"x86_64\""}
-      ]
-torchvision = [
-      {url = "https://download.pytorch.org/whl/cpu/torchvision-0.17.1%2Bcpu-cp311-cp311-linux_x86_64.whl#sha256=7dbe91c25cec4444729f8d73109b661be2a0df68c6dccd6d42b0c38653caafd2", platform = "linux", python = ">=3.11 <3.12"},
-      {url = "https://download.pytorch.org/whl/cpu/torchvision-0.17.1-cp311-cp311-macosx_11_0_arm64.whl", platform = "darwin", python = ">=3.11 <3.12", markers="platform_machine == \"arm64\""},
-      {url = "https://download.pytorch.org/whl/cpu/torchvision-0.17.1-cp311-cp311-macosx_10_13_x86_64.whl", platform = "darwin", python = ">=3.11 <3.12", markers="platform_machine == \"x86_64\""}
-
-]
 
 boto3 = "^1.28.52"
 wand = "^0.6.13"

@@ -1,3 +1,21 @@
+from urllib.parse import urlparse
+from jataware_georef.common.map_utils import (
+    extract_gcps_,
+    cps_to_transform,
+    project_,
+    generateCrsListFromGCPs,
+    filterCRSList,
+    create_buffered_map_area,
+    rectangleDetection
+)
+from jataware_georef.settings import app_settings
+from jataware_georef.georef.autogeoreferencer import AutoGeoreferencer
+from jataware_georef.common.utils import (
+    time_since,
+    s3_client,
+    # upload_s3_file
+)
+from starlette.background import BackgroundTasks
 import logging
 import os
 import tempfile
@@ -23,28 +41,6 @@ from cdr_schemas.georeference import GeoreferenceResults
 
 Image.MAX_IMAGE_PIXELS = None
 
-from starlette.background import BackgroundTasks
-
-
-from jataware_georef.common.utils import (
-    time_since,
-    s3_client,
-    # upload_s3_file
-)
-
-from jataware_georef.georef.autogeoreferencer import AutoGeoreferencer
-from jataware_georef.settings import app_settings
-from jataware_georef.common.map_utils import (
-    extract_gcps_,
-    cps_to_transform,
-    project_,
-    generateCrsListFromGCPs,
-    filterCRSList,
-    create_buffered_map_area,
-    rectangleDetection
-)
-from urllib.parse import urlparse
-
 
 logger: Logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.ERROR)
@@ -58,6 +54,7 @@ auth = {
     "Authorization": app_settings.cdr_bearer_token,
 }
 
+
 class Event(BaseModel):
     id: str
     event: str
@@ -65,7 +62,8 @@ class Event(BaseModel):
 
 ########################### helpers ###################
 
-async def post_results(files, data):    
+
+async def post_results(files, data):
     async with httpx.AsyncClient(timeout=None) as client:
         data_ = {
             "georef_result": data  # Marking the part as JSON
@@ -74,7 +72,7 @@ async def post_results(files, data):
         for file_path, file_name in files:
             files_.append(("files", (file_name, open(file_path, "rb"))))
         try:
-            if len(files_)>0:
+            if len(files_) > 0:
                 logging.debug(f'files to be sent {files_}')
                 logging.debug(f'data to be sent {data_}')
                 r = await client.post(app_settings.cdr_endpoint_url, files=files_, data=data_, headers=auth)
@@ -83,7 +81,7 @@ async def post_results(files, data):
             else:
                 logging.debug(f'files to be sent {files_}')
                 logging.debug(f'data to be sent {data_}')
-                r = await client.post(app_settings.cdr_endpoint_url,files=[], data=data_, headers=auth)
+                r = await client.post(app_settings.cdr_endpoint_url, files=[], data=data_, headers=auth)
                 logging.debug(f'Response text from CDR {r.text}')
                 r.raise_for_status()
         except Exception as e:
@@ -103,8 +101,10 @@ def extract_s3_info(s3_url):
             bucket = parsed.netloc.split('.')[0]
             path = parsed.path.lstrip('/')
     else:
-        raise ValueError("URL does not appear to be an S3 URL")
-    
+        parts = parsed.path.lstrip('/').split('/', 1)
+        bucket = parts[0]
+        path = parts[1]
+
     return bucket, path
 
 
@@ -133,41 +133,41 @@ async def georeference_map(req: MapEventPayload,  response_model=GeoreferenceRes
 
         if len(gcps) < 4:
             logging.info("Failed to find enough gcps")
-            all_gcps=[]
+            all_gcps = []
             for gcp in gcps:
                 all_gcps.append(
-                        {
-                            "gcp_id": gcp["gcp_id"],
-                            "map_geom": {
-                                "type":"Point",
-                                "latitude":gcp["y"],
-                                "longitude":gcp["x"]
-                                },
-                            "px_geom": {
-                                "type":"Point",
-                                "rows_from_top": height-gcp["rowb"],
-                                "columns_from_left": gcp["coll"]
-                                },
-                            "confidence":None,
-                            "model": "jataware_extraction",
-                            "model_version": "0.0.1",
-                            "crs":gcp['crs']
-                        }
+                    {
+                        "gcp_id": gcp["gcp_id"],
+                        "map_geom": {
+                            "type": "Point",
+                            "latitude": gcp["y"],
+                            "longitude": gcp["x"]
+                        },
+                        "px_geom": {
+                            "type": "Point",
+                            "rows_from_top": height-gcp["rowb"],
+                            "columns_from_left": gcp["coll"]
+                        },
+                        "confidence": None,
+                        "model": "jataware_extraction",
+                        "model_version": "0.0.1",
+                        "crs": gcp['crs']
+                    }
                 )
-            if len(all_gcps)==0:
+            if len(all_gcps) == 0:
                 all_gcps = []
 
             results = GeoreferenceResults(**{
-                        "cog_id" : cog_id,
-                        "gcps" : all_gcps,
-                        "georeference_results":[],
-                        "system" : "jataware_georef",
-                        "system_version": "0.1.0"
-                    }).model_dump_json()
-                
+                "cog_id": cog_id,
+                "gcps": all_gcps,
+                "georeference_results": [],
+                "system": "jataware_georef",
+                "system_version": "0.1.0"
+            }).model_dump_json()
+
             await post_results(files=[], data=results)
             return results
-        
+
         else:
             # find rectangle from gcps
             best_4_points = rectangleDetection(gcps=gcps, pixel_buffer=250)
@@ -180,40 +180,41 @@ async def georeference_map(req: MapEventPayload,  response_model=GeoreferenceRes
             gcp_ids = []
 
             for gcp in gcps:
-                
+
                 all_gcps.append(
-                        {
-                            "gcp_id": str(gcp["gcp_id"]),
-                            "map_geom": {
-                                "type":"Point",
-                                "latitude":gcp["y"],
-                                "longitude":gcp["x"]
-                                },
-                            "px_geom": {
-                                "type":"Point",
-                                "rows_from_top": height-gcp["rowb"],
-                                "columns_from_left": gcp["coll"]
-                                },
-                            "confidence":None,
-                            "model": "jataware_extraction",
-                            "model_version": "0.0.1",
-                            "crs": gcp['crs']
-                        }
+                    {
+                        "gcp_id": str(gcp["gcp_id"]),
+                        "map_geom": {
+                            "type": "Point",
+                            "latitude": gcp["y"],
+                            "longitude": gcp["x"]
+                        },
+                        "px_geom": {
+                            "type": "Point",
+                            "rows_from_top": height-gcp["rowb"],
+                            "columns_from_left": gcp["coll"]
+                        },
+                        "confidence": None,
+                        "model": "jataware_extraction",
+                        "model_version": "0.0.1",
+                        "crs": gcp['crs']
+                    }
                 )
 
             all_files = []
             all_projections = []
 
-            for crs_id in CRSs:                
+            for crs_id in CRSs:
                 proj_id = uuid.uuid4()
                 proj_file_name = f"{cog_id}_{proj_id}.pro.cog.tif"
 
                 pro_cog_path = os.path.join(tmpdir, proj_file_name)
-                if len(best_4_points)==4:
+                if len(best_4_points) == 4:
                     logging.info("Using best 4 points")
                     for gcp in best_4_points:
                         gcp_ids.append(str(gcp["gcp_id"]))
-                    geo_transform = cps_to_transform(best_4_points, height=height, to_crs=crs_id)
+                    geo_transform = cps_to_transform(
+                        best_4_points, height=height, to_crs=crs_id)
                     time_since(logger, "geo_transform loaded", start_transform)
 
                     project_(raw_path, pro_cog_path, geo_transform, crs_id)
@@ -223,12 +224,13 @@ async def georeference_map(req: MapEventPayload,  response_model=GeoreferenceRes
                     logging.info('Using all points')
                     for gcp in all_gcps:
                         gcp_ids.append(str(gcp["gcp_id"]))
-                    geo_transform = cps_to_transform(gcps, height=height, to_crs=crs_id)
+                    geo_transform = cps_to_transform(
+                        gcps, height=height, to_crs=crs_id)
                     time_since(logger, "geo_transform loaded", start_transform)
 
                     project_(raw_path, pro_cog_path, geo_transform, crs_id)
-                    map_area_geom=None
-                
+                    map_area_geom = None
+
                 all_projections.append({
                     "crs": crs_id,
                     "gcp_ids": gcp_ids,
@@ -236,7 +238,6 @@ async def georeference_map(req: MapEventPayload,  response_model=GeoreferenceRes
                 })
 
                 all_files.append((pro_cog_path, proj_file_name))
-
 
                 # # sending to minio for local testing
                 # s3_pro_key = f"cogs/{cog_id}_{proj_id}.pro.cog.tif"
@@ -247,13 +248,13 @@ async def georeference_map(req: MapEventPayload,  response_model=GeoreferenceRes
                 "map_area": map_area_geom
             }]
             data = GeoreferenceResults(**{
-                            "cog_id" : cog_id,
-                            "gcps" : all_gcps,
-                            "georeference_results":georeference_results,
-                            "system" : "jataware_georef",
-                            "system_version": "0.1.0"
-                    }).model_dump_json()
-            
+                "cog_id": cog_id,
+                "gcps": all_gcps,
+                "georeference_results": georeference_results,
+                "system": "jataware_georef",
+                "system_version": "0.1.0"
+            }).model_dump_json()
+
             await post_results(files=all_files, data=data)
             return data
 

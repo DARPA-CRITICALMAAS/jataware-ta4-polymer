@@ -1,31 +1,38 @@
-from logging import Logger
-import logging
-import pyproj
-from pyproj import Transformer
-import rasterio.transform as riot
-import rasterio as rio
-from rasterio.warp import Resampling, calculate_default_transform, reproject
-from datetime import datetime
-from elasticsearch import helpers
-import copy
-from auto_georef.settings import app_settings
-import uuid
-import httpx
-import re
-from osgeo import gdal
-from shapely.geometry import Point, MultiPoint
-import numpy as np
 import hashlib
+import logging
 import math
+import os
+import re
 import shutil
+import tempfile
+from logging import Logger
+
+import httpx
+import numpy as np
+import pyproj
+import rasterio as rio
+import rasterio.transform as riot
+from elasticsearch import helpers
+from osgeo import gdal
+from pyproj import Transformer
+from rasterio.warp import Resampling, calculate_default_transform, reproject
+from shapely.geometry import MultiPoint, Point
+
+from auto_georef.settings import app_settings
+
 logger: Logger = logging.getLogger(__name__)
+from cdr_schemas.georeference import GeoreferenceResults
 from PIL import Image
-import imagehash
-from shapely.geometry import shape
 from shapely.ops import transform
-from shapely import to_geojson
+
+from auto_georef.common.utils import s3_client
+from auto_georef.es import return_ES_doc_by_id
 
 Image.MAX_IMAGE_PIXELS = None
+
+auth = {
+    "Authorization": app_settings.cdr_bearer_token,
+}
 
 
 def hash_file_sha256(file_path):
@@ -36,14 +43,13 @@ def hash_file_sha256(file_path):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
 
-def generate_map_id(file):
-    with Image.open(file) as img:
-        return str(imagehash.dhash(img, hash_size=16))
-    
+
+# def generate_map_id(file):
+#     with Image.open(file) as img:
+#         return str(imagehash.dhash(img, hash_size=16))
+
 
 def create_boundary_polygon(south, east, north, west):
-    
-    
     try:
         if not -90 <= south <= 90:
             raise ValueError("South latitude is out of valid range. Must be between -90 and 90.")
@@ -61,75 +67,41 @@ def create_boundary_polygon(south, east, north, west):
             [east, south],  # Bottom-right
             [east, north],  # Top-right
             [west, north],  # Top-left
-            [west, south]   # Close the polygon
+            [west, south],  # Close the polygon
         ]
-        geo_shape = {
-        "type": "Polygon",
-        "coordinates": [coordinates]
-        }
+        geo_shape = {"type": "Polygon", "coordinates": [coordinates]}
         return geo_shape
     except Exception as e:
         logger.error(f"failed to create border: {e}")
         return None
 
 
-def calculate_centroid_as_geo_shape(south:float, west:float, east:float, north:float):
+def calculate_centroid_as_geo_shape(south: float, west: float, east: float, north: float):
     if not all(isinstance(arg, float) for arg in [south, west, east, north]):
         raise TypeError("All arguments must be of type float")
 
     try:
-
         centroid_longitude = (west + east) / 2
         centroid_latitude = (south + north) / 2
         if not math.isnan(centroid_longitude) and not math.isnan(centroid_latitude):
             return {
                 "type": "point",
-                "coordinates": [centroid_longitude, centroid_latitude]
+                "coordinates": [centroid_longitude, centroid_latitude],
             }
         else:
             return None
     except Exception as e:
         logger.error(f"failed to create centroid: {e}")
         return None
-    
-
-# es check if id exists
-def document_exists(es, index_name, doc_id):
-    return es.exists(index=index_name, id=doc_id)
 
 
-def extract_gcps_(AGR, img):
-    width, height = img.size
-
-    cps = AGR.extract_control_points(img)
-    for cp in cps:
-        cp["rowb"] = height - cp["row"]
-        cp["coll"] = cp["col"]
-        cp['provenance'] = "jataware_extraction"
-        cp['gcp_reference_id'] = None
-
-        del cp["row"]
-        del cp["col"]
-        del cp["crop_r"]
-        del cp["crop_c"]
-    return cps
-
-
-def es_search_map(es, index, map_id):
-    query = {"query": {"match": {"map_id": map_id}}}
-    response = es.search(index=index, body=query, size=100)
-    if not response["hits"]["hits"]:
-        return []
-    return [x["_source"] for x in response["hits"]["hits"]]
-
-
-def cps_to_transform(cps, height, to_crs):
+def cps_to_transform(cps, to_crs):
     cps = [
         {
-            "row": height - float(cp["rowb"]),
-            "col": float(cp["coll"]),
-            "x": float(cp["x"]),
-            "y": float(cp["y"]),
+            "row": float(cp["rows_from_top"]),
+            "col": float(cp["columns_from_left"]),
+            "x": float(cp["longitude"]),
+            "y": float(cp["latitude"]),
             "crs": cp["crs"],
         }
         for cp in cps
@@ -138,9 +110,7 @@ def cps_to_transform(cps, height, to_crs):
     for cp in cps:
         proj = Transformer.from_crs(cp["crs"], to_crs, always_xy=True)
         x_p, y_p = proj.transform(xx=cp["x"], yy=cp["y"])
-        cps_p.append(
-            riot.GroundControlPoint(row=cp["row"], col=cp["col"], x=x_p, y=y_p)
-        )
+        cps_p.append(riot.GroundControlPoint(row=cp["row"], col=cp["col"], x=x_p, y=y_p))
 
     return riot.from_gcps(cps_p)
 
@@ -177,32 +147,6 @@ def project_(raw_path, pro_cog_path, geo_transform, crs):
                 )
 
 
-def prepare_gcps_for_es(
-    gcps, map_id, extraction_model=None, extraction_model_version=None, provenance="api_endpoint"
-):
-    gcps_=[]
-    for gcp in gcps:
-        gcp_data = {
-            "gcp_id": gcp["gcp_id"],
-            "map_id": map_id,
-            "modified": datetime.now(),
-            "created": datetime.now(),
-            "gcp_reference_id": gcp.get("gcp_reference_id",None),
-            "provenance": gcp.get("provenance",provenance),
-            "extraction_model": extraction_model,
-            "extraction_model_version": extraction_model_version,
-            "rowb": float(gcp["rowb"]),
-            "coll": float(gcp["coll"]),
-            "x": float(gcp["x"]),
-            "y": float(gcp["y"]),
-            "crs": gcp["crs"],
-            "confidence":None
-        }
-        gcps_.append(gcp_data)
-    return gcps_
-        
-
-
 def update_documents(es, index_name, search_dict, update_body):
     """
     Update documents in an Elasticsearch index based on matching key-value pairs.
@@ -219,10 +163,7 @@ def update_documents(es, index_name, search_dict, update_body):
 
     doc_ids = [hit["_id"] for hit in response["hits"]["hits"]]
 
-    actions = [
-        {"_op_type": "update", "_index": index_name, "_id": doc_id, "doc": update_body}
-        for doc_id in doc_ids
-    ]
+    actions = [{"_op_type": "update", "_index": index_name, "_id": doc_id, "doc": update_body} for doc_id in doc_ids]
 
     success_count, failed_bulk_operations = helpers.bulk(es, actions)
     if failed_bulk_operations:
@@ -236,7 +177,7 @@ def update_documents(es, index_name, search_dict, update_body):
 def saveESData(es, index, info, id=None):
     if id != None:
         response = es.index(index=index, id=id, document=info, refresh=True)
-        
+
     else:
         response = es.index(index=index, document=info, refresh=True)
     return response
@@ -250,54 +191,6 @@ def convert_to_4326(epsg_code, x, y):
     x_converted, y_converted = transformer.transform(x, y)
 
     return x_converted, y_converted
-
-
-def updateGCPs(es, map_id, gcps):
-    # get current gcps for this map.
-    query_body = {"query": {"term": {"map_id": map_id}}}
-    response = es.search(index=app_settings.gcps_index, body=query_body, size=1000)
-    all_gcps = {}
-    for hit in response["hits"]["hits"]:
-        all_gcps[hit["_source"]["gcp_id"]] = hit["_source"]
-
-    # now loop over each point that was used in projection
-    # see if that gcp_id is already accounted for,
-    # if all the values are the same we leave it alone just save id wiht proj_info index
-    # If values are different at all or "manual" found in gcp_id,
-    #  create new id and save new point with updated values
-
-    gcp_ids = []
-    new_gcps = []
-    for gcp in gcps:            
-        new_gcp = copy.deepcopy(gcp)
-
-        if gcp["gcp_id"] in all_gcps.keys():
-            
-            if compare_dicts(
-                gcp, all_gcps[gcp["gcp_id"]], ["x", "y", "rowb", "coll", "crs"]
-            ):
-                print("Point has stayed the same")
-                gcp_ids.append(gcp["gcp_id"])
-                continue
-            
-            new_gcp['gcp_reference_id']=new_gcp.get("gcp_id",None)
-        
-
-        print("New point being created/saved")
-        
-        new_gcp["gcp_id"] = uuid.uuid4()
-        gcp_ids.append(new_gcp["gcp_id"])
-        new_gcps.append(new_gcp)
-
-    gcps_ =  prepare_gcps_for_es(gcps=new_gcps, map_id=map_id)
-    for gcp in gcps_:
-        saveESData(
-            es=es, 
-            index=app_settings.gcps_index,
-            info=gcp,
-            id=gcp['gcp_id']
-        )
-    return gcp_ids
 
 
 def compare_dicts(dict1, dict2, keys):
@@ -332,9 +225,7 @@ def query_gpt4(prompt_text):
 
         return {"matches": matches, "reasoning": first_message}
     else:
-        raise Exception(
-            f"API call failed with status code {response.status_code}: {response.text}"
-        )
+        raise Exception(f"API call failed with status code {response.status_code}: {response.text}")
 
 
 def return_crs(temp_file_path):
@@ -397,9 +288,7 @@ def calculateCentroid(gcps, number_of_points=3):
         distances = [point.distance(other) for other in points if point != other]
         avg_distances.append(np.mean(distances))
 
-    sorted_indices = [
-        index for index, value in sorted(enumerate(avg_distances), key=lambda x: x[1])
-    ]
+    sorted_indices = [index for index, value in sorted(enumerate(avg_distances), key=lambda x: x[1])]
 
     # Select the closest number_of_points to calculate centroid.
     # The reasoning is that we want to remove any outlier points that might shift the centroid into a different crs:
@@ -414,6 +303,7 @@ def calculateCentroid(gcps, number_of_points=3):
     centroid_point = Point(centroid.x, centroid.y)
 
     return centroid_point
+
 
 def duplicates(arr):
     """
@@ -476,10 +366,9 @@ def generateCrsListFromPoint(centroid):
             ),
         )
         return all_crs
-    except Exception as e:
-        logging.info('Error occurred generating CRS list')
+    except Exception:
+        logging.info("Error occurred generating CRS list")
         return []
-    
 
 
 def boundsFromGCPS(gcps):
@@ -517,7 +406,7 @@ def filterCRSList(crs_list, max_projections=1):
 
             if crs.code.startswith("26"):
                 codes.append(f"EPSG:{crs.code}")
-    
+
     unique_codes = list(set(codes))
     return unique_codes[:max_projections]
 
@@ -525,106 +414,273 @@ def filterCRSList(crs_list, max_projections=1):
 def update_document_by_id(es, index_name, doc_id, updates):
     """Update an Elasticsearch document by its ID with the provided updates."""
     try:
-        response = es.update(
-            index=index_name, 
-            id=doc_id,
-            body={
-                "doc": updates
-            },
-            refresh=True
-        )
+        response = es.update(index=index_name, id=doc_id, body={"doc": updates}, refresh=True)
         return response
     except Exception as e:
         print(f"Error updating document: {e}")
         return None
 
 
-def get_document_id_by_key_value( es,index_name, key, value):
+def get_document_id_by_key_value(es, index_name, key, value):
     """Retrieve the internal _id of a document based on key value combo."""
-    query = {
-        "query": {
-            "match": {
-                key: value
-            }
-        }
-    }
+    query = {"query": {"match": {key: value}}}
     response = es.search(index=index_name, body=query)
     # If we found a result, return its _id
-    if response['hits']['total']['value'] > 0:
-        return response['hits']['hits'][0]['_id']
+    if response["hits"]["total"]["value"] > 0:
+        return response["hits"]["hits"][0]["_id"]
     return None
-    
+
+
 def apply_custom_transform(geom, custom_transform):
     def affine_transform(x, y, z=None):
         x, y = custom_transform * (x, y)
         return x, y
-    
+
     return transform(affine_transform, geom)
 
-def project_vector_(es, feature, projection_id, crs):
-    #  look up info for projection
-    proj_info = es.get(index=app_settings.proj_files_index, id=projection_id)
-    map_id = proj_info['_source']['map_id']
-    map_info = es.get(index=app_settings.maps_index, id=map_id)
-    height = map_info['_source']['height']
-    width = map_info['_source']['width']
-    gcps = []
-    for gcp in proj_info['_source']['gcps_ids']:
-        gcps.append( es.get(index=app_settings.gcps_index, id=gcp)['_source'])
 
-    geo_transform = cps_to_transform(gcps, height=height, to_crs=crs)
-    bounds = riot.array_bounds(height, width, geo_transform)
-    pro_transform, pro_width, pro_height = calculate_default_transform(
-            crs, crs, width, height, *tuple(bounds)
-        )
-    geom = shape(feature['geometry'])
-    transformed_geom = apply_custom_transform(geom, pro_transform)
-    return to_geojson(transformed_geom)
+# def project_vector_(es, feature, projection_id, crs):
+#     #  look up info for projection
+#     proj_info = es.get(index=app_settings.polymer_projections_index, id=projection_id)
+#     cog_id = proj_info['_source']['cog_id']
+#     map_info = es.get(index=app_settings.maps_index, id=map_id)
+#     height = map_info['_source']['height']
+#     width = map_info['_source']['width']
+#     gcps = []
+#     for gcp in proj_info['_source']['gcps_ids']:
+#         gcps.append( es.get(index=app_settings.gcps_index, id=gcp)['_source'])
+
+#     geo_transform = cps_to_transform(gcps, height=height, to_crs=crs)
+#     bounds = riot.array_bounds(height, width, geo_transform)
+#     pro_transform, pro_width, pro_height = calculate_default_transform(
+#             crs, crs, width, height, *tuple(bounds)
+#         )
+#     geom = shape(feature['geometry'])
+#     transformed_geom = apply_custom_transform(geom, pro_transform)
+#     return to_geojson(transformed_geom)
 
 
 def inverse_geojson(geojson, image_height):
 
-    geom_type = geojson['type']
+    geom_type = geojson["type"]
 
     def transform_coord(coord):
         return [coord[0], image_height - coord[1]]
 
-    if geom_type == 'Point':
-        geojson['coordinates'] = transform_coord(geojson['coordinates'])
-    elif geom_type in ['LineString', 'MultiPoint']:
-        geojson['coordinates'] = [transform_coord(coord) for coord in geojson['coordinates']]
-    elif geom_type in ['Polygon', 'MultiLineString']:
-        geojson['coordinates'] = [[transform_coord(coord) for coord in ring] for ring in geojson['coordinates']]
-    elif geom_type == 'MultiPolygon':
-        geojson['coordinates'] = [[[transform_coord(coord) for coord in ring] for ring in polygon] for polygon in geojson['coordinates']]
-    elif geom_type == 'GeometryCollection':
-        for geometry in geojson['geometries']:
+    if geom_type == "Point":
+        geojson["coordinates"] = transform_coord(geojson["coordinates"])
+    elif geom_type in ["LineString", "MultiPoint"]:
+        geojson["coordinates"] = [transform_coord(coord) for coord in geojson["coordinates"]]
+    elif geom_type in ["Polygon", "MultiLineString"]:
+        geojson["coordinates"] = [[transform_coord(coord) for coord in ring] for ring in geojson["coordinates"]]
+    elif geom_type == "MultiPolygon":
+        geojson["coordinates"] = [
+            [[transform_coord(coord) for coord in ring] for ring in polygon] for polygon in geojson["coordinates"]
+        ]
+    elif geom_type == "GeometryCollection":
+        for geometry in geojson["geometries"]:
             inverse_geojson(geometry, image_height)
     else:
         raise ValueError(f"Unsupported geometry type: {geom_type}")
     return geojson
 
-def updateChildFeatures(es, map_id, new_feature_id, old_feature_id):
-    response = es.search(index=app_settings.features_index, body={
+
+def updateChildFeatures(es, cog_id, new_feature_id, old_feature_id):
+    response = es.search(
+        index=app_settings.polymer_legend_extractions,
+        body={
             "query": {
                 "bool": {
                     "must": [
-                        {"match": {"map_id": map_id}},
-                        {"match":{"parent_id":old_feature_id}}
+                        {"match": {"cog_id": cog_id}},
+                        {"match": {"parent_id": old_feature_id}},
                     ],
                     "filter": [
                         {"terms": {"category": ["legend_description"]}},
-                    ]
+                    ],
                 }
             }
-        })
-    updates=[]
-    for hit in response['hits']['hits']:
+        },
+    )
+    updates = []
+    for hit in response["hits"]["hits"]:
         action = {
-                    "_op_type": "update",
-                    "_index": app_settings.features_index,
-                    "_id": hit['_source']['feature_id'],
-                    "doc": {"parent_id":new_feature_id}
-                }
+            "_op_type": "update",
+            "_index": app_settings.polymer_legend_extractions,
+            "_id": hit["_source"]["legend_id"],
+            "doc": {"parent_id": new_feature_id},
+        }
         updates.append(action)
     return updates
+
+
+async def post_results(files, data):
+    async with httpx.AsyncClient(timeout=None) as client:
+        data_ = {"georef_result": data}  # Marking the part as JSON
+        print(data_)
+        files_ = []
+        for file_path, file_name in files:
+            print(file_path, file_name)
+            files_.append(("files", (file_name, open(file_path, "rb"))))
+        try:
+            if len(files_) > 0:
+                logging.debug(f"files to be sent {files_}")
+                logging.debug(f"data to be sent {data_}")
+                r = await client.post(
+                    app_settings.cdr_endpoint_url + "/v1/maps/publish/georef",
+                    files=files_,
+                    data=data_,
+                    headers=auth,
+                )
+                logging.debug(f"Response text from CDR {r.text}")
+                r.raise_for_status()
+            else:
+                logging.debug(f"files to be sent {files_}")
+                logging.debug(f"data to be sent {data_}")
+                r = await client.post(
+                    app_settings.cdr_endpoint_url + "/v1/maps/publish/georef",
+                    files=[],
+                    data=data_,
+                    headers=auth,
+                )
+                logging.debug(f"Response text from CDR {r.text}")
+                r.raise_for_status()
+        except Exception as e:
+            logging.exception(e)
+
+
+def get_gcp_from_cdr(gcp_id):
+    endpoint = f"{app_settings.cdr_endpoint_url}/v1/maps/cog/gcp/{gcp_id}"
+    response = httpx.get(endpoint, headers=auth)
+    if response.status_code == 200:
+        return response.json()
+
+    return None
+
+
+def get_projections_from_cdr(cog_id):
+    endpoint = f"{app_settings.cdr_endpoint_url}/v1/maps/cog/projections/{cog_id}"
+    response = httpx.get(endpoint, headers=auth)
+    if response.status_code == 200:
+        return response.json()
+
+    return None
+
+
+def build_cdr_georef_result(proj_id):
+    # get projection from es
+    projection = return_ES_doc_by_id(app_settings.polymer_projections_index, proj_id)
+    all_gcps = []
+    georef_result = None
+    if projection:
+        for gcp_id in projection.get("gcps_ids"):
+            #  get gcp from es
+            gcp_ = return_ES_doc_by_id(app_settings.polymer_gcps_index, gcp_id)
+            if gcp_ is not None:
+                # found in es which means it has been edited or created in polymer
+                gcp_["map_geom"] = {
+                    "latitude": gcp_.get("latitude"),
+                    "longitude": gcp_.get("longitude"),
+                }
+                gcp_["px_geom"] = {
+                    "rows_from_top": gcp_.get("rows_from_top"),
+                    "columns_from_left": gcp_.get("columns_from_left"),
+                }
+                del gcp_["rows_from_top"]
+                del gcp_["columns_from_left"]
+                del gcp_["latitude"]
+                del gcp_["longitude"]
+                del gcp_["registration_id"]
+                del gcp_["reference_id"]
+                all_gcps.append(gcp_)
+            else:
+                # get gcp from cdr since not in es
+                gcp_ = get_gcp_from_cdr(gcp_id=gcp_id)
+                if gcp_:
+                    gcp_["map_geom"] = {
+                        "latitude": gcp_.get("latitude"),
+                        "longitude": gcp_.get("longitude"),
+                    }
+                    gcp_["px_geom"] = {
+                        "rows_from_top": gcp_.get("rows_from_top"),
+                        "columns_from_left": gcp_.get("columns_from_left"),
+                    }
+                    gcp_["model_version"] = gcp_["model"]["model_version"]
+                    gcp_["model"] = gcp_["model"]["model_name"]
+
+                    del gcp_["rows_from_top"]
+                    del gcp_["columns_from_left"]
+                    del gcp_["latitude"]
+                    del gcp_["longitude"]
+                    del gcp_["registration_id"]
+                    del gcp_["reference_id"]
+
+                    all_gcps.append(gcp_)
+
+        georef_result = {
+            "likely_CRSs": [],
+            "map_area": None,
+            "projections": [
+                {
+                    "crs": projection["crs"],
+                    "gcp_ids": projection["gcps_ids"],
+                    "file_name": projection["projection_id"],
+                }
+            ],
+        }
+        georef_result = GeoreferenceResults(
+            cog_id=projection.get("cog_id"),
+            georeference_results=[georef_result],
+            system=app_settings.polymer_auto_georef_system,
+            system_version=app_settings.polymer_auto_georef_system_version,
+            gcps=all_gcps,
+        ).model_dump_json()
+
+    return georef_result, projection.get("cog_id")
+
+
+async def send_georef_to_cdr(proj_id):
+    data, cog_id = build_cdr_georef_result(proj_id=proj_id)
+    if data is not None:
+        s3_key = f"{app_settings.polymer_s3_cog_projections_prefix}/{cog_id}/{proj_id}"
+        logging.info(f's3_key {s3_key}')
+        all_files = []
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            proj_file_name = f"{s3_key.split('/')[-1]}"
+            raw_path = os.path.join(tmpdir, proj_file_name)
+            s3 = s3_client()
+            s3.download_file(app_settings.polymer_public_bucket, s3_key, raw_path)
+            pro_cog_path = os.path.join(tmpdir, proj_file_name)
+
+            all_files.append((pro_cog_path, proj_file_name))
+
+            result = await post_results(files=all_files, data=data)
+
+            logging.info("Finished")
+
+
+async def send_legend_extractions(cog_id):
+    logging.ingo(cog_id)
+
+
+import json
+
+
+async def post_feature_results(data):
+    async with httpx.AsyncClient(timeout=None) as client:
+        try:
+            r = await client.post(
+                app_settings.cdr_endpoint_url + "/v1/maps/publish/features",
+                data=json.dumps(data),
+                headers=auth,
+            )
+            logging.debug(f"Response text from CDR {r.text}")
+            r.raise_for_status()
+        except Exception as e:
+            logging.error(e)
+
+
+async def send_feature_results_to_cdr(data):
+    await post_feature_results(data)
+    return

@@ -1,0 +1,319 @@
+{% extends "shared/_page.html" %}
+{% block main_content %}
+
+<div id="container" class="flex flex-col w-full">
+  <div class="flex flex-col p-8 z-100 w-full">
+    <div>
+      <span class="" >id:</span>
+      <span class="opacity-70 text-lg">
+        {{ doc["id"] }}
+      </span>
+
+    </div>
+
+    <div class="stats stats-horizontal w-fit mb-8">
+      <div class="stat">
+        <div class="stat-title text-xs">Pages</div>
+        <div class="stat-value text-xl">{{ doc["pages"] }}</div>
+        <div class="stat-desc">
+          <a class="link link-primary link-sm" href="/cdr/d/{{ doc['id'] }}"> Preview </a>
+        </div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-title text-xs">Size</div>
+        <div class="stat-value text-xl">{{ format_size(dget(doc, "size", 0)) }}</div>
+        <div class="stat-desc">
+          <a class="link link-primary link-sm" href="/cdr/download/{{ doc['id'] }}"> Download </a>
+        </div>
+      </div>
+    </div>
+
+    <form
+      id="form"
+      hx-post="/partials/cdr/info/meta/{{ doc['id'] }}"
+      >
+    <div class="flex flex-row w-full">
+      <div class="flex w-full">
+        <div class="grid grid-cols-8 gap-4 editable-content w-full">
+
+          <div class="text-right">
+            <span class="label-text">title: </span>
+          </div>
+
+          <div class="col-span-7">
+            <div>
+              <input name="title" type="text" placeholder=""
+                     value="{{ dget(doc, 'title', '') }}"
+                     class="input input-bordered w-full input-sm"
+                     >
+            </div>
+          </div>
+
+          <div class="text-right">
+            <span class="label-text">doi: </span>
+          </div>
+          <div class="col-span-7">
+            <div>
+
+              <input name="doi" type="text" placeholder=""
+                     value="{{ dget(doc, 'metadata.doi', '') }}"
+                     class="input input-bordered w-full input-sm"
+                     >
+            </div>
+          </div>
+
+          <div class="text-right">
+            <span class="label-text">year: </span>
+          </div>
+          <div class="col-span-7">
+            <div>
+              <input name="year" type="text" placeholder=""
+                     value="{{ dget(doc, 'metadata.year', '') }}"
+                     class="input input-bordered w-full input-sm"
+                     >
+            </div>
+          </div>
+
+          <div class="text-right">
+            <span class="label-text">month: </span>
+          </div>
+          <div class="col-span-7">
+            <div>
+              <input name="month" type="text" placeholder=""
+                     value="{{ dget(doc, 'metadata.month', '') }}"
+                     class="input input-bordered w-full input-sm"
+                     >
+            </div>
+          </div>
+
+          <div class="text-right">
+            <span class="label-text">volume: </span>
+          </div>
+          <div class="col-span-7">
+            <div>
+              <input name="volume" type="text" placeholder=""
+                     value="{{ dget(doc, 'metadata.volume', '') }}"
+                     class="input input-bordered w-full input-sm"
+                     >
+            </div>
+          </div>
+
+          <div class="text-right">
+            <span class="label-text">is open: </span>
+          </div>
+          <div class="col-span-7">
+            <div>
+              <input name="is_open" type="checkbox" {{ "checked" if dget(doc, 'is_open') else "" }} class="checkbox checkbox-sm" />
+            </div>
+          </div>
+        </div>
+
+
+        <div class="flex w-full">
+          <div class="grid grid-cols-8 gap-4 editable-content w-full">
+
+            <div class="text-right">
+              <span class="label-text">publisher: </span>
+            </div>
+            <div class="col-span-7">
+              <div>
+                <input name="publisher" type="text" placeholder=""
+                       value="{{ dget(doc, 'metadata.publisher', '') }}"
+                       class="input input-bordered w-full input-sm"
+                       >
+              </div>
+            </div>
+
+            <div class="text-right">
+              <span class="label-text">journal: </span>
+            </div>
+            <div class="col-span-7">
+              <div>
+                <input name="journal" type="text" placeholder=""
+                       value="{{ dget(doc, 'metadata.journal', '') }}"
+                       class="input input-bordered w-full input-sm"
+                       >
+              </div>
+            </div>
+
+
+            <div class="text-right">
+              <span class="label-text">issue: </span>
+            </div>
+            <div class="col-span-7">
+              <div>
+                <input name="issue" type="text" placeholder=""
+                       value="{{ dget(doc, 'metadata.issue', '') }}"
+                       class="input input-bordered w-full input-sm"
+                       >
+              </div>
+            </div>
+
+            <div class="text-right">
+              <span class="label-text">description: </span>
+            </div>
+            <div class="col-span-7">
+              <div>
+                <textarea name="description" placeholder=""
+                          class="textarea textarea-bordered w-full text-sm"
+                          >{{ dget(doc, 'metadata.description', '') }}</textarea>
+              </div>
+            </div>
+
+            <div class="text-right">
+              <span class="label-text">authors: </span>
+            </div>
+            <div class="col-span-7">
+              {% set authors = dget(doc, "metadata.authors", []) %}
+
+              <div
+                x-data="{ authors: {{- authors | jsonify -}},
+                        newAuthor: '',
+                        }"
+                >
+                  <div class="mt-2">
+                    <template x-for="(author, idx) in authors" :key="index">
+                      <div class="flex flex-row text-sm">
+                        <div
+                          @click="authors.splice(idx, 1)"
+                          class="text-red-500 w-8 cursor-pointer">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke-width="1.5"
+                            stroke="currentColor"
+                            class="w-4 h-4">
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                          </svg>
+                        </div>
+                        <span x-text="author"></span>
+                        <input type="hidden" name="authors" :value="author" />
+                      </div>
+                    </template>
+                  </div>
+                  <div class="flex flex-row">
+                    <div class="text-green-500 my-4 w-8 cursor-pointer"
+                         @click="if (newAuthor.trim()) { authors.push(newAuthor.trim()); newAuthor = '';}"
+                         >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+
+                    </div>
+                    <div class="w-full">
+                      <input
+                        type="text"
+                        @keyup.enter="if (newAuthor.trim()) { authors.push(newAuthor.trim()); newAuthor = '';}"
+                        x-model="newAuthor"
+                        class="input input-sm text-sm input-bordered mt-4 w-full">
+                    </div>
+                  </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-row space-x-4">
+      <div class="text-right">
+        <button class="btn btn-outline btn-success btn-sm">
+          Update
+        </button>
+      </div>
+    </div>
+    </form>
+
+    {% set provenance = dget(doc, 'provenance', []) %}
+
+
+    <div class="flex flex-row mt-8">
+
+      <div class="text-right">
+        <span class="label-text">provenance: </span>
+      </div>
+
+      <div class="col-span-7 grid grid-cols-8 w-full gap-4">
+
+        {% for p in provenance %}
+        {% include "cdr_doc/provenance_list_info.html" %}
+        {% endfor %}
+
+
+        <div id="spacer" class="col-span-7 grid grid-cols-12 w-full gap-4">
+          <div class="col-span-12">
+            <span class="text-lg"></span>
+          </div>
+        </div>
+
+        <div class="col-span-7 grid grid-cols-12 w-full gap-4" >
+          <div class="text-right">
+            <span class="label-text">name: </span>
+          </div>
+
+          <div class="col-span-11">
+            <input
+              type="text"
+              name="provname"
+              class="input input-sm text-sm input-bordered mt-4 w-full">
+
+          </div>
+
+          <div class="text-right">
+            <span class="label-text">id: </span>
+          </div>
+
+          <div class="col-span-11">
+
+            <input
+              type="text"
+              name="provid"
+              class="input input-sm text-sm input-bordered mt-4 w-full">
+
+          </div>
+
+          <div class="text-right">
+            <span class="label-text">url: </span>
+          </div>
+
+          <div class="col-span-11">
+            <input
+              type="text"
+              name="provurl"
+              class="input input-sm text-sm input-bordered mt-4 w-full">
+          </div>
+
+        </div>
+
+        <div class="col-span-7 grid grid-cols-12 w-full gap-4" >
+          <div class="col-span-12 flex flex-row">
+            <div>
+              <button class="btn btn-outline btn-success btn-sm"
+                      hx-post="/partials/cdr/info/prov/{{ doc['id'] }}"
+                      hx-include="[name='provname'], [name='provid'], [name='provurl']"
+                      hx-target="#spacer"
+                      hx-swap="beforebegin"
+                      hx-trigger="click"
+                      >
+                Add Provenance
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+
+<script type="module" src="/static/js/alpine.js"></script>
+{% endblock %}
+

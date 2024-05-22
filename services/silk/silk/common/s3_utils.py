@@ -60,4 +60,4 @@ def read_s3_contents(s3, s3_bucket, s3_key):
         return contents
     except s3.exceptions.NoSuchKey:
         logger.warning("NoSuchKey - %s", s3_key)
-        raise Exception("Key Not Found")
+        raise Exception("Key Not Found") from None

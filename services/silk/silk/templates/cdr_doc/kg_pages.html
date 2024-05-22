@@ -1,0 +1,40 @@
+
+<div>
+  {% if pages|length == 0 %}
+
+  <div> Not connected to Knowledge Graph</div>
+
+  {% else %}
+
+  <div id="kg-loaded" class="my-4">
+
+      <button type="button" class="btn btn-warning btn-outline"
+              hx-get="/partial/kg/di/{{ doc_id }}/load"
+              hx-trigger="click"
+              hx-target="#kg-loaded"
+              hx-swap="outerHTML"
+              >
+        Load Labels From Knowledge Graph
+      </button>
+
+  </div>
+
+  {% endif %}
+
+  {% for page in pages %}
+
+  <div class="flex flex-row">
+    <div class="h24 mr-2">
+      <a href="/d/{{doc_id}}/{{ page }}">{{ page }}</a>
+    </div>
+
+    <div class="px-2 mb-2 text-xs h-16 max-w-24">
+      <img
+        loading="lazy"
+        src="/png/pdf/{{ doc_id }}/{{ page }}/{{ page_index[page][0] }}/{{ page_index[page][1] }}/{{ page_index[page][2] }}/{{ page_index[page][3] }}" />
+    </div>
+
+  </div>
+
+  {% endfor %}
+</div>

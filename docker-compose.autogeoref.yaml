@@ -17,10 +17,8 @@ services:
       - --workers
       - "1"
       - "--reload"
-    environment:
-      AUTOGEOREF_MAPBOX_KEY: ${MAPBOX_KEY}
-      AUTOGEOREF_TILES_SERVER: http://tiles.${INTERNAL_DOMAIN}/tiles
-      AUTOGEOREF_TILES_SERVER_API: http://tiles.${INTERNAL_DOMAIN}/api
+    ports:
+      - "3000:3000"
     logging:
       driver: json-file
       options:

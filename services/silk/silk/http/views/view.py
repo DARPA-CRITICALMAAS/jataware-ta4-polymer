@@ -10,7 +10,7 @@ import httpx
 from cachetools import TTLCache
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from pyzotero import zotero
 
 from ...common.s3_utils import aws_s3_client, s3_client, s3_presigned_url, upload_s3_file
@@ -41,13 +41,15 @@ def index_search_tmpl(which: str, request: Request, search_by: str = "title"):
 
 @router.get("/")
 def index(request: Request):
-    logger.debug(templates.get_template("index/index.html"))
-    return templates.TemplateResponse(
-        "index/index.html",
-        {
-            "request": request,
-        },
-    )
+    return RedirectResponse("/cdr/")
+
+    # logger.debug(templates.get_template("index/index.html"))
+    # return templates.TemplateResponse(
+    #     "index/index.html",
+    #     {
+    #         "request": request,
+    #     },
+    # )
 
 
 @router.get("/download/pubs/progress")
@@ -258,7 +260,7 @@ def zot_id(key: str, request: Request, response: HTMLResponse):
             return
     except Exception:
         logger.exception("zot item failed")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="") from None
 
     return HTMLResponse(
         content="""

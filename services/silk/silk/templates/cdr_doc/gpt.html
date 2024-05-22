@@ -1,0 +1,17 @@
+
+<div id="gpt_response" class="mx-2 my-4">
+  <p class="bg-neutral text-neutral-content">
+    Assistant:
+  </p>
+  <div id="disconnect">
+    <div hx-ext="sse" sse-connect="{{ connect }}">
+      <div sse-swap="gpt_response"
+           hx-target="#gpt-stream"
+           hx-swap="beforeend"></div>
+      <span sse-swap="response" class="text-xs"></span>
+      <span sse-swap="fin" hx-target="#disconnect"></span>
+    </div>
+  </div>
+  <pre id="gpt-stream" class="text-xs text-wrap"></pre>
+</div>
+

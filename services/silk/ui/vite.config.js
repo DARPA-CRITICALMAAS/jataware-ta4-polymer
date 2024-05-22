@@ -6,6 +6,7 @@ import { glob } from 'glob';
 export default defineConfig({
 
   build: {
+    target: 'esnext',
     minify: false,
     emptyOutDir: true,
     outDir: "../static/js/",

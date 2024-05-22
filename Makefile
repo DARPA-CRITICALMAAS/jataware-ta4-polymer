@@ -1,4 +1,4 @@
-VERSION := 0.1.91
+VERSION := 0.1.127
 
 # make helpers
 null  :=
@@ -57,9 +57,9 @@ format:   ## Run python format
 lint:   ## Run python lint
 	(cd services/auto-georef && poetry run lint)
 
-.PHONY: docker-build-ui
-docker-build-ui:
-	(cd ui && docker build -t nylon_ui:dev .)
+.PHONY: docker-build-maps-ui
+docker-build-maps-ui:
+	(cd maps_ui && docker build -t nylon_maps_ui:dev .)
 
 .PHONY: docker-build-georef
 docker-build-georef:
@@ -90,21 +90,30 @@ docker_buildx-georef:| gitlab-docker-login  ## build and push georef image
 			-f Dockerfile \
 			.)
 
-define ui_env_prod
+define maps_ui_env_prod
 VITE_TIFF_URL="https://s3.amazonaws.com/common.polymer.rocks"
 VITE_MAPTILER_KEY="${MAPTILER_KEY}"
+VITE_POLYMER_COG_URL="https://s3.amazonaws.com"
+VITE_POLYMER_PUBLIC_BUCKET="common.polymer.rocks"
+VITE_POLYMER_S3_COG_PRO_PREFEX="cogs/projections"
+VITE_CDR_COG_URL="https://s3.amazonaws.com"
+VITE_CDR_PUBLIC_BUCKET="public.cdr.land"
+VITE_CDR_S3_COG_PRO_PREFEX="test/cogs"
+VITE_CDR_S3_COG_PREFEX="cogs"
+VITE_POLYMER_SYSTEM="polymer"
+VITE_POLYMER_SYSTEM_VERSION="0.0.1"
 endef
 
-ui/.env.production:| check-MAPTILER_KEY  ## writes ui/.env.production file
-		$(file > ui/.env.production,$(ui_env_prod))
+maps_ui/.env.production:| check-MAPTILER_KEY  ## writes ui/.env.production file
+		$(file > maps_ui/.env.production,$(maps_ui_env_prod))
 
 .PHONY: docker_buildx-ui
-docker_buildx-ui:| gitlab-docker-login  ui/.env.production ## build and push ui
-	@echo "building ui"
-	(cd ui && \
+docker_buildx-maps-ui:| gitlab-docker-login  maps_ui/.env.production ## build and push ui
+	@echo "building maps_ui"
+	(cd maps_ui && \
 		docker buildx build \
 			--platform linux/amd64 \
-		-t registry.gitlab.com/jataware/nylon/ui:${VERSION} \
+		-t registry.gitlab.com/jataware/nylon/maps_ui:${VERSION} \
 		--output type=image,push=true \
 		-f Dockerfile \
 		.)
@@ -132,7 +141,7 @@ docker_buildx-jataware_georef:| gitlab-docker-login  ## build and push jataware-
 		.)
 
 .PHONY: docker_buildx-all
-docker_buildx-all:| docker_buildx-ui docker_buildx-silk docker_buildx-georef docker_buildx-jataware_georef
+docker_buildx-all:| docker_buildx-maps-ui docker_buildx-silk docker_buildx-georef docker_buildx-jataware_georef
 
 .PHONY:
 ALL_DOCKER_COMPOSE_FILES:= $(wildcard docker-compose*.yaml)

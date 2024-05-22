@@ -1,0 +1,49 @@
+
+<div class="flex flex-row mb-4 job-item">
+
+  <div class="flex flex-col">
+    <div class="w-48 text-sm">Submitted:
+      <span class="text-sm">{{ human_delta(job.created_date) }} ago</span>
+    </div>
+
+    <div>Result:
+      {% set color = {"created": "text-green-400", "duplicate": "text-yellow-400"}[job.result] | default("") -%}
+      <span class="text-sm {{ color }}">{{ job.result or "pending"}}</span>
+    </div>
+    {% if not job.result %}
+    <div>
+      <div
+        hx-target="closest .job-item"
+        hx-swap="outerHTML"
+        hx-trigger="click"
+        class="link link-primary text-sm"
+        hx-get="/partials/cdr/job/result/{{ job.job_id }}">check job status</div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <div class="mr-4">
+    {% if job.cdr_id %}
+    <a
+      class="link link-primary text-xs"
+      href="/cdr/d/{{ job.cdr_id }}/0">
+      <span>view</span>
+    </a>
+    {% else %}
+      <span class="text-xs opacity-50">view</span>
+    {% endif %}
+  </div>
+
+  <div class="flex flex-col max-w-[600px] text-sm mb-4">
+    <div>
+      <span class="opacity-60">File: </span>
+      <span>{{ job.file_name }}</span>
+    </div>
+    <div>
+      <span class="opacity-60">Title: </span>
+      <span>{{ job.title }}</span>
+    </div>
+  </div>
+
+</div>

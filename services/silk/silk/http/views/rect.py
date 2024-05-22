@@ -26,10 +26,7 @@ router = APIRouter()
 
 @router.get("/r/{annotation_type}/{doc_id}/{page}/{x0}/{y0}/{x1}/{y1}")
 def index(annotation_type: str, doc_id: str, page: int, x0: float, y0: float, x1: float, y1: float, request: Request):
-    with db_session() as session:
-        pdf = session.query(DbPdf).filter_by(id=doc_id).one()
-
-    doc = cache_open_pdf(pdf.id)
+    doc = cache_open_pdf(doc_id)
     p = doc[page]
     r = p.rect
     rotation = p.rotation
@@ -53,7 +50,6 @@ def index(annotation_type: str, doc_id: str, page: int, x0: float, y0: float, x1
         {
             "doc_id": doc_id,
             "request": request,
-            "file": pdf.file_name,
             "page_num": page,
             "page_count": doc.page_count,
             "page_height": page_y1,
@@ -88,7 +84,6 @@ def index_table(doc_id: str, page: int, x0: float, y0: float, x1: float, y1: flo
         {
             "doc_id": doc_id,
             "request": request,
-            "file": pdf.file_name,
             "page_num": page,
             "page_count": doc.page_count,
             "page_height": page_y1,

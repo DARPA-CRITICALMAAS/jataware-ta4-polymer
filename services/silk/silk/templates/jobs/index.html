@@ -1,0 +1,13 @@
+{% extends "shared/_page.html" %}
+{% block main_content %}
+
+
+<div class="flex flex-col m-4">
+
+  <div class="text-lg my-4">Pending Jobs: {{ qsize }}</div>
+  {% for job in jobs %}
+  {% include "jobs/job.html" %}
+  {% endfor %}
+</div>
+
+{% endblock %}

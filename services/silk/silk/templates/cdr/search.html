@@ -1,0 +1,109 @@
+<div
+  id="container"
+  class="flex flex-col w-8/12">
+
+  <div class="flex flex-col">
+    <div class="flex flex-row">
+      <div
+        hx-include="input[name='search_by']:checked, input[name='which']:checked"
+        class="flex flex-col w-full my-4">
+        <div>
+          <input class="input input-bordered w-full"
+                 type="search"
+                 name="search"
+                 id="search"
+                 autocomplete="off"
+                 placeholder="Begin Typing To Search..."
+                 hx-get="/partials/cdr/search"
+                 hx-trigger="input changed delay:150ms, search"
+                 hx-target="#search-results"
+                 hx-indicator=".htmx-indicator">
+        </div>
+      </div>
+    </div>
+    <div class="flex flex-row">
+      <div class="flex form-control my-2 w-5/12">
+        <label class="label cursor-pointer">
+          <span class="label-text">CDR</span>
+          <input
+            type="radio"
+            name="which"
+            class="radio checked:bg-red-500"
+            value="cdr"
+            checked
+            hx-on:change="searchPage.toggleSearchType(), htmx.trigger('#search', 'search')"
+            />
+        </label>
+        <label class="label cursor-pointer text-xs">
+          <span class="label-text">USGS Publications Search</span>
+          <input type="radio"
+                 name="which"
+                 value="pubs"
+                 class="radio checked:bg-blue-500"
+                 hx-on:change="searchPage.toggleSearchType(), htmx.trigger('#search', 'search')"
+                 />
+        </label>
+      </div>
+      <div class="flex form-control my-2 w-2/12"></div>
+      <div class="flex form-control my-2 w-5/12">
+        <label class="label cursor-pointer">
+          <span class="label-text text-md">Search by Title</span>
+          <input type="radio"
+                 name="search_by"
+                 value="title"
+                 class="radio checked:bg-red-500"
+                 checked
+                 hx-on:change="searchPage.toggleSearchType(), htmx.trigger('#search', 'search')"
+                 />
+        </label>
+        <label class="label cursor-pointer">
+          <span class="label-text text-md">Search by DOI</span>
+          <input type="radio"
+                 name="search_by"
+                 value="doi"
+                 class="radio checked:bg-blue-500"
+                 hx-on:change="searchPage.toggleSearchType(), htmx.trigger('#search', 'search')"
+                 />
+        </label>
+        <label class="label cursor-pointer pubsonly hidden">
+          <span class="label-text">Search by Term</span>
+          <input type="radio"
+                 name="search_by"
+                 value="term"
+                 class="radio checked:bg-green-500"
+                 hx-on:change="searchPage.toggleSearchType(), htmx.trigger('#search', 'search')"
+                 >
+        </label>
+        <label class="label cursor-pointer cdronly">
+          <span class="label-text">Search by Provenance</span>
+          <input type="radio"
+                 name="search_by"
+                 value="prov"
+                 class="radio checked:bg-green-500"
+                 hx-on:change="searchPage.toggleSearchType(), htmx.trigger('#search', 'search')"
+                 >
+        </label>
+
+        <label class="label cursor-pointer cdronly">
+          <span class="label-text">Search by Url</span>
+          <input type="radio"
+                 name="search_by"
+                 value="url"
+                 class="radio checked:bg-purple-500"
+                 hx-on:change="searchPage.toggleSearchType(), htmx.trigger('#search', 'search')"
+                 >
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="htmx-indicator">
+    <span class="loading loading-spinner loading-md"></span> Searching...
+  </div>
+
+  <div class="flex flex-col" id="search-results">
+  </div>
+
+</div>
+
+<script src="{{ root_path }}/static/js/cdr_search_page.js" type="module"></script>

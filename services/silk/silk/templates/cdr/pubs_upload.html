@@ -1,0 +1,173 @@
+{% extends "shared/_page.html" %}
+{% block main_content %}
+
+<div id="container" class="flex flex-col w-full">
+  <div x-data class="flex items-center justify-center w-full p-24 z-100">
+    <form id="form"
+          hx-target="#container"
+          hx-post="/cdr/upload/pubs"
+          class="w-full"
+          x-on:keydown.prevent.enter=""
+          hx-swap="outerHTML"
+          >
+      <div class="flex flex-col w-full">
+        <div class="flex flex-row my-4 space-x-8 w-full">
+          <div class="flex flex-col w-1/2 space-y-4">
+            {% set linkOpts = [] %}
+            {% for link in dget(doc, 'links', []) if path_ext(dget(link, "url", "-")) == ".pdf" %}
+              {% set linkurl =  dget(link, "url", "-") %}
+              {% set size    =  dget(link, "size", "") %}
+              {% set linktext = size ~ ' ' ~ linkurl %}
+              {% set linkOpt = ({"text": linktext, "url": linkurl}) %}
+              {% set _ = linkOpts.append(linkOpt) %}
+            {% endfor %}
+            <div x-data="{linkOpts: {{- linkOpts | jsonify -}}, selectedUrl: ''}"
+                 x-init="selectedUrl = linkOpts[0]?.url || ''">
+              <label class="form-control">
+                <span>File</span>
+                <select name="url" x-model="selectedUrl" class="select select-ghost w-full select-md">
+                  <template x-for="(option, idx) in linkOpts">
+                    <option :key="idx" :value="option.url" x-text="option.text"></option>
+                  </template>
+                </select>
+              </label>
+              <div class="mx-2">
+                <a class="link link-primary text-xs" target="_blank" :href="selectedUrl" x-text="selectedUrl"></a>
+              </div>
+            </div>
+
+            <div>
+              <label class="form-control" for="title">
+                <span>Title *</span>
+                <input name="title" type="text" class="input input-bordered" value="{{ dget(doc, 'title', '')|e }}" >
+              </label>
+            </div>
+
+            <div>
+              <label class="form-control" for="doi">
+                <span>DOI</span>
+                <input name="doi" type="text" class="input input-bordered" value="{{ dget(doc, 'doi', '')|e }}">
+              </label>
+            </div>
+
+            <div>
+              <label class="form-control" for="year">
+                <span>Year</span>
+                <input name="year" type="text" class="input input-bordered" value="{{ dget(doc, 'publicationYear', '')|e }}">
+              </label>
+            </div>
+
+            <div class="form-control w-56">
+              <label class="cursor-pointer label" for="is_open">
+                <span>Document is Public</span>
+                <input name="is_open" type="checkbox" checked class="checkbox checkbox-sm" />
+              </label>
+            </div>
+
+
+
+            <div class="flex flex-row space-x-2">
+              <button id="btn" class="btn btn-primary w-48">Submit</button>
+              <button id="btn" class="btn btn-error w-48" onclick="event.preventDefault(); window.location.reload();" >Reset</button>
+            </div>
+          </div>
+
+          <div class="flex flex-col w-1/2 space-y-4">
+
+            <div>
+              <label class="form-control" for="src_name">
+                <span>Source Name * </span>
+                <input type="text" class="input input-bordered" disabled value="pubs.usgs.gov">
+                <input name="src_name" hidden value="pubs.usgs.gov">
+              </label>
+            </div>
+
+            <div x-data="{ src_url: 'https://pubs.usgs.gov/publication/{{ dget(doc, 'indexId', '')|e }}' }">
+              <label class="form-control" for="src_url">
+                <span>Source URL</span>
+                <input name="src_url" type="text" class="input input-bordered" x-model="src_url">
+              </label>
+              <div class="mt-2 ml-2">
+                <a class="link text-xs link-primary" :href=src_url target="_blank" x-text="src_url"></a>
+              </div>
+            </div>
+
+            <div>
+              <label class="form-control" for="src_id">
+                <span>Source ID</span>
+                <input name="src_id" type="text" class="input input-bordered" value="{{ dget(doc, 'indexId', '')|e }}">
+              </label>
+            </div>
+
+            {% set authors = dget(doc, "contributors.authors", []) %}
+            <div
+              x-data="{ authors: {{- authors |map(attribute='text') | list | jsonify -}},
+                        newAuthor: '',
+                      }"
+              >
+              <label class="form-control">
+                <span>Author(s)</span>
+
+                <div class="mt-2">
+                  <template x-for="(author, idx) in authors" :key="index">
+                    <div class="flex flex-row text-sm">
+                      <div
+                        @click="authors.splice(idx, 1)"
+                        class="text-red-500 w-8 cursor-pointer">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke-width="1.5"
+                          stroke="currentColor"
+                          class="w-4 h-4">
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                        </svg>
+                      </div>
+                      <span x-text="author"></span>
+                      <input type="hidden" name="authors" :value="author" />
+                    </div>
+                  </template>
+                </div>
+
+                <input
+                  type="text"
+                  @keyup.enter="if (newAuthor.trim()) { authors.push(newAuthor.trim()); newAuthor = '';}"
+                  x-model="newAuthor"
+                  class="input input-sm text-sm input-bordered mt-4">
+              </label>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </form>
+
+
+  </div>
+
+  <div x-ref="progress-container"
+       class="flex flex-col items-center w-full justify-center hidden">
+    <div>
+      <span class="loading loading-spinner loading-sm"></span>
+      <span class="text-xl">Uploading</span>
+    </div>
+    <div class="mb-5">
+      <span class="white-space-pre">File: </span><span x-text="uploadFile"></span>
+    </div>
+
+    <div class="w-96 bg-gray-200 rounded-full dark:bg-gray-700">
+      <div id="pbar" class="bg-blue-600 text-lg font-medium text-blue-100 text-center p-0.5 leading-none rounded-full" style="width: 0%"> 0%</div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module" src="/static/js/uploads_page.js"></script>
+
+
+{% endblock %}

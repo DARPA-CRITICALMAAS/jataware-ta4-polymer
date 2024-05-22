@@ -1,0 +1,36 @@
+{% extends "shared/_page.html" %}
+{% block main_content %}
+<div class="container mx-4 flex flex-1">
+  <div class="flex flex-row w-full">
+    <div class="flex flex-col m-4 w-full">
+      <div class="text-lg">
+        Select Images of Maps to send to Geo Referencer
+      </div>
+
+      <div class="grid grid-cols-4 gap-4">
+        {% for o in objects %}
+        <div class="flex flex-row">
+          <div class="mt-4 mx-2">
+            <label class="label cursor-pointer">
+              <input type="checkbox" class="checkbox checkbox-primary" />
+            </label>
+          </div>
+          <div class="flex flex-col">
+            <span class="text-xs">page: _</span>
+            <img
+              class="max-h-32"
+              loading="lazy"
+              src="data:image/png;base64, {{ dget(o, 'children.0.bytes', '') }}">
+
+            <a href="/d/{{ doc_id }}/0" target="_blank" class="link link-primary text-xs">go to this page</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+{% endblock %}

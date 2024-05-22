@@ -1,0 +1,55 @@
+{% for clip in clips %}
+
+<div class="m-4"
+     x-data="{
+             waitingGPT: false,
+             }"
+     >
+  <div class="flex flex-col">
+    <img
+      src="{{ clip['img_url'] }}"
+      class="max-w-none bg-pdf-base" loading="lazy">
+    <div class="text-neutral-content bg-neutral p-4 my-4 {{ '' if clip['text'] else 'hidden' }}">
+      <pre name="other-text" class="text-xs font-mono"> {{ clip["text"] }}</pre>
+    </div>
+    <div class="flex">
+      <form hx-post="/doc/ask/gpt"
+            hx-swap="innerHTML"
+            hx-target="#gpt-results"
+            hx-params="prompt,content"
+            hx-indicator="#gpt-spinner"
+            class="flex-1"
+            hx-on::before-send="OL.dispatchEvent('.gpt-button', 'gpt-started', 'starting')"
+            hx-on::after-request="OL.dispatchEvent('.gpt-button', 'gpt-finished', 'complete')"
+            >
+        <input type="hidden" name="content" value="{{ clip['text'] }}">
+        <textarea name="prompt" placeholder="Ask Assistant"
+                  class="textarea textarea-bordered textarea-lg w-full leading-normal text-sm"></textarea>
+        <button
+          x-bind:disabled="waitingGPT"
+          @gpt-started.window="waitingGPT=true"
+          @gpt-finished.window="waitingGPT=false"
+          class="gpt-button btn btn-primary">Ask</button>
+      </form>
+    </div>
+    <div id="gpt-spinner" :class="waitingGPT ? 'opacity-0 flex justify-center htmx-indicator' : 'opacity-0 flex justify-center htmx-indicator hidden'" class="opacity-0">
+      <span class="loading loading-dots loading-lg"></span>
+    </div>
+    <div class="flex-1 my-2" id="gpt-results"></div>
+    <div class="text-xs font-mono my-2 {{'' if clip['tbls']|length > 0 else 'hidden' }}">
+      {% for tbl in clip['tbls'] %}
+      <div class="mb-4">
+        <a class="link link-primary"
+           href="data:text/csv;charset=utf-8,{{ tbl['csv'] }}"
+           download="table.csv">Download as CSV</a>
+      </div>
+      <div>
+        {{ tbl['html']|safe }}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% endfor %}
+
