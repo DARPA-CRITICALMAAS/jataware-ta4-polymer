@@ -125,10 +125,10 @@ def main():
         raise ValueError("Couldn't connect to Elasticsearch. Ensure it's running and accessible.")
 
     indices_to_create = [
-        # ("polymer_gcps", gcps__mapping),
-        # ("polymer_projections", projection_file_mapping),
+        ("polymer_gcps", gcps__mapping),
+        ("polymer_projections", projection_file_mapping),
         ("polymer_legend_extractions", legend_mapping),
-        # ("polymer_area_extractions", area_extractions_mapping)
+        ("polymer_area_extractions", area_extractions_mapping),
     ]
 
     for index, mapping in indices_to_create:

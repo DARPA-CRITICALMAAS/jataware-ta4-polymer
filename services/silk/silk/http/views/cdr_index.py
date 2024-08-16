@@ -481,7 +481,7 @@ def create_upload_file(
         session.add(record)
         session.commit()
 
-    return ResponeRedirect("/cdr/jobs/")
+    return RedirectResponse("/cdr/jobs/", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/cdr/jobs/")

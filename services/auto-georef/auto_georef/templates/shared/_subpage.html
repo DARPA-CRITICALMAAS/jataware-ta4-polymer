@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en" style="scrollbar-gutter: auto">
+  {% include "shared/_head.html" %}
+  <body class="h-screen w-full overflow-hidden bg-base-300">
+    <div class="pointer-events-none flex h-screen w-full flex-col">
+      {% include "shared/_nav.html" %}
+      <div class="relative size-full group/page">
+        {% block main_content %}{% endblock %}
+      </div>
+    </div>
+    <script type="module" src="/static/js/all_pages.js"></script>
+  </body>
+</html>

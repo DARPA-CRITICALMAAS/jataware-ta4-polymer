@@ -2,13 +2,16 @@ import copy
 import logging
 import uuid
 from datetime import datetime
+from logging import Logger
 
 import httpx
-from elasticsearch import Elasticsearch, exceptions
+from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
 from fastapi import HTTPException, status
 
 from ..settings import app_settings
+
+logger: Logger = logging.getLogger(__name__)
 
 
 def compare_dicts(dict1, dict2, keys):
@@ -46,7 +49,7 @@ def update_document_by_id(index_name, doc_id, updates):
         response = es.update(index=index_name, id=doc_id, body={"doc": updates}, refresh=True)
         return response
     except Exception:
-        logging.exception(f"Error updating document:")
+        logger.exception(f"Error updating document:")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{doc_id} item not found")
 
 
@@ -66,27 +69,27 @@ def cdr_GCP_by_id(cog_id, gcp_id):
     return return_ES_doc_by_id(app_settings.polymer_gcps_index, gcp_id)
 
 
-# def legend_categories_by_cog_id(index, cog_id, category):
-#     response = es.search(
-#             index=index,
-#             body={"query": {"bool": {
-#                 "must": [
-#                     {"match": {"cog_id": cog_id}},
-#                     {"match": {"category": category}},
-#                     ]
-#                 }}},
-#             size=10000,
-#         )
-#     return [hit["_source"] for hit in response["hits"]["hits"]]
-
-
 def return_ES_doc_by_id(index, id):
     try:
         response = es.get(index=index, id=id)
         return response["_source"]
 
     except Exception:
-        logging.exception(f"An error occured looking for {id}")
+        logger.exception(f"An error occured looking for {id}")
+        return None
+
+
+def polymer_system_cog_id(index, cog_id):
+    try:
+        response = es.search(
+            index=index,
+            body={"query": {"bool": {"must": [{"match": {"cog_id": cog_id}}]}}},
+        )
+        if len([hit["_source"] for hit in response["hits"]["hits"]]) > 0:
+            return app_settings.polymer_auto_georef_system + "_" + app_settings.polymer_auto_georef_system_version
+        return None
+    except Exception:
+        logger.exception("An error occured")
         return None
 
 
@@ -100,7 +103,7 @@ def search_by_cog_id(index, cog_id):
         return [hit["_source"] for hit in response["hits"]["hits"]]
 
     except Exception:
-        logging.exception("An error occured")
+        logger.exception("An error occured")
         return []
 
 
@@ -108,7 +111,7 @@ def delete_by_id(index, id):
     try:
         response = es.delete(index=index, id=id, refresh=True)
     except Exception as e:
-        logging.exception(f"Failed to delete {id} from {index}")
+        logger.exception(f"Failed to delete {id} from {index}")
 
     return response
 
@@ -203,7 +206,7 @@ def update_GCPs(cog_id, gcps):
                 all_gcps[gcp["gcp_id"]],
                 ["latitude", "longitude", "rows_from_top", "columns_from_left", "crs"],
             ):
-                logging.info("Point has stayed the same")
+                logger.info("Point has stayed the same")
                 gcp_ids.append(gcp["gcp_id"])
                 continue
 
@@ -215,7 +218,7 @@ def update_GCPs(cog_id, gcps):
             new_gcp["model_version"] = ""
 
         print("New point being created/saved")
-        logging.info("New point being created/saved")
+        logger.info("New point being created/saved")
 
         new_gcp["gcp_id"] = uuid.uuid4()
         gcp_ids.append(new_gcp["gcp_id"])
@@ -245,12 +248,14 @@ def legend_categories_by_cog_id(index, cog_id, category):
                     "must": [
                         {"match": {"cog_id": cog_id}},
                         {"match": {"category": category}},
+                        {"match": {"status": "validated"}},
                     ]
                 }
             }
         },
         size=10000,
     )
+
     return [hit["_source"] for hit in response["hits"]["hits"]]
 
 

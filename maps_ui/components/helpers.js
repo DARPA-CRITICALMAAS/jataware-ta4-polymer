@@ -22,40 +22,20 @@ const POLYMER_S3_COG_PRO_PREFEX = import.meta.env
 // --
 // Map helpers
 
-export const provenance_mapper = {
-  "ngmdb_2.0": "NGMDB",
-  "polymer_0.0.1": "Human",
-  "polymer_hmi_0.1.0": "Human",
-  "umn-usc-inferlink_0.0.1": "UMN 1",
-  "umn-usc-inferlink_0.0.2": "UMN 2",
-  "umn-usc-inferlink_0.0.3": "UMN 3",
-  "uncharted-process_0.0.2": "Uncharted 2",
-  "uncharted_0.0.3": "Uncharted 3",
-  "uncharted-lara_0.0.2": "Uncharted L 2",
-  "jataware_georef_0.1.0": "Jataware Extraction Model",
-  "UIUC_0.4.0": "UIUC 40",
-  "UIUC_golden_muscat_0.4.1": "UIUC GM 41",
-  "UIUC_drab_volcano_0.4.1": "UIUC D 41V",
-};
 export const provenance_colors = {
-  "ngmdb_2.0": "#446100",
-  "polymer_0.0.1": "#FF0000",
-  "polymer_hmi_0.1.0": "#FF0000",
-  "umn-usc-inferlink_0.0.1": "#690fda",
+  "ngmdb_2.0": "var(--mui-palette-success-main)",
+  "polymer_0.0.1": "var(--mui-palette-Alert-infoColor)",
   "uncharted-process_0.0.2": "#4B0082",
   "jataware_georef_0.1.0": "#690fda",
 };
 
 export function checkIfEdited(gcp) {
-  // if there is a reference_id that means this gcp was edited and used before
-  // if just_edited is true the user just edited this gcp and it will make a new gcp when used in georeferencing.
-  if (gcp["reference_id"] !== null && gcp["reference_id"] !== undefined) {
-    return true;
-  } else if (gcp["just_edited"] === true) {
-    return true;
-  } else {
-    return false;
-  }
+  // GCP was edited and used before
+  const hasBeenUsed = ![null, undefined].includes(gcp["reference_id"]);
+  // GCP edited, will make a new gcp when used in georeferencing
+  const { just_edited: justEdited } = gcp;
+
+  return hasBeenUsed || justEdited;
 }
 
 export function getColorForProvenance(provenance) {
@@ -83,7 +63,7 @@ export const gcp2box = function (
     model_version,
     just_edited,
   },
-  height
+  height,
 ) {
   const BUFFER = 150;
 
@@ -197,7 +177,7 @@ function modifyProj4String(input) {
     const params = input.split(" ");
     // Filter out the '+nadgrids=' parameter and value
     const filteredParams = params.filter(
-      (param) => !param.startsWith("+nadgrids=")
+      (param) => !param.startsWith("+nadgrids="),
     );
     // add '+towgs84=-8,160,176,0,0,0,0'
     return filteredParams.join(" ") + " +towgs84=-8,160,176,0,0,0,0";
@@ -317,8 +297,7 @@ export function returnImageBufferUrl(cog_id, gcp, height) {
 }
 
 export function determineMapSourceURL(projection_info, cog_id) {
-  // console.log(projection_info["projection_id"], POLYMER_PUBLIC_BUCKET)
-  if (projection_info["in_cdr"]) {
+  if (projection_info?.in_cdr) {
     return `${CDR_COG_URL}/${CDR_PUBLIC_BUCKET}/${CDR_S3_COG_PRO_PREFEX}/${cog_id}/${projection_info["system"]}/${projection_info["system_version"]}/${projection_info["projection_id"]}`;
   } else {
     return `${POLYMER_COG_URL}/${POLYMER_PUBLIC_BUCKET}/${POLYMER_S3_COG_PRO_PREFEX}/${cog_id}/${projection_info["projection_id"]}`;
@@ -350,7 +329,7 @@ export const oneMap = async (status, navigate, nav_path) => {
       url: "/api/map/search/random_cog?georeferenced=" + path,
     });
     if (data) {
-      console.log(data)
+      console.log(data);
       navigate(nav_path + data[0]["cog_id"]);
       navigate(0);
     }
@@ -362,7 +341,7 @@ export const oneMap = async (status, navigate, nav_path) => {
 export const findFeatureByAttribute = function (
   source,
   attributeName,
-  attributeValue
+  attributeValue,
 ) {
   return source
     .getFeatures()
@@ -370,6 +349,10 @@ export const findFeatureByAttribute = function (
 };
 
 export const returnImageUrl = function (cog_id, extent) {
+  if (extent == null || (Array.isArray(extent) && extent.length === 0)) {
+    return "";
+  }
+
   return (
     "/api/map/clip-bbox?cog_id=" +
     cog_id +
@@ -383,3 +366,41 @@ export const returnImageUrl = function (cog_id, extent) {
     parseInt(extent[3])
   );
 };
+
+export const validateExtent = function (extent) {
+  if (extent == null || (Array.isArray(extent) && extent.length === 0)) {
+    return false;
+  }
+  return true;
+};
+
+export const returnInCDR = function (in_cdr) {
+  if (in_cdr) {
+    return "TRUE"
+  }
+  return "FALSE"
+}
+
+export const returnInCDRStyle = function (in_cdr) {
+  if (in_cdr) {
+    return { marginRight: "5px", background: "var(--mui-palette-success-light)" }
+  }
+  return { marginRight: "5px" }
+}
+
+export function getShapeCenterPoint(coordinatesArray) {
+  const pointsCount = coordinatesArray.length;
+  // add up lon(s), lat(s), output new point like: [100, 200]
+  const lon = 0;
+  const lat = 1;
+  const [avgLon, avgLat] = coordinatesArray.reduce(
+    (acc, curr) => [acc[lon] + curr[lon], acc[lat] + curr[lat]],
+    [0, 0],
+  );
+  // average by dividing each lon/lat by pointsCount
+  return [avgLon / pointsCount, avgLat / pointsCount];
+}
+
+export function numberToFixed(latOrLon) {
+  return latOrLon ? latOrLon.toFixed(4) : "";
+}

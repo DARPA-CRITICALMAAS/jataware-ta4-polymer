@@ -1,0 +1,94 @@
+<div class="absolute abs overflow-x-hidden flex flex-col gap-2">
+  <div class="grid gap-2 map-search-results-grid flex-1 overflow-y-auto overflow-x-hidden">
+    {% for map in maps %}
+      <div
+        class="flex flex-col {%if use_maps_grid %}justify-evenly{%endif%} card bg-base-100 bg-opacity-80
+               rounded-none lg:rounded-md border border-slate-300 dark:border-neutral border-solid
+               relative py-1 px-2"
+        >
+        <h5
+          title="{{map.cog_name}}"
+          class="mb-1 card-title line-clamp-2 font-light text-base leading-snug"
+          >
+          {{map.cog_name}}
+        </h5>
+        <div class="flex gap-2 items-center">
+          <div class="overflow-hidden outline rounded outline-solid outline-neutral-200 max-w-32 max-h-32 min-w-20 min-h-20">
+            <a
+              href="{{map.gcp_url}}"
+              class="contents"
+              target="_blank"
+              >
+              <img class="zoomed-proj object-cover max-w-[110%]"
+                   src="{{map.thumbnail_url}}" />
+            </a>
+          </div>
+
+          <div id="map-result-data" class="flex-1 rounded text-neutral-content">
+
+            <div
+              hx-get="{{template_prefix}}/map-stats/{{map.cog_id}}"
+              hx-swap="outerHTML"
+              hx-trigger="load"
+              hx-target="this"
+            >
+              <div class="flex inset-0 w-full">
+                <span class="loading loading-ring loading-sm"></span>
+                &nbsp;
+                <span class="text-neutral whitespace-nowrap">Loading features</span>
+              </div>
+            </div>
+
+          </div><!-- /map-result-data -->
+        </div>
+
+        <div class="mt-1">
+          <div class="flex prose text-sm">
+            <div class="flex gap-1 mr-4">
+              <div class="">Scale</div>
+              <div class="text-base-content font-bold">
+                1:<span class="">{{map.fmt_scale}}</span>
+              </div>
+            </div>
+            <div class="flex gap-1 mr-4">
+              <div class="">Year</div>
+              <div class=""><span class="text-base-content font-bold">{{map.publish_year}}</span></div>
+            </div>
+            <div class="flex gap-1 mr-4">
+              <div>Source</div>
+              <a class="font-bold" target="_blank" href="{{map.provider_catalog_url}}">
+                {{'ngmdb' if 'NGMDB' in map.provider_name else map.provider_name}}
+              </a>
+            </div>
+          </div>
+          {# <span title="Publisher" class="text-sm">{{map.publisher}}</span> #}
+        </div>
+      </div>
+    {%endfor%}
+  </div>
+
+  <div class="text-center">
+    <div class="join m-auto border-solid border dark:border-neutral">
+      <button
+        class="join-item btn {{'btn-disabled' if not prev_page_url}}"
+        hx-post="{{prev_page_url}}"
+        hx-target="#map-results-target"
+        hx-swap="innerHTML">
+        Prev
+      </button>
+      <button class="join-item btn pointer-events-none opacity-100">Page {{page + 1}}</button>
+      <button
+        hx-post="{{next_page_url}}"
+        hx-target="#map-results-target"
+        hx-swap="innerHTML"
+        class="join-item btn {{'btn-disabled' if not next_page_url}}">
+        Next
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById("map-results-on-page").innerText="Showing {{maps_in_page}}";
+  document.getElementById("maps-results-count-total").classList.remove("hidden");
+</script>

@@ -1,0 +1,115 @@
+<style>
+  /* Fixes global `tailwind_input.css` styling */
+  a:link,
+  a:visited,
+  a:hover {
+    text-decoration: unset !important;
+    color: unset !important;
+  }
+</style>
+<div
+  class="navbar pointer-events-auto relative z-40 flex w-screen flex-row justify-between bg-base-200 shadow-md gap-8 transition-[gap] xl:gap-16"
+>
+  <div class="gap-4 transition-[gap] xl:gap-16">
+    <a
+      href="/"
+      class="btn btn-ghost text-3xl gap-2 w-fit p-1 place-content-center"
+    >
+      <div
+        class="bg-base-content h-full aspect-square [mask-image:url('/static/img/polymer_logo.svg')]"
+      ></div>
+      <h1>Polymer</h1>
+    </a>
+    <div class="flex gap-2">
+      <a href="/points/{{cog_id}}" class="btn btn-ghost" id="points-link">
+        <i class="fa-solid fa-map-pin"></i>
+        <span>Map GCPs</span>
+      </a>
+      <a href="/projections/{{cog_id}}" class="btn btn-ghost" id="proj-link">
+        <i class="fa-solid fa-earth-americas"></i>
+        <span>Projections</span>
+      </a>
+      <a
+        href="/swatchannotation/{{cog_id}}"
+        class="btn btn-ghost"
+        id="legend-link"
+      >
+        <i class="fa-solid fa-list"></i>
+        <span>Legend Swatches</span>
+      </a>
+      <a href="/segment/{{cog_id}}" class="btn btn-ghost" id="segment-link">
+        <i class="fa-solid fa-shapes"></i>
+        <span>Segmentation</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="gap-4 transition-[gap] xl:gap-16 min-w-0 flex-1 justify-end">
+    <div class="hidden items-center gap-2 text-sm lg:flex min-w-0">
+      <script type="module">
+        import { copyTextToClipboard as copy } from "/static/js/clipboard.js";
+        const cogID = document.querySelector("#cog-id");
+        cogID.addEventListener("click", () => copy("{{cog_id}}"));
+      </script>
+      <h2 class="font-semibold uppercase opacity-65">COG</h2>
+
+      <div
+        class="tooltip tooltip-bottom pointer-events-auto cursor-pointer min-w-0 !flex"
+        data-tip="Copy to Clipboard"
+      >
+        <span
+          class="badge badge-neutral badge-sm px-2 py-2.5 min-w-0 active:opacity-50"
+          id="cog-id"
+        >
+          <span class="overflow-hidden text-ellipsis">{{cog_id}}</span>
+        </span>
+      </div>
+    </div>
+
+    <div
+      class="tooltip tooltip-bottom pointer-events-auto before:-translate-x-[79%]"
+      data-tip="Change Theme"
+    >
+      <div id="theme-switcher">
+        <button class="btn btn-square btn-ghost text-lg" data-set-theme="">
+          <i class="fa-solid fa-sun"></i>
+        </button>
+        <button class="btn btn-square btn-ghost text-lg" data-set-theme="light">
+          <i class="fa-solid fa-moon"></i>
+        </button>
+        <button class="btn btn-square btn-ghost text-lg" data-set-theme="dark">
+          <i class="fa-solid fa-paint-roller"></i>
+          <i
+            class="fa-solid fa-user-gear absolute text-xs translate-x-3/4 translate-y-3/4"
+          ></i>
+        </button>
+      </div>
+      <script>
+        const ts = document.querySelector("#theme-switcher");
+        const updateThemeButton = () => {
+          const system = ts.querySelector("[data-set-theme='']").classList;
+          const light = ts.querySelector("[data-set-theme='light']").classList;
+          const dark = ts.querySelector("[data-set-theme='dark']").classList;
+
+          const theme = window.localStorage.getItem("theme");
+          if (theme === "light") {
+            system.remove("hidden");
+            light.add("hidden");
+            dark.add("hidden");
+          } else if (theme === "dark") {
+            system.add("hidden");
+            light.remove("hidden");
+            dark.add("hidden");
+          } else {
+            system.add("hidden");
+            light.add("hidden");
+            dark.remove("hidden");
+          }
+        };
+
+        ts.addEventListener("click", updateThemeButton);
+        updateThemeButton();
+      </script>
+    </div>
+  </div>
+</div>

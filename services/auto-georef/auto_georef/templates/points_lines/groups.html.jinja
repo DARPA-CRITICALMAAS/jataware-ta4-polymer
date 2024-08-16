@@ -1,0 +1,14 @@
+{% for group in groups %}
+<label
+  class="btn btn-block text-lg bg-base-300 shadow-inner has-[:checked]:btn-active has-[:checked]:btn-primary pointer-events-auto"
+  tabindex="0">
+  <input class="hidden" type="checkbox" checked autocomplete="off" name="group-toggle" value="{{ group.legend_id }}">
+  <span>{{ group.name }}</span>
+</label>
+{% endfor %}
+
+<script>
+  console.log("groups.html.jinja");
+  window.polymer.rawFeatures = {{ features | tojson }};
+</script>
+<script src="/static/js/label_tab_fix.js"></script>

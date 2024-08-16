@@ -1,0 +1,15 @@
+.polymer-button-input {
+  display: grid;
+  grid-column-gap: 0.25rem;
+  grid-template-columns: auto 1fr;
+
+  .grouped-Input-field {
+    &:focus,
+    &:focus-within,
+    &:focus-visible {
+      fieldset {
+        border-width: 1px;
+      }
+    }
+  }
+}

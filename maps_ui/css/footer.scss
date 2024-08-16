@@ -1,0 +1,11 @@
+footer {
+  display: flex;
+  border-top: 1px solid var(--mui-palette-background-highlight);
+  padding: 0.5rem;
+  color: var(--mui-palette-text-secondary);
+
+  .online {
+    color: var(--mui-palette-success-light);
+    display: inline;
+  }
+}

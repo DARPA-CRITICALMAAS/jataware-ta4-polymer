@@ -70,28 +70,9 @@ For this one you'll want to use the following JSON:
 }
 ```
 
-For the CDR instructions at https://github.com/jataware/cdr?tab=readme-ov-file#creation-of-users-tokens-assignment-of-roles to regiester both pair of systems above by first creating a user, user token, and giving your tokens the appropriate roles, and then register your systems via the CDR API's using your token.
+For the CDR instructions at https://github.com/jataware/cdr?tab=readme-ov-file#creation-of-users-tokens-assignment-of-roles to register both pair of systems above by first creating a user, user token, and giving your tokens the appropriate roles, and then register your systems via the CDR API's using your token.
 
 ![Polymer Registrastion with CDR](./images/polymer_register.png)
-
-Create `.env` file in `services/auto-georef/` with the following:
-
-```
-
-AUTOGEOREF_OPEN_AI_KEY="YOUR_KEY"
-AUTOGEOREF_CDR_BEARER_TOKEN="Bearer YOUR_CDR_TOKEN"
-AUTOGEOREF_cdr_s3_endpoint_url="http://localhost:9000"
-AUTOGEOREF_cdr_es_endpoint_url="http://localhost:9200"
-AUTOGEOREF_cdr_endpoint_url="http://localhost:8333"
-AUTOGEOREF_polymer_es_endpoint_url="http:/localhost:9200"
-AUTOGEOREF_polymer_s3_endpoint_url="http://localhost:9000"
-AUTOGEOREF_polymer_public_bucket="common.polymer.rocks"
-AUTOGEOREF_ES_ENDPOINT_URL="http://elastic:9200"
-
-AWS_PROFILE=default
-CPL_CURL_VERBOSE=1
-
-```
 
 ## Build and Run For Development (via Docker Containers)
 
@@ -107,42 +88,19 @@ Build Polymer HMI
 
 `make docker-build-maps-ui`
 
-## Prepopulate Data to minio
+## Build and Run For Development (Locally)
 
-If you would like to preload data into minio add it to the `load/` directory with the format of `{name}/{name}.cog.tif`
+### Polymer API
 
-Example
-
-```
-
-./load/test/
-./load/test/test.cog.tif
-
-```
-
-## Start services
-
-This will start elasticsearch + minio
-
-```
-
-make up.a
-
-```
-
-Verify:
-
-minio admin http://localhost:9000 u: miniouser p: miniopass
-
-elastic http://localhost:9200/
-
-### Auto Georef
+ ### TODO tesseract-ocr dependency
+ ### common.polymer.rocks bucket missing + public permission
 
 Setup AWS profile
 
-modify `~/.aws/credentials` add the following profile. Make sure your shell does not have
-`AWS_ACCESS_KEY_ID` `AWS_SECRET_ACCESS_KEY` already in the environment
+Modify `~/.aws/credentials` add the following profile.
 
+Make sure your shell does not have
+`AWS_ACCESS_KEY_ID` `AWS_SECRET_ACCESS_KEY` already in the environment.
 ```
 
 [minio]
@@ -154,13 +112,20 @@ aws_secret_access_key = miniopass
 Setup `services/auto-georef/.env`
 
 ```
+AUTOGEOREF_OPEN_AI_KEY="sk-lksjdlfkjalsjdflkakjsdf"
+AUTOGEOREF_CDR_BEARER_TOKEN="Bearer ce749b92d78546bad1680fd2583ecfa9a5b9d1fe2d184f6ef805ce3717da1128"
+AUTOGEOREF_cdr_s3_endpoint_url="http://localhost:9000"
+AUTOGEOREF_cdr_es_endpoint_url="http://localhost:9200"
+AUTOGEOREF_cdr_endpoint_url="http://localhost:8333"
+AUTOGEOREF_polymer_es_endpoint_url="http://localhost:9200"
+AUTOGEOREF_polymer_s3_endpoint_url="http://localhost:9000"
+AUTOGEOREF_polymer_public_bucket="common.polymer.rocks"
 
-AUTOGEOREF_S3_ENDPOINT_URL=http://0.0.0.0:9000
 AWS_PROFILE=minio
-
+CPL_CURL_VERBOSE=1
 ```
 
-Start
+Install and Start Polymer API
 
 ```
 
@@ -172,6 +137,20 @@ AWS_PROFILE=minio poetry run dev
 
 Verify: http://0.0.0.0:3000/docs
 
+### Create Minio/S3 Bucket needed for Polymer
+
+```
+cd services/auto-georef
+AWS_PROFILE=minio poetry run python -m auto_georef.cli.buckets
+```
+
+### Create Polymer Elasticsearch Indices
+
+```
+cd services/auto-georef
+poetry run python -m auto_georef.cli.create_es_index
+```
+
 ### Maps UI
 
 Create an `maps_ui/.env`
@@ -179,13 +158,23 @@ Create an `maps_ui/.env`
 Example config:
 
 ```
+VITE_MAPTILER_KEY="R1RblN2331a03Z4mv3"
 
-VITE_TIFF_URL="http://0.0.0.0:9000/polymer-rocks/"
-VITE_MAPTILER_KEY="{key}"
+VITE_TIFF_URL="http://localhost:9000/common.polymer.rocks"
 
+VITE_POLYMER_COG_URL="http://localhost:9000"
+VITE_POLYMER_PUBLIC_BUCKET="common.polymer.rocks"
+VITE_POLYMER_S3_COG_PRO_PREFEX="cogs/projections"
+
+VITE_CDR_COG_URL="http://localhost:9000"
+VITE_CDR_PUBLIC_BUCKET="public.cdr.land"
+VITE_CDR_S3_COG_PRO_PREFEX="test/cogs"
+VITE_CDR_S3_COG_PREFEX="cogs"
+VITE_POLYMER_SYSTEM="polymer"
+VITE_POLYMER_SYSTEM_VERSION="0.0.1"
 ```
 
-Run:
+Install and Run the UI:
 
 ```
 
@@ -196,7 +185,3 @@ npm run start
 ```
 
 Verify: http://localhost:8080/
-
-```
-
-```

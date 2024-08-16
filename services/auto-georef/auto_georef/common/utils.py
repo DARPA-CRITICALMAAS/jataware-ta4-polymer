@@ -1,6 +1,7 @@
 import io
 import logging
-from functools import wraps
+import os
+from functools import partial, wraps
 from logging import Logger
 from time import perf_counter
 from typing import Any, Callable
@@ -8,8 +9,12 @@ from typing import Any, Callable
 import boto3
 import fitz
 import numpy as np
-from fastapi.concurrency import run_in_threadpool
+import rasterio as rio
+from cachetools import TTLCache, cached
 from PIL import Image
+
+load_tiff_cache_ = TTLCache(maxsize=2, ttl=15)
+
 
 from auto_georef.settings import app_settings
 
@@ -31,32 +36,27 @@ def timeit(logger):
 
 
 # s3 client builder
-def s3_client():
-    s3 = boto3.client("s3", endpoint_url=app_settings.cdr_s3_endpoint_url, verify=False)
+def s3_client(endpoint_url=app_settings.cdr_s3_endpoint_url):
+    s3 = boto3.client("s3", endpoint_url=endpoint_url, verify=False)
     return s3
+
+
+def download_file_polymer(s3_key, local_file_path):
+    s3 = s3_client()
+    try:
+        s3.download_file(app_settings.polymer_public_bucket, s3_key, local_file_path)
+        logger.info(f"File downloaded successfully to {local_file_path}")
+    except Exception:
+        logger.exception(f"Error downloading file from S3")
 
 
 def download_file(s3_key, local_file_path):
     s3 = s3_client()
     try:
         s3.download_file(app_settings.cdr_public_bucket, s3_key, local_file_path)
-        logging.info(f"File downloaded successfully to {local_file_path}")
+        logger.info(f"File downloaded successfully to {local_file_path}")
     except Exception:
-        logging.exception(f"Error downloading file from S3")
-
-
-@timeit(logger)
-async def load_tiff_cache(cache, s3_key):
-    if s3_key in cache:
-        logger.debug("Loading image from cache: %s", s3_key)
-        return cache[s3_key]
-
-    logger.debug("Loading image from S3: %s", s3_key)
-    img_data = await run_in_threadpool(lambda: read_s3_contents(s3_key))
-    image = Image.open(io.BytesIO(img_data))
-
-    cache[s3_key] = image
-    return image
+        logger.exception(f"Error downloading file from S3")
 
 
 @timeit(logger)
@@ -141,3 +141,65 @@ def pdf_to_hd_tif(filepath, temp_file):
     img.save(tiff, format="TIFF")
 
     temp_file.write(tiff.getvalue())
+
+
+def toint(s, default=-1):
+    try:
+        return int(s or "")
+    except ValueError:
+        return default
+
+
+def nth(xs, i, default=None):
+    try:
+        j = int(i)
+        if j >= 0:
+            return xs[j]
+        return default
+    except ValueError:
+        return default
+
+
+def dget(d, path, default=None):
+    if not d or not path:
+        return d
+
+    parts = path.split(".") if isinstance(path, str) else path
+
+    f = partial(d.get, parts[0]) if isinstance(d, dict) else partial(nth, d, toint(parts[0]))
+
+    if x := f():
+        return dget(x, parts[1:], default)
+
+    return default
+
+
+def check_file_exists(filename):
+    # Construct the full path to the file
+    file_path = os.path.join(app_settings.disk_cache_dir, filename)
+    return os.path.isfile(file_path)
+
+
+def return_stacked_image(rgb, src):
+    rgb = np.dstack(rgb)
+    image = Image.fromarray(rgb, "RGB")
+    return image, src.height
+
+
+@cached(load_tiff_cache_)
+def load_from_disk(cog_id):
+    logging.info(f"Loading cog from disk: {cog_id}")
+    with rio.open(f"{app_settings.disk_cache_dir}/{cog_id}.cog.tif") as src:
+        bands = [src.read(i) for i in range(1, src.count + 1)]
+
+        if len(bands) == 1:
+            gray = bands[0]
+            image = Image.fromarray(gray, "L")
+        else:
+            red = bands[0] if len(bands) > 0 else np.zeros((src.height, src.width), dtype=np.uint8)
+            green = bands[1] if len(bands) > 1 else np.zeros((src.height, src.width), dtype=np.uint8)
+            blue = bands[2] if len(bands) > 2 else np.zeros((src.height, src.width), dtype=np.uint8)
+
+            rgb = np.dstack((red, green, blue))
+            image = Image.fromarray(rgb, "RGB")
+        return image, src.height

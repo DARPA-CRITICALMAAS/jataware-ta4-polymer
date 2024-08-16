@@ -1,0 +1,23 @@
+.projection-viewer-root {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--mui-palette-common-background);
+}
+
+.flex-container {
+  height: 100%;
+  display: block;
+  width: 100%;
+}
+
+.error-message {
+  height: 100%;
+  width: 100%;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}

@@ -1,0 +1,53 @@
+{% macro systems_menu(systems, input=(none, none, none)) %}
+{#
+A menu that displays a list of systems and their versions.
+
+Parameters:
+- systems: dict[str, list[str]] - a dictionary of systems and lists of versions
+- input: tuple[str, str] - a tuple of the input type, input name, and feature type to use for the buttons
+#}
+<ul tabIndex={0} class="menu p-0">
+
+  {% if systems %}
+  {% set input_type, name, feature_type = input %}
+  {% for system, versions in systems.items() %}
+  <li>
+    <details open>
+      <summary>
+        <i class="fa-solid fa-user-gear"></i>
+        <span>{{ system }}</span>
+      </summary>
+      <ul>
+        {% for version in versions %}
+        <li>
+
+          {% if input_type and name %}
+          <label class="systems-menu-{{ name }} my-[0.3125rem] has-[:checked]:btn-active" tabindex="0">
+            <input class="hidden" type="{{ input_type }}" name="{{ name }}" autocomplete="off"
+              value="{{ feature_type }}__{{ system }}__{{ version }}">
+            <i class="fa-solid fa-gears"></i>
+            <span>{{ version }}</span>
+          </label>
+          {% else %}
+          <button class="my-[0.3125rem]">
+            <i class="fa-solid fa-gears"></i>
+            <span>{{ version }}</span>
+          </button>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+  </li>
+  {% endfor %}
+  {% else %}
+  <li inert>
+    <div>
+      <i class="fa-solid fa-ban"></i>
+      <span>No systems found</span>
+    </div>
+  </li>
+  {% endif %}
+</ul>
+<script src="/static/js/label_tab_fix.js"></script>
+{% endmacro %}

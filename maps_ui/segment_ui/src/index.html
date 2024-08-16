@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="en" data-theme="light" style="scrollbar-gutter: auto">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Polymer Segmentation</title>
+    <link rel="shortcut icon" href="#" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body class="group/page h-screen w-full overflow-hidden bg-base-300">
+    <svg
+      id="cursor"
+      class="pointer-events-none fixed -left-full z-10 hidden w-10 -translate-x-1/2 -translate-y-1/2"
+      viewBox="0 0 100 100"
+      style="width: 0"
+    >
+      <circle
+        cx="50"
+        cy="50"
+        r="25"
+        fill="none"
+        stroke="white"
+        stroke-width="4"
+        vector-effect="non-scaling-stroke"
+      />
+      <circle
+        cx="50"
+        cy="50"
+        r="25"
+        fill="none"
+        stroke="black"
+        stroke-width="2"
+        vector-effect="non-scaling-stroke"
+      />
+    </svg>
+
+    <div class="pointer-events-none flex h-screen w-full flex-col">
+      <div
+        class="navbar pointer-events-auto relative z-40 flex w-screen flex-row items-center justify-between bg-base-200 shadow-md"
+      >
+        <div class="navbar-start w-fit gap-8 transition-[gap] xl:gap-16">
+          <a href="/" class="h-fit">
+            <h1 class="btn btn-ghost text-3xl">Polymer</h1>
+          </a>
+          <div class="flex gap-2">
+            <a class="btn btn-ghost" id="points-link">
+              <i class="fa-solid fa-map-pin"></i>
+              <span>Map GCPs</span>
+            </a>
+            <a class="btn btn-ghost" id="proj-link">
+              <i class="fa-solid fa-earth-americas"></i>
+              <span>Projections</span>
+            </a>
+            <a class="btn btn-ghost" id="legend-link">
+              <i class="fa-solid fa-list"></i>
+              <span>Legend Swatches</span>
+            </a>
+            <a class="btn btn-ghost" id="segment-link">
+              <i class="fa-solid fa-shapes"></i>
+              <span>Segmentation</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="navbar-end w-fit gap-8 2xl:gap-16">
+          <h2 class="hidden items-center gap-2 text-sm 2xl:flex">
+            <span class="font-semibold uppercase opacity-65">COG</span>
+            <div
+              class="tooltip tooltip-bottom pointer-events-auto cursor-pointer"
+              data-tip="Copy to Clipboard"
+            >
+              <span class="badge badge-neutral badge-sm px-2 py-2.5" id="cog-id"></span>
+            </div>
+          </h2>
+
+          <div class="tooltip tooltip-left pointer-events-auto" data-tip="Change Theme">
+            <label
+              class="btn btn-square btn-ghost swap swap-rotate text-lg has-[:focus-visible]:outline has-[:focus-visible]:[outline-offset:2px] has-[:focus-visible]:[outline-width:2px]"
+            >
+              <input
+                type="checkbox"
+                class="theme-controller focus-visible:outline-none"
+                value="dark"
+                tabindex="0"
+              />
+              <i class="fa-solid fa-sun swap-off fill-current"></i>
+              <i class="fa-solid fa-moon swap-on fill-current"></i>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="relative size-full">
+        <div
+          id="map"
+          class="pointer-events-auto absolute inset-0 transition-[padding-right] duration-[350ms] group-has-[#layer-toggle:checked]/page:pr-[--side-bar-width]"
+        ></div>
+        <div class="absolute left-2 top-2 z-20 flex size-fit flex-row gap-2">
+          <div class="flex flex-col gap-2">
+            <div id="mode" class="join join-vertical pointer-events-auto shadow-md">
+              <div class="tooltip tooltip-right">
+                <input
+                  class="fa-solid fa-arrow-pointer btn btn-square join-item relative text-lg after:hidden focus-visible:z-10"
+                  type="radio"
+                  name="mode"
+                  value="view"
+                  autocomplete="off"
+                  checked="checked"
+                />
+              </div>
+
+              <div class="divider join-item z-10 m-0 h-fit bg-base-200"></div>
+
+              <div class="tooltip tooltip-right">
+                <input
+                  class="fa-solid fa-tag btn btn-square join-item relative text-lg after:hidden focus-visible:z-10"
+                  type="radio"
+                  name="mode"
+                  value="label"
+                  autocomplete="off"
+                />
+              </div>
+
+              <div class="tooltip tooltip-right">
+                <input
+                  class="fa-solid fa-wand-magic-sparkles btn btn-square join-item relative text-lg after:hidden focus-visible:z-10"
+                  type="radio"
+                  name="mode"
+                  value="lasso"
+                  autocomplete="off"
+                />
+              </div>
+
+              <div class="divider join-item z-10 m-0 h-fit bg-base-200"></div>
+
+              <div class="tooltip tooltip-right">
+                <input
+                  class="fa-solid fa-paintbrush btn btn-square join-item relative text-lg after:hidden focus-visible:z-10"
+                  type="radio"
+                  name="mode"
+                  value="add"
+                  autocomplete="off"
+                />
+              </div>
+
+              <div class="tooltip tooltip-right">
+                <input
+                  class="fa-solid fa-eraser btn btn-square join-item relative text-lg after:hidden focus-visible:z-10"
+                  type="radio"
+                  name="mode"
+                  value="erase"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+
+            <div class="tooltip tooltip-right pointer-events-auto" data-tip="Hide Polygons (,)">
+              <button class="btn btn-square swap text-lg shadow-md" id="hide-polygons" tabindex="0">
+                <i class="fa-solid fa-shapes swap-off"></i>
+                <i class="fa-solid fa-eye-slash swap-on -ml-[0.055rem]"></i>
+              </button>
+            </div>
+
+            <div class="tooltip tooltip-right pointer-events-auto" data-tip="Hide Map (.)">
+              <button class="btn btn-square swap text-lg shadow-md" id="hide-map" tabindex="0">
+                <i class="fa-solid fa-map swap-off"></i>
+                <i class="fa-solid fa-eye-slash swap-on -ml-[0.055rem]"></i>
+              </button>
+            </div>
+
+            <div class="join join-vertical pointer-events-auto shadow-md">
+              <div class="tooltip tooltip-right" data-tip="Undo (Ctrl + Z or ⌘Z)">
+                <button
+                  class="btn btn-square join-item relative text-lg hover:btn-warning focus-visible:z-10"
+                  id="undo"
+                >
+                  <i class="fa-solid fa-undo"></i>
+                </button>
+              </div>
+
+              <div
+                class="tooltip tooltip-right pointer-events-auto"
+                data-tip="Redo (Ctrl + Shift + Z or ⇧⌘Z)"
+              >
+                <button
+                  class="btn btn-square join-item relative text-lg hover:btn-warning focus-visible:z-10"
+                  id="redo"
+                >
+                  <i class="fa-solid fa-redo"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="tooltip tooltip-right pointer-events-auto" data-tip="Clear All">
+              <button class="btn btn-square text-lg shadow-md hover:btn-error" id="clear">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <button
+              class="btn pointer-events-auto hidden w-fit shadow-md hover:btn-error"
+              id="select-delete"
+            >
+              <i class="fa-solid fa-delete-left"></i>
+              <span>Delete Selection</span>
+            </button>
+
+            <div id="label-mode" class="flex hidden gap-2">
+              <div class="join pointer-events-auto size-fit shadow-md">
+                <input
+                  class="fa-radio-solid fa-circle-check btn join-item"
+                  type="radio"
+                  name="label-mode"
+                  aria-label="Positive"
+                  value="positive"
+                  autocomplete="off"
+                  checked="checked"
+                />
+
+                <input
+                  class="fa-radio-solid fa-circle-xmark btn join-item"
+                  type="radio"
+                  name="label-mode"
+                  aria-label="Negative"
+                  value="negative"
+                  autocomplete="off"
+                />
+              </div>
+
+              <button
+                class="btn pointer-events-auto hidden w-fit shadow-md hover:btn-primary"
+                id="send-labels"
+              >
+                <i class="fa-solid fa-paper-plane"></i>
+                <span>Get Region</span>
+              </button>
+            </div>
+
+            <div id="lasso-draw-mode" class="join pointer-events-auto hidden size-fit shadow-md">
+              <input
+                class="fa-radio-solid fa-magnet btn join-item"
+                type="radio"
+                name="lasso-draw-mode"
+                aria-label="Magnetic"
+                value="magnetic"
+                autocomplete="off"
+                checked="checked"
+              />
+
+              <input
+                class="fa-radio-solid fa-vector-square btn join-item"
+                type="radio"
+                name="lasso-draw-mode"
+                aria-label="Manual"
+                value="manual"
+                autocomplete="off"
+              />
+            </div>
+
+            <div id="lasso-mode" class="join pointer-events-auto hidden size-fit shadow-md">
+              <input
+                class="fa-radio-solid fa-circle-plus btn join-item"
+                type="radio"
+                name="lasso-mode"
+                aria-label="Add"
+                value="add"
+                autocomplete="off"
+                checked="checked"
+              />
+
+              <input
+                class="fa-radio-solid fa-circle-minus btn join-item"
+                type="radio"
+                name="lasso-mode"
+                aria-label="Erase"
+                value="erase"
+                autocomplete="off"
+              />
+            </div>
+
+            <div id="draw-mode" class="flex hidden gap-2">
+              <div class="join pointer-events-auto size-fit shadow-md">
+                <input
+                  class="fa-radio-solid fa-fill btn join-item"
+                  type="radio"
+                  name="draw-mode"
+                  aria-label="Fill"
+                  value="fill"
+                  autocomplete="off"
+                  checked="checked"
+                />
+
+                <input
+                  class="fa-radio-solid fa-circle-xmark btn join-item"
+                  type="radio"
+                  name="draw-mode"
+                  aria-label="No Fill"
+                  value="no-fill"
+                  autocomplete="off"
+                />
+
+                <div class="divider join-item divider-horizontal z-10 m-0 w-fit bg-base-200"></div>
+
+                <input
+                  class="fa-radio-solid fa-arrow-pointer btn join-item"
+                  type="radio"
+                  name="draw-mode"
+                  aria-label="Select"
+                  value="select"
+                  autocomplete="off"
+                />
+              </div>
+
+              <button
+                class="btn pointer-events-auto hidden w-fit shadow-md hover:btn-error"
+                id="draw-delete"
+              >
+                <i class="fa-solid fa-delete-left"></i>
+                <span>Delete Selection</span>
+              </button>
+            </div>
+
+            <div
+              class="card card-compact pointer-events-auto hidden w-96 bg-base-200 shadow-md"
+              id="radius"
+            >
+              <div class="card-body flex-row items-center gap-4">
+                <h2 class="font-bold">Radius</h2>
+                <input class="range range-xs" type="range" name="radius" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="absolute bottom-2 left-2 z-20 flex w-fit flex-col gap-2">
+          <div class="tooltip tooltip-right pointer-events-auto" data-tip="Help (H)">
+            <button
+              class="btn btn-circle text-lg shadow-md hover:btn-info"
+              onclick="document.querySelector('#help').showModal()"
+            >
+              <i class="fa-solid fa-question"></i>
+            </button>
+          </div>
+        </div>
+
+        <div
+          class="pointer-events-auto absolute inset-x-1/2 bottom-2 z-20 flex w-fit -translate-x-1/2 flex-col items-center gap-2 transition-[padding-right] duration-[350ms] group-has-[#layer-toggle:checked]/page:pr-[--side-bar-width]"
+        >
+          <div class="card w-fit bg-base-200 shadow-md" id="selected-mode">
+            <div class="card-body gap-0 px-10 py-4 text-center">
+              <div class="flex flex-row items-center gap-2">
+                <span class="loading loading-spinner loading-md hidden" id="mode-loading"></span>
+                <h2 class="card-title text-2xl font-extrabold capitalize" id="mode-name">View</h2>
+              </div>
+              <h3 class="font-semibold uppercase opacity-65">Mode</h3>
+            </div>
+          </div>
+        </div>
+
+        <!-- React container -->
+        <div id="layer-sidebar"></div>
+
+        <!-- React container -->
+        <div id="alert-container"></div>
+      </div>
+    </div>
+
+    <dialog id="options" class="modal"></dialog>
+
+    <dialog id="help" class="modal">
+      <div class="modal-box z-20 flex w-5/6 max-w-2xl flex-col overflow-clip bg-base-200">
+        <form method="dialog">
+          <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">✕</button>
+        </form>
+
+        <h2 class="mb-4 mt-3 text-2xl font-bold">How to Use</h2>
+
+        <div
+          class="-m-6 mt-2 flex flex-col gap-2 overflow-y-hidden bg-base-100 p-2 pt-0 before:content-['_']"
+        >
+          <div class="flex flex-col gap-2 overflow-y-auto p-8 pt-2">
+            <div class="divider bg-transparent">
+              <h3 class="text-xl font-bold">Overview</h3>
+            </div>
+
+            <p>
+              There are five interface modes that you can use to interact with the map and polygons.
+              Each mode has its own set of controls and shortcuts that you can use.
+            </p>
+
+            <ul class="flex list-disc flex-col gap-2 pl-6">
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-arrow-pointer"></i>View</span
+                >: Pan and zoom around the map.
+              </li>
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-tag"></i>Label</span
+                >: Segment regions by selecting points.
+              </li>
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-wand-magic-sparkles"></i>Lasso</span
+                >: Segment regions by connecting points.
+              </li>
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-paintbrush"></i>Add</span
+                >: Manually add regions.
+              </li>
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-eraser"></i>Erase</span
+                >: Manually remove regions.
+              </li>
+            </ul>
+
+            <p>
+              There are also general controls that you can use to manage the polygons and data that
+              you have created. You can undo and redo your actions, hide the polygons or map, and
+              clear all polygons and data for the current layer.
+            </p>
+
+            <p>
+              Additionally, there is functionality to work with multiple layers, which you can
+              manage using the layer sidebar. You can add, remove, and switch between layers, as
+              well as adjust the visibility of individual layers, associate layers with validated
+              legend items, and import preexisting polygon results for the map.
+            </p>
+
+            <div class="divider">
+              <div class="flex items-center gap-2 align-middle">
+                <i class="fa-solid fa-arrow-pointer"></i>
+                <h3 class="text-xl font-bold">View</h3>
+                <kbd class="kbd kbd-sm font-normal">Q</kbd>
+              </div>
+            </div>
+
+            <ul class="flex flex-col gap-2">
+              <li><span class="font-bold">Pan</span>: Click and drag to move around the map.</li>
+
+              <li>
+                <span class="font-bold">Zoom</span>: Use the scroll wheel to zoom in and out of the
+                map.
+              </li>
+
+              <li>
+                <span class="font-bold">Center</span>: Use <kbd class="kbd kbd-sm">Shift</kbd> +
+                drag to select a region to center the view on.
+              </li>
+
+              <li>
+                <span class="font-bold">Select</span>: Click on a feature to select it. Use
+                <kbd class="kbd kbd-sm">Shift</kbd> + click to select multiple features.
+              </li>
+
+              <li>
+                <span class="font-bold">Delete</span>: Click the
+                <span class="badge badge-neutral inline-flex gap-1.5">
+                  <i class="fa-solid fa-delete-left inline-flex"></i>
+                  <span>Delete Selection</span>
+                </span>
+                button or use the <kbd class="kbd kbd-sm">Delete</kbd> or
+                <kbd class="kbd kbd-sm">Backspace</kbd> keys to remove the selected features.
+              </li>
+            </ul>
+
+            <div class="divider">
+              <div class="flex items-center gap-2 align-middle">
+                <i class="fa-solid fa-tag"></i>
+                <h3 class="text-xl font-bold">Label</h3>
+                <kbd class="kbd kbd-sm font-normal">W</kbd>
+              </div>
+            </div>
+
+            <ul class="flex flex-col gap-2">
+              <li>
+                <span class="font-bold">Insert</span>: Click to add a label. Use the associated
+                buttons or <kbd class="kbd kbd-sm">W</kbd> to toggle between
+                <span class="badge badge-neutral inline-flex gap-1.5">
+                  <i class="fa-solid fa-circle-check inline-flex"></i>
+                  <span>Positive</span>
+                </span>
+                and
+                <span class="badge badge-neutral inline-flex gap-1.5">
+                  <i class="fa-solid fa-circle-xmark inline-flex"></i>
+                  <span>Negative</span>
+                </span>
+                label modes. Use right click to add a label of the opposite mode.
+              </li>
+
+              <li>
+                <span class="font-bold">Generate</span>: Click the
+                <span class="badge badge-neutral inline-flex gap-1.5">
+                  <i class="fa-solid fa-paper-plane inline-flex"></i>
+                  <span>Get Region</span>
+                </span>
+                button or use <kbd class="kbd kbd-sm">Space</kbd> or
+                <kbd class="kbd kbd-sm">Enter</kbd>
+                to generate a polygon.
+              </li>
+
+              <li><span class="font-bold">Remove</span>: Click on a label to remove it.</li>
+            </ul>
+
+            <div class="divider">
+              <div class="flex items-center gap-2 align-middle">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <h3 class="text-xl font-bold">Lasso</h3>
+                <kbd class="kbd kbd-sm font-normal">E</kbd>
+              </div>
+            </div>
+
+            <ul class="flex flex-col gap-2">
+              <li>
+                <span class="font-bold">Add Points</span>: Click to add points to the lasso. Click
+                the first point to close the lasso and generate a polygon.
+              </li>
+
+              <li>
+                <span class="font-bold">Connection Type</span>: Use the associated buttons or
+                <kbd class="kbd kbd-sm">E</kbd> to toggle between
+                <span class="badge badge-neutral inline-flex gap-1.5">
+                  <i class="fa-solid fa-magnet inline-flex"></i>
+                  <span>Magnetic</span>
+                </span>
+                and
+                <span class="badge badge-neutral inline-flex gap-1.5">
+                  <i class="fa-solid fa-vector-square inline-flex"></i>
+                  <span>Manual</span>
+                </span>
+                connection modes which describes how the next point will be connected.
+              </li>
+
+              <li>
+                <span class="font-bold">Lasso Type</span>: Use the associated buttons or
+                <kbd class="kbd kbd-sm">Shift</kbd> + <kbd class="kbd kbd-sm">E</kbd> to toggle
+                between
+                <span class="badge badge-neutral inline-flex gap-1.5">
+                  <i class="fa-solid fa-circle-plus inline-flex"></i>
+                  <span>Adding</span>
+                </span>
+                and
+                <span class="badge badge-neutral inline-flex gap-1.5">
+                  <i class="fa-solid fa-circle-minus inline-flex"></i>
+                  <span>Erasing</span>
+                </span>
+                lasso mode which describes whether the final closed lasso will be drawn or erased
+                from the map.
+              </li>
+            </ul>
+
+            <div class="divider">
+              <div class="flex items-center gap-2 align-middle">
+                <i class="fa-solid fa-paintbrush"></i>
+                <h3 class="text-xl font-bold">Add</h3>
+                <kbd class="kbd kbd-sm font-normal">R</kbd>
+                &
+                <i class="fa-solid fa-eraser"></i>
+                <h3 class="text-xl font-bold">Erase</h3>
+                <kbd class="kbd kbd-sm font-normal">T</kbd>
+              </div>
+            </div>
+
+            <ul class="flex flex-col gap-2">
+              <li><span class="font-bold">Draw</span>: Click and drag to fill or erase regions.</li>
+              <li>
+                <span class="font-bold">Pan</span>: Middle click and drag to move around the map.
+              </li>
+              <li>
+                <span class="font-bold">Fill Mode</span>: Use the associated buttons or
+                <kbd class="kbd kbd-sm">R</kbd> to toggle between
+                <span class="badge badge-neutral inline-flex gap-1.5">
+                  <i class="fa-solid fa-fill inline-flex"></i>
+                  <span>Fill</span>
+                </span>
+                and
+                <span class="badge badge-neutral inline-flex gap-1.5">
+                  <i class="fa-solid fa-circle-xmark inline-flex"></i>
+                  <span>No Fill</span>
+                </span>
+                modes. Click and drag with right click to temporarily use the opposite fill mode.
+              </li>
+
+              <li>
+                <span class="font-bold">Radius</span>: Adjust the radius of the fill or erase brush
+                using the
+                <span class="badge badge-neutral inline-flex gap-1.5">Radius</span> slider.
+              </li>
+
+              <li>
+                <ul class="flex flex-col gap-2 pl-6">
+                  <li>
+                    <span class="font-bold">Adjust Radius</span>: Adjust the radius with a realtime
+                    preview by holding <kbd class="kbd kbd-sm">Alt</kbd> or
+                    <kbd class="kbd kbd-sm font-[inherit]">⌥</kbd> and dragging.
+                  </li>
+
+                  <li>
+                    <span class="font-bold">Decrement Radius</span>: Decrease the radius with
+                    <kbd class="kbd kbd-sm">[</kbd>.
+                  </li>
+
+                  <li>
+                    <span class="font-bold">Increment Radius</span>: Increase the radius with
+                    <kbd class="kbd kbd-sm">]</kbd>.
+                  </li>
+                </ul>
+              </li>
+
+              <li>
+                <span class="font-bold">Select Mode</span>: Click the
+                <span class="badge badge-neutral inline-flex gap-1.5">
+                  <i class="fa-solid fa-arrow-pointer inline-flex"></i>
+                  <span>Select</span>
+                </span>
+                mode to select and delete polygons that you have drawn to add or erase.
+              </li>
+              <li>
+                <ul class="flex flex-col gap-2 pl-6">
+                  <li>
+                    <span class="font-bold">Select</span>: Click on a feature to select it. Use
+                    <kbd class="kbd kbd-sm">Shift</kbd> + click to select multiple features.
+                  </li>
+
+                  <li>
+                    <span class="font-bold">Delete</span>: Click the
+                    <span class="badge badge-neutral inline-flex gap-1.5">
+                      <i class="fa-solid fa-delete-left inline-flex"></i>
+                      <span>Delete Selection</span>
+                    </span>
+                    button or use the <kbd class="kbd kbd-sm">Delete</kbd> or
+                    <kbd class="kbd kbd-sm">Backspace</kbd> keys to remove the selected features.
+                  </li>
+                </ul>
+              </li>
+            </ul>
+
+            <div class="divider">
+              <h3 class="text-xl font-bold">General Controls</h3>
+            </div>
+
+            <ul class="flex flex-col gap-2">
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-shapes"></i>Hide Polygons</span
+                >: Temporarily hide the polygons to see the map more clearly.
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-map"></i>Hide Map</span
+                >: Temporarily hide the map to see the polygons more clearly.
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-undo"></i>Undo</span
+                >: Undo your latest action with <kbd class="kbd kbd-sm">Ctrl</kbd> +
+                <kbd class="kbd kbd-sm">Z</kbd> or <kbd class="kbd kbd-sm font-[inherit]">⌘</kbd>
+                <kbd class="kbd kbd-sm">Z</kbd>.
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-redo"></i>Redo</span
+                >: Redo your latest action with <kbd class="kbd kbd-sm">Ctrl</kbd> +
+                <kbd class="kbd kbd-sm">Shift</kbd> + <kbd class="kbd kbd-sm">Z</kbd> or
+                <kbd class="kbd kbd-sm font-[inherit]">⇧</kbd>
+                <kbd class="kbd kbd-sm font-[inherit]">⌘</kbd> <kbd class="kbd kbd-sm">Z</kbd>.
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-trash-can"></i>Clear</span
+                >: Clear all polygons and data for the current layer.
+              </li>
+            </ul>
+
+            <div class="divider">
+              <div class="flex items-center gap-2 align-middle">
+                <i class="fa-solid fa-layer-group"></i>
+                <h3 class="text-xl font-bold">Layer Overview</h3>
+              </div>
+            </div>
+
+            <ul class="flex flex-col gap-2">
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold align-middle"
+                  ><input type="checkbox" class="checkbox size-4 rounded-md" inert="true" checked="true"></i>Visibility</span
+                >: Adjust the visibility of individual layers using the checkboxes, or the
+                visibility of all layers using the main checkbox at the top of the sidebar.
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-plus"></i>New Layer</span
+                >: Add a new layer to the map.
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-trash-can"></i>Remove Layer</span
+                >: Remove the current layer from the map.
+              </li>
+
+              <li>
+                <span class="font-bold">Switch Layer</span>: Click to select a different layer to
+                edit.
+              </li>
+
+              <li>
+                <span class="font-bold">Rename Layer</span>: Double click on the layer name to
+                rename it.
+              </li>
+            </ul>
+
+            <div class="divider">
+              <div class="flex items-center gap-2 align-middle">
+                <!-- <i class="fa-solid fa-link"></i> -->
+                <h3 class="text-xl font-bold">Legend Item Association</h3>
+              </div>
+            </div>
+
+            <ul class="flex flex-col gap-2">
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-crosshairs"></i>Set Legend Item</span
+                >: Click on a legend swatch to associate the layer with a validated legend item. The
+                layer will then be marked as associated, and the layer name will be updated to and
+                locked to reflect the legend item.
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-xmark"></i>Clear Legend Item</span
+                >: Clear the associated legend item for the layer.
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-binoculars"></i>Show Legend Item</span
+                >: Show the associated legend item for the layer.
+              </li>
+            </ul>
+
+            <div class="divider">
+              <div class="flex items-center gap-2 align-middle">
+                <!-- <i class="fa-solid fa-check"></i> -->
+                <h3 class="text-xl font-bold">Layer Validation</h3>
+              </div>
+            </div>
+
+            <ul class="flex flex-col gap-2">
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-user-check"></i>Mark as Validated</span
+                >: Mark an associated layer as validated to be uploaded to the CDR.
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-triangle-exclamation"></i>Mark as Not Validated</span
+                >: Mark an associated layer as not validated.
+              </li>
+            </ul>
+
+            <div class="divider">
+              <div class="flex items-center gap-2 align-middle">
+                <i class="fa-solid fa-wrench"></i>
+                <h3 class="text-xl font-bold">More Options</h3>
+              </div>
+            </div>
+
+            <ul class="flex flex-col gap-2">
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-cloud-arrow-down"></i>Import Polygons</span>: Import polygon features from different <span class="badge badge-neutral inline-flex gap-1.5">
+                    <i class="fa-solid fa-user-gear inline-flex"></i>
+                    <span>Systems</span>
+                  </span> and <span class="badge badge-neutral inline-flex gap-1.5">
+                    <i class="fa-solid fa-gears inline-flex"></i>
+                    <span>Versions</span>
+                  </span> for the
+                map.
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-cloud-arrow-up"></i>Upload All Validated Layers to CDR</span>: Upload all of the validated layers&apos; polygons to the
+                CDR under the <span class="badge badge-neutral inline-flex gap-1.5">
+                  <i class="fa-solid fa-user-gear inline-flex"></i>
+                  <span>Polymer</span>
+                </span> system
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-circle-nodes"></i>Create Image Embeddings for Label Tool</span>: Create image embeddings for the label tool to use for segmentation.
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-flag"></i>Check Whether Image Embeddings Exist</span>: Check whether image embeddings exist for the current map.
+              </li>
+
+              <li>
+                <span class="inline-flex items-center gap-2 font-bold"
+                  ><i class="fa-solid fa-rotate"></i>Reload Segmentation Tooling</span>: Reload the segmentation label and lasso tooling for the current map for times where they no longer work.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <form method="dialog" class="modal-backdrop">
+        <button>Close</button>
+      </form>
+    </dialog>
+
+    <!-- Dummy div to allow dynamically applied tailwindcss classes to be included in css -->
+    <!-- <div hidden class="visible alert-success alert-info alert-warning alert-error"></div> -->
+
+    <script type="module" src="app.tsx"></script>
+  </body>
+</html>

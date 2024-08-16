@@ -1,0 +1,42 @@
+{
+  "name": "uil-seg",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier src --check",
+    "format:fix": "prettier src --write"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^6.5.2",
+    "@types/jsts": "^0.17.24",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "dotenv": "^16.3.1",
+    "jsts": "^2.11.3",
+    "ol": "^8.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.5.0",
+    "@types/eslint__js": "^8.42.3",
+    "@types/geojson": "^7946.0.14",
+    "autoprefixer": "^10.4.19",
+    "daisyui": "^4.12.2",
+    "eslint": "^8.57.0",
+    "globals": "^15.6.0",
+    "postcss": "^8.4.39",
+    "prettier": "^3.3.3",
+    "prettier-plugin-tailwindcss": "^0.6.5",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.4.5",
+    "typescript-eslint": "^7.13.1",
+    "vite": "^4.0.0"
+  }
+}

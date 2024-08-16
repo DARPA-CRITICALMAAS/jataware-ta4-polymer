@@ -1,0 +1,18 @@
+.points-root {
+  background: var(--mui-palette-common-background);
+  color: var(--mui-palette-text-main);
+
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+
+  .error-message {
+    flex-direction: column;
+    padding: 4rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--mui-palette-warning-light);
+  }
+}

@@ -1,0 +1,67 @@
+services:
+
+  redisinsight:
+    profiles:
+      - redis
+    image: redis/redisinsight:2.44
+    hostname: redisinsight.polymer.geo
+    volumes:
+      - redisinsigt_data:/data
+    healthcheck:
+      test: wget -qO - localhost:5540 || exit 1
+    ports:
+      - 5540:5540
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: "3"
+    networks:
+      - nylon
+
+  redis:
+    profiles:
+      - redis
+    image: redis/redis-stack-server:7.2.0-v9
+    hostname: redis.nyl.on
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli","ping"]
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: "3"
+    networks:
+      - nylon
+
+  backup-redis:
+    profiles: 
+      - redis
+    image: redis/redis-stack-server:7.2.0-v9
+    entrypoint:
+      - bash
+    command:
+      - -c
+      - |
+        set -xe
+        echo save | redis-cli -h redis.polymer.geo
+        gzip -c /data/dump.rdb > /tmp/backups/redis_$(date --utc +%Y%m%d-%H%M%SZ).dump.rdb.gz
+
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - redis_data:/data
+      - ./backups:/tmp/backups:rw
+
+    networks:
+      - nylon
+
+volumes:
+  redis_data:
+  redisinsigt_data:

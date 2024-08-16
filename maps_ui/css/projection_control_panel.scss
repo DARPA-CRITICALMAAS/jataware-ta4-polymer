@@ -1,0 +1,17 @@
+.projection-control-panel {
+  margin: 1rem;
+  padding: 1rem;
+  z-index: 3;
+  border-radius: 7px;
+  opacity: 0.9;
+  position: absolute;
+  min-width: 15rem;
+  right: 2rem;
+  bottom: 1rem;
+
+  background-color: var(--mui-palette-background-paper);
+
+  .MuiOutlinedInput-root {
+    color: var(--mui-palette-text-primary);
+  }
+}

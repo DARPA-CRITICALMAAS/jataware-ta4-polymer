@@ -1,4 +1,4 @@
-VERSION := 0.1.127
+VERSION := 0.1.189
 
 # make helpers
 null  :=
@@ -79,8 +79,16 @@ gitlab-docker-login:| check-GITLAB_USER check-GITLAB_PASS
 	@printf "${GITLAB_PASS}\n" | docker login registry.gitlab.com/jataware -u "${GITLAB_USER}" --password-stdin
 
 
+define georef_ui_env_prod
+VITE_MAPTILER_KEY="${MAPTILER_KEY}"
+endef
+
+services/auto-georef/ui/.env.production:| check-MAPTILER_KEY  ## writes .env.production file
+		$(file > services/auto-georef/ui/.env.production,$(georef_ui_env_prod))
+
+
 .PHONY: docker-buildx-georef
-docker_buildx-georef:| gitlab-docker-login  ## build and push georef image
+docker_buildx-georef:| gitlab-docker-login services/auto-georef/ui/.env.production ## build and push georef image
 	@echo "building georef"
 	(cd services/auto-georef && \
 		docker buildx build \
@@ -160,16 +168,17 @@ DOCKER_COMPOSE_FILES:=docker-compose.network.yaml \
 	docker-compose.silk.yaml \
 	docker-compose.autogeoref.yaml \
 	docker-compose.jataware_georef.yaml \
+	docker-compose.redis.yaml \
 	$(DOCKER_COMPOSE_LOCALS) \
 	docker-compose.dev.yaml
 
-ALL_PROFILES=default minio elastic postgis silk georef jataware_georef
+ALL_PROFILES=default minio elastic postgis silk georef jataware_georef redis
 
 define all_profiles
 $(subst $(space),$(comma),$(ALL_PROFILES))
 endef
 
-STORAGE_PROFILES=default minio elastic postgis
+STORAGE_PROFILES=default minio elastic postgis redis
 
 define storage_profiles
 $(subst $(space),$(comma),$(STORAGE_PROFILES))
@@ -183,13 +192,17 @@ up:
 up.georef:
 	COMPOSE_PROFILES="georef" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
 
+.PHONY: up.redis
+up.redis:
+	COMPOSE_PROFILES="redis" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
+
 .PHONY: up.jataware_georef
 up.jataware_georef:
 	COMPOSE_PROFILES="jataware_georef" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
 
 .PHONY: down.jataware_georef
 down.jataware_georef:
-	COMPOSE_PROFILES="jataware_georef" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) down 
+	COMPOSE_PROFILES="jataware_georef" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) down
 
 
 .PHONY: up.silk

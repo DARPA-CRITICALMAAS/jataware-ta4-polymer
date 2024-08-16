@@ -1,44 +1,57 @@
+import React, { useState } from "react";
 
-import React, { useState } from 'react';
+import { returnImageBufferUrl } from "./helpers";
 
-import { returnImageBufferUrl } from "./helpers"
+import { MapSpinner } from "../Spinner";
+
+import "../css/small_map.scss";
 
 function SmallMapImage({ cog_id, gcp, height }) {
-    const [clipUrl, setClipUrl] = useState(returnImageBufferUrl(cog_id, gcp, height))
+  const [clipUrl, setClipUrl] = useState(
+    returnImageBufferUrl(cog_id, gcp, height),
+  );
 
-    function returnColor(arr) {
-        return `rgb(${arr[0]},${arr[1]},${arr[2]} )`
-    }
-    function returnHeight() {
-        return "220px"
-    }
+  const [isLoading, setLoading] = useState(true);
 
-    return (
-        <>
-            {clipUrl &&
-                <div
-                    className='borderBox'
-                    style={{
-                        display: "grid",
-                        justifyContent: "center",
-                        alignContent: "center",
-                        width: returnHeight(),
-                        height: "220px",
-                        background: returnColor(gcp.color)
-                    }}>
-                    <img
-                        src={clipUrl}
-                        alt="Loading Clipped Map..."
-                        style={{
+  function returnColor(arr) {
+    return `rgb(${arr[0]},${arr[1]},${arr[2]} )`;
+  }
+  function returnHeight() {
+    return "220px";
+  }
 
-                            width: '200px',
-                            height: '200px',
-                            cursor: 'pointer'
-                        }}
-                    />
-                </div>
-            }
-        </>
-    )
+  function onError() {
+    setLoading(false);
+  }
+  function onLoad() {
+    setLoading(false);
+  }
+
+  if (!clipUrl) {
+    return null;
+  }
+
+  return (
+    <div
+      className="small-map-image-root"
+      style={{
+        border: `5px solid ${returnColor(gcp.color)}`,
+      }}
+    >
+      {isLoading && (
+        <div className="small-map-spinner">
+          <MapSpinner />
+        </div>
+      )}
+      <img
+        src={clipUrl}
+        alt="Loading Clipped Map..."
+        onError={onError}
+        onLoad={onLoad}
+        className={"small-map-image"}
+        style={isLoading ? { visibility: "hidden" } : {}}
+      />
+    </div>
+  );
 }
 export default SmallMapImage;

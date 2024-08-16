@@ -1,0 +1,12 @@
+<div
+  class="p-2 prose"
+  >
+  <h3>Server Error</h3>
+  <p>
+    {% if error_details%}
+      {{error_details}}
+    {% else %}
+      CDR refused the connection. Please try again or contact us.
+    {% endif %}
+  </p>
+</div>

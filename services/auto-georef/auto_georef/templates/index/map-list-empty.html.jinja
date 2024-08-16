@@ -1,0 +1,33 @@
+<div
+  class="p-2 prose"
+  >
+  <h3>No More Maps!</h3>
+  <p>
+    No Maps found with search criteria.
+    Try broadening filter parameters.
+  </p>
+
+  {%if prev_page_url %}
+    <div class="join m-auto border-solid border dark:border-neutral">
+      <button
+        class="join-item btn {{'btn-disabled' if not prev_page_url}}"
+        hx-post="{{prev_page_url}}"
+        hx-target="#map-results-target"
+        hx-swap="innerHTML">
+        Prev
+      </button>
+      <button class="join-item btn pointer-events-none opacity-100">Page {{page + 1}}</button>
+      <button
+        hx-post="{{next_page_url}}"
+        hx-target="#map-results-target"
+        hx-swap="innerHTML"
+        class="join-item btn {{'btn-disabled' if not next_page_url}}">
+        Next
+      </button>
+    </div>
+    {%endif%}
+</div>
+
+<script>
+  document.getElementById("maps-results-count-total").classList.add("hidden");
+</script>

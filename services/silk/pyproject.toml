@@ -26,7 +26,7 @@ python-multipart = "^0.0.6"
 # img2table = "^1.2.2"
 # transformers = "^4.34.0"
 # torch = "^2.1.0"
-cdr_schemas = { git = "https://github.com/DARPA-CRITICALMAAS/cdr_schemas.git", tag = "v0.2.6+draft" }
+cdr_schemas = { git = "https://github.com/DARPA-CRITICALMAAS/cdr_schemas.git", tag = "v0.4.3" }
 openai = "^1.23.6"
 sqlalchemy = "^2.0.25"
 httpx = "^0.26.0"

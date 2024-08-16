@@ -24,7 +24,7 @@ pillow = "^10.1.0"
 shapely="2.0.1"
 PyYAML="6.0.1"
 boto3 = "^1.28.52"
-cdr_schemas = { git = "https://github.com/DARPA-CRITICALMAAS/cdr_schemas.git", tag = "v0.2.6+draft" }
+cdr_schemas = { git = "https://github.com/DARPA-CRITICALMAAS/cdr_schemas.git", tag = "v0.4.3" }
 albumentations="1.2.1"
 segmentation-models-pytorch="0.3.0"
 torch = [

@@ -1,0 +1,393 @@
+{% extends "shared/_page.html" %}
+
+{% block main_content %}
+
+  <header class="absolute z-10 top-3 left-3">
+    <nav class="ml-1 flex items-center gap-2">
+      <div class="avatar shadow-lg">
+        <div style="width: 2rem;">
+          <img src="/static/img/polymer_logo.svg" />
+        </div>
+      </div>
+      <ul class="gap-2 flex">
+        <li class="">
+          <h2
+            class="font-bold text-2xl ml-[-5px] text-white"
+            style="text-shadow: 2px -1px 0 #000, 3px -1px 0 #000, 2px 1px 0 #000, 2px 2px 0 #000;"
+            >
+            Polymer
+          </h2>
+        </li>
+        <li class="">
+        </li>
+      </ul>
+    </nav>
+  </header>
+
+
+  <header class="flex items-center absolute z-10 top-3.5 right-3 flex">
+    <aside
+      class="flex gap-2"
+      hx-get="{{template_prefix}}/map-stats"
+      hx-swap="outerHTML"
+      hx-trigger="load"
+      >
+    </aside>
+
+    {# for using an icon instead of select input to toggle theme: #}
+    <label class="swap swap-rotate bg-base-100 rounded text-accent ml-2 p-1 shadow-md">
+      <input type="checkbox" data-toggle-theme="dark,light"/>
+      <svg
+        class="swap-off size-6 fill-current"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24">
+        <path
+          d="M5.64,17l-.71.71a1,1,0,0,0,0,1.41,1,1,0,0,0,1.41,0l.71-.71A1,1,0,0,0,5.64,17ZM5,12a1,1,0,0,0-1-1H3a1,1,0,0,0,0,2H4A1,1,0,0,0,5,12Zm7-7a1,1,0,0,0,1-1V3a1,1,0,0,0-2,0V4A1,1,0,0,0,12,5ZM5.64,7.05a1,1,0,0,0,.7.29,1,1,0,0,0,.71-.29,1,1,0,0,0,0-1.41l-.71-.71A1,1,0,0,0,4.93,6.34Zm12,.29a1,1,0,0,0,.7-.29l.71-.71a1,1,0,1,0-1.41-1.41L17,5.64a1,1,0,0,0,0,1.41A1,1,0,0,0,17.66,7.34ZM21,11H20a1,1,0,0,0,0,2h1a1,1,0,0,0,0-2Zm-9,8a1,1,0,0,0-1,1v1a1,1,0,0,0,2,0V20A1,1,0,0,0,12,19ZM18.36,17A1,1,0,0,0,17,18.36l.71.71a1,1,0,0,0,1.41,0,1,1,0,0,0,0-1.41ZM12,6.5A5.5,5.5,0,1,0,17.5,12,5.51,5.51,0,0,0,12,6.5Zm0,9A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z" />
+      </svg>
+      <svg
+        class="swap-on size-6 fill-current"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24">
+        <path
+          d="M21.64,13a1,1,0,0,0-1.05-.14,8.05,8.05,0,0,1-3.37.73A8.15,8.15,0,0,1,9.08,5.49a8.59,8.59,0,0,1,.25-2A1,1,0,0,0,8,2.36,10.14,10.14,0,1,0,22,14.05,1,1,0,0,0,21.64,13Zm-9.5,6.69A8.14,8.14,0,0,1,7.08,5.22v.27A10.15,10.15,0,0,0,17.22,15.63a9.79,9.79,0,0,0,2.1-.22A8.11,8.11,0,0,1,12.14,19.73Z" />
+      </svg>
+    </label>
+  </header>
+
+  <form
+    id="search-maps-form"
+    onkeydown="return event.key != 'Enter';"
+    hx-post="{{template_prefix}}/search-maps"
+    hx-swap="innerHTML"
+    hx-target="#map-results-target"
+    >
+    <section class="max-w-md card gap-2 p-3 prose z-10 absolute left-3 top-14 bg-base-200 rounded-lg shadow-md">
+      <h2 class="mb-0 card-title dark:text-base-content text-slate-800">Search Maps</h2>
+
+      <label class="input input-md input-bordered flex items-center gap-2">
+        <input
+          type="text"
+          class="dark:neutral-content grow"
+          name="search_text"
+          placeholder="Legend Text"
+          />
+        <!-- filter icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+      </label>
+
+      <label class="form-control mb-[-0.5rem]">
+        <div class="label mt-0 py-0">
+          <h4 class="m-0 label-text text-slate">Map Scale 1:n</h4>
+        </div>
+
+        <div class="mx-2 px-2">
+          <input type="text" id="scale" />
+          <input type="text" name="scale_min" class="hidden" />
+          <input type="text" name="scale_max" class="hidden" />
+        </div>
+      </label>
+
+      <label class="form-control">
+        <div class="label mt-0 py-0">
+          <h4 class="m-0 label-text text-slate">Map Years</h4>
+        </div>
+
+        <div class="mx-2 px-2">
+          <input type="text" id="publish_year" />
+          <input type="text" name="publish_year_min" class="hidden" />
+          <input type="text" name="publish_year_max" class="hidden" />
+        </div>
+      </label>
+
+      <select
+        name="georeferenced_status"
+        class="select select-md select-bordered w-full max-w-xs"
+        >
+        <option selected value="">Any Georeferenced Status</option>
+        <option value="georeferenced">Georeferenced</option>
+        <option value="not_georeferenced">Not Georeferenced</option>
+        <option value="validated">Georeferenced & Validated</option>
+      </select>
+
+      <div>
+        <div class="divider my-1"></div>
+        <h4 class="my-0 label-text text-slate">Bounding Box</h4>
+
+        <div class="grid grid-cols-2 gap-1">
+          <div class="form-control">
+            <label class="label cursor-pointer flex pt-1 pb-0 justify-start gap-2">
+              <input type="radio" value="state" name="radio-bounds" class="radio radio-sm radio-accent" checked />
+              <span class="label-text">Select State</span>
+            </label>
+          </div>
+          <div class="form-control">
+            <label class="label cursor-pointer flex pt-1 pb-0 justify-start gap-2">
+              <input type="radio" value="draw" name="radio-bounds" class="radio radio-sm radio-accent" />
+              <span class="label-text">Draw on Map</span>
+            </label>
+          </div>
+
+          <div class="form-control">
+            <label class="label cursor-pointer flex pt-0 pb-1 justify-start gap-2">
+              <input type="radio" value="upload" name="radio-bounds" class="radio radio-sm radio-accent" />
+              <span class="label-text">Use Shapefile</span>
+            </label>
+          </div>
+
+          <div class="form-control">
+            <label class="label cursor-pointer flex pt-0 pb-1 justify-start gap-2">
+              <input type="radio" value="cma" name="radio-bounds" class="radio radio-sm radio-accent" />
+              <span class="label-text">Existing CMA</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <input
+            id="state_input"
+            class="input input-md input-bordered min-w-[16rem] my-1"
+            type="text"
+            placeholder="Enter US State"
+            />
+          <div
+            id="state-autocomplete-results"
+            class="border border-solid border-neutral/25 bg-base-100"
+            >
+          </div>
+        </div>
+
+        <label id="shapefiles-input-wrapper" class="form-control max-w-xs cursor-pointer hidden opacity-90 mt-1">
+          <div class="label flex align-center justify-start py-0">
+            <h4 class="not-prose label-text inline-block m-0 p-0 text-neutral-content">Select Shapefile (.zip)</h4>
+            <span class="hidden loading-xs text-primary ml-1 text-xs text-neutral-content">Processing...</span>
+          </div>
+          <!-- No name field as we don't send the file itself for search, only extracted polygon coords -->
+          <input
+            type='file'
+            id="shapefiles-file-input"
+            accept=".zip"
+            class="file-input file-input-bordered file-input-sm h-6 pe-0 text-xs file-input-accent" />
+        </label>
+
+        <div id="cma-filter-wrapper" class="hidden">
+          <input
+            id="cma-input"
+            class="input input-md input-bordered min-w-[16rem] my-1"
+            type="text"
+            placeholder="Enter CMA name"
+            />
+          <div
+            id="cma-autocomplete-results"
+            class="border border-solid border-slate-400 bg-base-100"
+            >
+          </div>
+        </div>
+
+        <input type="hidden" name="multi_polygons_intersect" />
+
+      </div>
+
+      {# Unused and hidden while we implement on CDR search #}
+      {# <div class="mt-[-0.25rem]"> #}
+      {#   <h4 class="my-0 label-text text-slate" style="">Extracted Data</h4> #}
+      {#   <div class="grid grid-cols-2 gap-x-3 gap-y-0"> #}
+      {#     <div class="form-control"> #}
+      {#       <label class="label cursor-pointer justify-start gap-2 py-1"> #}
+      {#         <input #}
+      {#           name="features_extracted" #}
+      {#           type="checkbox" #}
+      {#           class="checkbox checkbox-xs checkbox-accent" #}
+      {#           /> #}
+      {#         <span class="label-text">Features</span> #}
+      {#       </label> #}
+      {#     </div> #}
+      {#     <div class="form-control"> #}
+      {#       <label class="label cursor-pointer justify-start gap-2 py-1"> #}
+      {#         <input #}
+      {#           name="legends_extracted" #}
+      {#           type="checkbox" class="checkbox checkbox-xs checkbox-accent" /> #}
+      {#         <span class="label-text">Legends</span> #}
+      {#       </label> #}
+      {#     </div> #}
+      {#   </div> #}
+      {# </div> #}
+
+      <div class="hidden" id="rock-units-section">
+        <h4 class="label-text text-slate mt-0 mb-1">Geology Rock Units</h4>
+
+        <div>
+          <ul id="selected-rock-units" class="hidden flex flex-wrap max-w-60 max-h-40 overflow-y-auto overflow-x-hidden not-prose"> </ul>
+          <input
+            id="rock-units-autocomplete"
+            class="input input-md input-bordered min-w-[16rem] mb-1"
+            type="text"
+            placeholder="Start Typing Rock Units"
+            />
+          <div
+            id="rock-units-autocomplete-results"
+            class="border border-solid border-neutral/25 bg-base-100 overflow-y-auto overflow-x-hidden"
+            >
+          </div>
+        </div>
+        <input type="hidden" name="sgmc_geology_major_1" class="sgmc_geology_input" />
+        <input type="hidden" name="sgmc_geology_major_2" class="sgmc_geology_input" />
+        <input type="hidden" name="sgmc_geology_major_3" class="sgmc_geology_input" />
+        <input type="hidden" name="sgmc_geology_minor_1" class="sgmc_geology_input" />
+        <input type="hidden" name="sgmc_geology_minor_2" class="sgmc_geology_input" />
+        <input type="hidden" name="sgmc_geology_minor_3" class="sgmc_geology_input" />
+        <input type="hidden" name="sgmc_geology_minor_4" class="sgmc_geology_input" />
+        <input type="hidden" name="sgmc_geology_minor_5" class="sgmc_geology_input" />
+
+      </div>
+
+      <button
+        class="btn btn-primary hover:btn-active"
+        type="submit"
+        id="submit-search-button"
+        hx-disabled-elt
+        >
+        Search
+      </button>
+    </section> <!-- end left filters -->
+
+
+    <!-- browse map results -->
+    <section
+      id="browse-results"
+      class="hidden flex overflow-x-hidden flex-column absolute z-10 card w-[31rem] lg:w-[60rem] right-3 top-14 h-[51rem] bg-base-200 rounded-lg shadow-md p-3"
+      >
+      <div class="flex justify-between w-full items-center">
+        <h2 class="m-0 card-title text-2xl dark:text-base-content text-slate-800">Map Results</h2>
+        <p class="list-none italic text-neutral-content m-0 text-right block">
+          <button id="clear-search-results" class="btn btn-ghost btn-sm">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12" />
+            </svg>
+
+          </button>
+        </p>
+      </div>
+
+      <p
+        class="text-sm text-neutral-content mb-1 pr-2 dark:saturate-50 hidden"
+        id="maps-results-count-total"
+        >
+        <span id="map-results-on-page"></span> <span id="maps-results-count"></span>
+      </p>
+
+      <div
+        class="flex-1 relative overflow-x-hidden"
+        id="map-results-target"
+        >
+        <div class="prose p-1 flex">
+          <span class="loading loading-spinner text-primary"></span>&nbsp;
+          Fetching results.
+        </div>
+      </div>
+
+    </section><!-- end map results -->
+
+  </form>
+
+  <!-- bottom controls -->
+  <section class="absolute z-10 bottom-2 left-3">
+    <div class="bg-base-200 m-auto p-3 pb-4 rounded-lg shadow-md">
+      <div class="mt-[-0.75rem]">
+        <form
+          id="upload-map-form"
+          hx-encoding="multipart/form-data"
+          data-url="{{upload_map_url|safe}}"
+          data-job_url="{{job_url|safe}}"
+          >
+          <label class="form-control w-full max-w-xs cursor-pointer">
+            <div class="label prose flex align-center justify-start">
+              <svg
+                xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+                class="size-6 text-blue-500 -rotate-45 mr-0.5 mt-[-0.25rem]"
+                >
+                <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+              </svg>
+
+              <h3 class="inline-block m-0 p-0">Upload Map to CDR</h3>
+            </div>
+            <input
+              type='file'
+              id="cdr-map-file-input"
+              name='map_file'
+              onchange="document.getElementById('map-upload-details').classList.remove('hidden'); document.getElementById('upload-title-input').focus();"
+              class="file-input file-input-bordered file-input-sm file-input-primary" />
+          </label>
+
+          <div id="map-upload-details" class="hidden">
+            <br class="br h-2"/>
+
+            <label class="input input-bordered flex items-center gap-2 input-sm">
+              Title
+              <input type="text" id="upload-title-input" placeholder="Optional Title" class="grow" />
+            </label>
+
+            <input type="hidden" name="map_data" id="map-data-input" />
+
+            <br class="br h-2"/>
+
+            <div class="flex justify-end w-full m-auto">
+              <button id="upload-cancel-button" class="btn btn-error btn-outline btn-sm">
+                Cancel
+              </button>
+              &nbsp;&nbsp;
+              <button type="button" id="upload-button" class="btn btn-outline btn-success btn-sm">
+                Upload
+              </button>
+            </div>
+          </div>
+
+        </form>
+
+        <div class="hidden" id="upload-loading">
+
+          <div class="label prose mb-0 flex align-center justify-start">
+            <svg
+              xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+              class="size-6 text-blue-500 -rotate-45 mr-0.5 mt-[-0.25rem]"
+              >
+              <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+            </svg>
+
+            <h3 class="inline-block m-0 p-0">Uploading Map to CDR</h3>
+          </div>
+          <div class="flex prose">
+            <span class="loading loading-spinner loading-xs"></span>
+            &nbsp;
+            <h5 id="map-processing-message">Please stay on this page until processed.</h5>
+          </div>
+        </div>
+
+        <div id="upload-failed" class="hidden mt-1 text-red-500 dark:text-red-400"></div>
+      </div>
+    </div>
+  </section><!-- end bottom controls -->
+
+  <div id="shapefile-error-toast" class="toast toast-center z-20 hidden">
+    <div class="alert alert-error text-red-100">
+      <span>No Polygon shapes detected in zipfile. Select a valid shapefile zip.</span>
+    </div>
+  </div>
+
+
+  <script>
+    window.rock_units_uri = "{{rock_units_uri}}";
+    window.template_prefix = "{{template_prefix}}";
+    window.list_cmas_uri = "{{list_cmas_uri}}";
+  </script>
+  <script type="module" src="/static/js/index_page.js"></script>
+{% endblock %}

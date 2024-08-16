@@ -1,0 +1,204 @@
+/* @import "charts.css/dist/charts.min.css"; */
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+@import "./rSlider.css";
+@import "@fortawesome/fontawesome-free/css/all.min.css";
+
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  font-feature-settings: 'liga' 1, 'calt' 1; /* fix for Chrome */
+}
+
+@supports (font-variation-settings: normal) {
+  :root { font-family: InterVariable, system-ui, sans-serif; }
+}
+
+.badge {
+  @apply p-3 uppercase font-bold;
+}
+
+.badge-info, .badge-success, .badge-warning, .badge-error {
+  @apply text-primary-content;
+}
+
+.alert {
+  @apply py-2;
+}
+
+.btn-primary {
+  @apply text-primary-content;
+}
+
+html[data-theme='dark'] {
+  .badge-info,
+  .badge-success,
+  .badge-warning,
+  .badge-error {
+    @apply text-secondary-content;
+  }
+}
+
+.tabs {
+  @apply tabs-boxed;
+}
+
+.table {
+  border: 1px solid;
+  @apply border-slate-500;
+}
+
+.dbg {
+  border: 1px dashed red;
+}
+
+/* These two screen rules were broken, not working from tailwind docs */
+.w-screen {
+  width: 100vw;
+}
+.h-screen {
+  height: 100vh;
+}
+
+.abs {
+  @apply top-0 right-0 bottom-0 left-0;
+}
+
+.input:hover, .select:hover {
+  @apply border-primary;
+}
+
+.input:focus, .input:focus-within,
+.select:focus, .select:focus-within, .input[type=file] {
+  @apply outline-primary;
+  outline-width: 1px;
+  outline-offset: 0px;
+}
+
+/* So that we can change height of br tags, when adding this class */
+.br {
+  content: " ";
+  display: block;
+}
+
+
+.range-black {
+  --range-shdw: auto;
+}
+
+.range::-webkit-slider-thumb {
+  @apply bg-primary;
+}
+.range::-moz-range-thumb {
+  @apply bg-primary;
+}
+
+/* .range-black:hover { */
+/*   --range-shdw: auto; */
+/* } */
+
+a:link, a:visited {
+  @apply no-underline hover:underline text-accent;
+}
+
+.tooltip {
+  position: relative;
+  &.absolute {
+    position: absolute;
+  }
+  display: inline-block;
+  /*border-bottom: 1px dotted var(--tooltip-color); /* If you want dots under the hoverable text */
+  text-align: inherit;
+}
+.tooltip .tooltip-text {
+  visibility: hidden;
+  @apply glass;
+  background-image: none;
+  backdrop-filter: blur(var(--glass-blur, 60px));
+
+  text-align: center;
+  padding: 0.35rem;
+  border-radius: 6px;
+  /* Position the tooltip text - see examples below! */
+  position: absolute;
+  z-index: 15;
+  [data-theme="dark"] & {
+    background-color: var(--tooltip-color);
+  }
+}
+.tooltip:hover .tooltip-text {
+  visibility: visible;
+}
+.tooltip .tooltip-text {
+  width: 100%;
+  left: 50%;
+  margin-left: -50%; /* Use half of the width to center the tooltip */
+
+  &.tooltip-left {
+    left: unset;
+    top: -5px;
+    right: 105%;
+    margin-left: unset;
+  }
+  &.tooltip-right {
+    left: unset;
+    top: -5px;
+    left: 105%;
+    margin-left: unset;
+  }
+
+  &.tooltip-cover {
+    top: 0;
+  }
+}
+/* tooltip caret; harder to use with other tw theme colors so skipping for now. */
+/* .tooltip .tooltiptext::after { */
+/*   content: " "; */
+/*   position: absolute; */
+/*   bottom: 100%;  /\* At the top of the tooltip *\/ */
+/*   left: 50%; */
+/*   margin-left: -5px; */
+/*   border-width: 5px; */
+/*   border-style: solid; */
+/*   border-color: transparent transparent var(--tooltip-color) transparent; */
+/* } */
+
+.zoomed-legend {
+  transform: scale(1.7);
+  transform-origin: 91% 40%;
+}
+
+.zoomed-gcp {
+  transform: scale(1.4);
+  transform-origin: 50% 50%;
+}
+
+.zoomed-proj {
+  transform: scale(1.3);
+  transform-origin: 50% 50%;
+}
+
+
+#state-autocomplete-results .selected, #rock-units-autocomplete-results .selected,
+#cma-autocomplete-results .selected
+{
+  @apply bg-base-300;
+  filter: contrast(1.05);
+}
+
+.map-stats-grid {
+  grid-template-columns: repeat(auto-fill, minmax(100px,1fr));
+}
+
+.map-search-results-grid {
+  grid-template-columns: repeat(auto-fill, minmax(450px,1fr));
+}
+
+.input.input-md {
+  @apply h-10;
+}
+
+select.select.select-md {
+  @apply h-10;
+  @apply min-h-10;
+}

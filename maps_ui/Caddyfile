@@ -1,16 +1,55 @@
-
-
-
+{
+  debug
+}
 :8080 {
-
+  # Redirect /api to /api/
   redir /api /api/
-  handle_path /api/* {
+
+  handle /ui/upload/* {
+    uri strip_prefix /ui/upload
+    request_header Authorization "Bearer {$CDR_TOKEN}"
+    request_header Host api.cdr.land
+    reverse_proxy api.cdr.land:443 {
+      transport http {
+        tls
+      }
+    }
+  }
+
+  handle /ui/* {
+    uri strip_prefix /ui
+    reverse_proxy {env.API}:3000
+  }
+
+  handle /static/* {
+    rewrite * /api{uri}
+    reverse_proxy {env.API}:3000
+  }
+
+  # Handle API requests with reverse proxy
+  handle /api/* {
+    uri strip_prefix /api
+    reverse_proxy {env.API}:3000
+  }
+
+  handle /segment/* {
+    uri strip_prefix /segment
+    root * /usr/share/caddy/segment
+    try_files {path} {path}/ /index.html
+    file_server
+  }
+
+  handle_path / {
+    reverse_proxy {env.API}:3000
+  }
+
+  handle /lines/* {
     reverse_proxy {env.API}:3000
   }
 
   handle_path /* {
     root * /usr/share/caddy
-    try_files {path} /index.html
+    try_files {path} {path}/ /index.html
     file_server
   }
 }

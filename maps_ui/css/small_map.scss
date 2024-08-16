@@ -1,0 +1,29 @@
+.small-map-image-root {
+  height: 100%;
+  width: 100%;
+
+  color: var(--mui-palette-primary-light);
+  border-radius: 5px;
+
+  .small-map-spinner {
+    height: inherit;
+    width: inherit;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .small-map-image {
+    width: inherit;
+    height: inherit;
+    cursor: pointer;
+  }
+}
+
+.small-map-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}

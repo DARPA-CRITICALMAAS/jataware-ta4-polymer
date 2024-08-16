@@ -1,0 +1,31 @@
+.gcp-list {
+  flex: 1;
+  position: relative;
+
+  & > div {
+    display: grid;
+    grid-gap: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    grid-auto-rows: min-content;
+    overflow-y: auto;
+
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 1px;
+  }
+}
+
+.gcp-list-degrees {
+  .MuiRadio-root {
+    margin: 4% 0.2rem 4% 0.5rem;
+    padding: 3px;
+  }
+}
+
+.MuiFormControl-root.degrees-selection {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}

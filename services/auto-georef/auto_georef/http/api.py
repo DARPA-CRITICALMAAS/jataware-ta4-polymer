@@ -3,8 +3,10 @@ from logging import Logger
 
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from ..settings import app_settings
+from . import views
 from .middleware import setup_middleware
 from .router import api_router, tags_metadata
 
@@ -12,7 +14,11 @@ logger: Logger = logging.getLogger(__name__)
 api = FastAPI(debug=True, openapi_tags=tags_metadata)
 setup_middleware(api)
 api.include_router(api_router)
+api.include_router(views.view_router, include_in_schema=False)
 api.add_middleware(GZipMiddleware, minimum_size=100000)
+
+api.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 def print_debug_routes() -> None:
     max_len = max(len(route.path) for route in api.routes)

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+  {% include "shared/_head.html" %}
+
+  <body>
+
+    <div
+      class="w-screen h-screen relative"
+      id="map"
+    >
+      {% block main_content %}{% endblock %}
+    </div>
+
+     <script type="module" src="/static/js/all_pages.js"></script>
+
+  </body>
+
+</html>

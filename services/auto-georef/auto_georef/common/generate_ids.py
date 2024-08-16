@@ -14,6 +14,11 @@ def generate_map_area_id(cog_id: str, map_area: dict):
     return f"""{cog_id}_{hashed_map_area}"""
 
 
-def generate_legend_id(cog_id, system, system_version, geometry):
+def generate_geom_id(cog_id, system, system_version, geometry):
     geom = hash_map_area(geometry)
-    return f"{cog_id}_{system}_{system_version}_{geom}" ""
+    return f"{cog_id}_{system}_{system_version}_{geom}"
+
+
+def generate_legend_id(cog_id, system, system_version, geometry, label):
+    label = label[:150]
+    return generate_geom_id(cog_id, system, system_version, geometry) + "_" + label

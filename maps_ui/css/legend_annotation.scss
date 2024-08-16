@@ -1,0 +1,162 @@
+.swatch-annotation-root {
+  background: var(--mui-palette-common-background);
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  grid-template-columns: auto;
+  height: 100vh;
+  width: 100vw;
+
+  .right-column-legends {
+    flex: 1;
+    position: relative;
+
+    & > div {
+      position: absolute;
+      inset: 0;
+      overflow-y: auto;
+      margin-bottom: 3rem;
+
+      display: grid;
+      grid-gap: 1rem;
+      grid-auto-rows: min-content;
+    }
+  }
+
+  .left_column {
+    display: flex;
+    flex-direction: column;
+    .legend-items {
+      flex: 1;
+      flex-direction: column;
+      position: relative;
+      & > div {
+        margin-bottom: 3rem;
+        position: absolute;
+        inset: 0;
+        overflow-y: auto;
+      }
+    }
+  }
+
+  .swatch-flex-container {
+    display: flex;
+    background: var(--mui-palette-common-background);
+  }
+
+  .swatch-instructions {
+    background-color: var(--mui-palette-background-paper);
+    box-shadow: var(--mui-shadows-1);
+    border-radius: 4px;
+  }
+
+  .container_card {
+    width: 100%;
+    display: grid;
+    margin-bottom: 10px;
+    align-items: center;
+  }
+
+  .scrollableContent {
+    flex-grow: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100%;
+  }
+
+  .card {
+    min-width: 400px;
+  }
+
+  .map-wrapper {
+    position: relative;
+
+    .control-panel {
+      position: absolute;
+      top: 1rem;
+      right: 2rem;
+      padding: 1rem 0.5rem 1rem 1rem;
+      z-index: 1;
+      border-radius: 7px;
+      background-color: var(--mui-palette-background-paper);
+      opacity: 0.9;
+      height: fit-content;
+
+      .provenance-control-label {
+        display: flex;
+        align-items: center;
+        & > p {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          max-width: 22rem;
+        }
+      }
+    }
+  }
+
+  .flex-child {
+    flex: 1;
+    display: grid;
+  }
+
+  .map {
+    background-color: var(--mui-palette-grey-800);
+  }
+
+  .right-panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem 0.5rem 0 0.75rem;
+
+    .right-panel-swatch-list {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+
+      .legend-validate-root {
+        position: relative;
+        flex: 1;
+
+        & > div {
+          display: grid;
+          grid-template-rows: auto 1fr;
+          position: absolute;
+          margin-bottom: 2rem;
+          inset: 0;
+          overflow-y: auto;
+          grid-gap: 1rem;
+        }
+      }
+    }
+
+    .right-container {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 4fr 3fr;
+      grid-template-rows: auto;
+      overflow-y: auto;
+      grid-gap: 1rem;
+
+      .saved-legend-list {
+        display: grid;
+        grid-template-rows: auto 1fr;
+
+        & > div {
+          display: flex;
+          flex-direction: column;
+          position: relative;
+
+          & > div {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            overflow-y: auto;
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,80 @@
+.map-extraction-root {
+  .map-x-controls-wrap {
+    position: relative;
+    flex: 2;
+    height: 100%;
+  }
+
+  .control-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin: 1rem;
+    padding: 1.5rem;
+    z-index: 1;
+    border-radius: 7px;
+    background-color: var(--mui-palette-background-paper);
+    opacity: 0.9;
+  }
+
+  .card {
+    .MuiCardContent-root {
+      padding-top: 0.75rem;
+      padding-bottom: 0.25rem;
+    }
+  }
+
+  .nextButton {
+    align-self: flex-start;
+    margin: 20px;
+    display: flex;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
+  }
+
+  .map {
+    background-color: var(--mui-palette-grey-800);
+  }
+
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0 1rem 0.25rem 1rem;
+    // flex: 1.3;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .flex {
+    display: flex;
+  }
+
+  .panel-menu {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+    margin-bottom: 0.5rem;
+  }
+
+  .crs-form {
+    display: flex;
+    flex-direction: column;
+    .crs-help-description {
+      color: var(--mui-palette-text-secondary);
+    }
+
+    .ocr-expanded {
+      padding: 0.5rem;
+      padding-bottom: 0;
+    }
+  }
+
+  .crs-ocr-root {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--mui-palette-background-border);
+  }
+}

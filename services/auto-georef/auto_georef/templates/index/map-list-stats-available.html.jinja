@@ -1,0 +1,35 @@
+<div
+  class="grid gap-1 p-0.5 map-stats-grid"
+  hx-get="{{template_prefix}}/map-stats/{{cog_id}}"
+  hx-swap="outerHTML"
+  hx-trigger="load"
+  hx-target="this"
+  >
+  {% for stat in stats %}
+  <div class="min-w-4">
+    <div class="flex items-end w-full">
+      <a
+        class="btn w-12 p-0 h-4 border-{{stat.main_color}} hover:border-{{stat.alt_color}} border-solid border scale-75"
+        target="_blank"
+        title="{{stat.display_title}}" href="{{stat.link_url}}">
+        {{stat.icon|safe}}
+      </a>
+      <div>
+        <h5 class="w-full text-{{stat.main_color}} dark:text-{{stat.main_color}}/50 leading-none">{{stat.display_title}}</h5>
+        <p class="mt-0 w-full inline-block leading-none">
+          {% if stat.total_count and stat.total_count > 0 %}
+          <span title="total">{{stat.total_count}}</span>
+          {%endif%}
+        </p>
+      </div>
+    </div>
+  </div>
+  {%endfor%}
+
+  <div class="tooltip absolute bottom-0 right-4">
+    <div class="tooltip-text tooltip-left min-w-32">
+      Fetching stats
+    </div>
+    <span class="loading loading-ring loading-sm"></span>
+  </div>
+</div>

@@ -1,1 +1,6 @@
-static/*
+static/js/*
+static/css/*
+static/webfonts/*
+/ui/static/*
+disk_cache/*.tif
+disk_cache/*.pt

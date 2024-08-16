@@ -2,7 +2,7 @@ name: Build Release
 
 on:
   schedule:
-    - cron: '0 10 * * 2'
+    - cron: '0 6 * * 1-5'
 
   workflow_dispatch:
 

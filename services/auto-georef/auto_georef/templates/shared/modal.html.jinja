@@ -1,0 +1,51 @@
+{% macro header() %}
+<div class="divider">
+  {%- if caller -%}
+  <div class="flex items-center gap-2 align-middle text-xl font-bold">
+    {{ caller() }}
+  </div>
+  {%- endif -%}
+</div>
+{% endmacro %}
+
+
+{% macro modal(title, subtitle="", id="", center_title=true, closeable=true) %}
+{#
+A modal dialog that can be used to display content on top of the current page.
+
+Parameters:
+- title: str - the title of the modal
+- subtitle: str - the subtitle of the modal
+- id: str - the id of the modal
+- center_title: bool - whether to center the title
+- close: bool - whether to show the close button and allow background click to close
+#}
+<dialog id="{{ id }}" class="modal [&:not(&[open])]:invisible">
+  <div class="modal-box z-20 flex flex-col overflow-clip bg-base-200">
+    {% if closeable %}
+    <form method="dialog">
+      <button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">✕</button>
+    </form>
+    {% endif %}
+
+    {% set text_class = 'text-center' if center_title else '' %}
+    <h2 class="mt-3 text-2xl font-bold {{ text_class }}">{{ title }}</h2>
+    {% if subtitle %}
+    <h3 class="mb-4 text-lg font-bold {{ text_class}} opacity-75">{{ subtitle }}</h3>
+    {% endif %}
+
+
+    <div class="-m-6 mt-2 flex flex-col gap-2 overflow-y-hidden bg-base-100 p-2 pt-0 before:content-['_']">
+      <div class="flex flex-col gap-2 overflow-y-auto p-8 pt-2">
+        {{ caller() }}
+      </div>
+    </div>
+  </div>
+
+  {% if closeable %}
+  <form method="dialog" class="modal-backdrop h-screen w-screen">
+    <button>Close</button>
+  </form>
+  {% endif %}
+</dialog>
+{% endmacro %}

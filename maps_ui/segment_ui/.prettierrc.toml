@@ -1,0 +1,5 @@
+# .prettierrc.toml
+plugins = ["prettier-plugin-tailwindcss"]
+
+printWidth = 100
+quoteProps = "consistent"
