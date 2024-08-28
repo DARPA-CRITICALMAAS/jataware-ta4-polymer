@@ -39,9 +39,9 @@ html[data-theme='dark'] {
   }
 }
 
-.tabs {
-  @apply tabs-boxed;
-}
+/* .tabs { */
+/*   @apply tabs-boxed; */
+/* } */
 
 .table {
   border: 1px solid;
@@ -64,15 +64,24 @@ html[data-theme='dark'] {
   @apply top-0 right-0 bottom-0 left-0;
 }
 
-.input:hover, .select:hover {
+.input:hover, .select:hover, .textarea:hover {
   @apply border-primary;
 }
 
 .input:focus, .input:focus-within,
-.select:focus, .select:focus-within, .input[type=file] {
+.select:focus, .select:focus-within, .input[type=file],
+.textarea:focus, .textarea:focus-within {
   @apply outline-primary;
   outline-width: 1px;
   outline-offset: 0px;
+}
+
+.input.no-hover,
+.input.no-hover:focus,
+.input.no-hover:focus-within,
+.input.no-hover:hover {
+  outline-width: 0px;
+  border: 0px;
 }
 
 /* So that we can change height of br tags, when adding this class */

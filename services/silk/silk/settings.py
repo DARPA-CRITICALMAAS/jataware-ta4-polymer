@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     authelia_user: str
     authelia_pass: str
 
-    georef_api_host: str = "https://georef.polymer.rocks"
+    cdr_api_host: str = "https://api.cdr.land"
 
     # zotero_user: str = Field(validation_alias="zotero_user")
     # zotero_token: SecretStr = ""

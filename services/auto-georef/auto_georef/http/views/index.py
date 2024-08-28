@@ -239,8 +239,8 @@ stat_display_data = {
                       </svg>""",
         "main_color": "violet-500",
         "alt_color": "violet-300",
-        "link_segment": False,
-        "disabled": True,
+        "link_segment": "/lines/",
+        "disabled": False,
     },
     "line": {
         "display_title": "Lines",
@@ -249,8 +249,8 @@ stat_display_data = {
                       </svg>""",
         "main_color": "amber-500",
         "alt_color": "amber-300",
-        "link_segment": False,
-        "disabled": True,
+        "link_segment": "/lines/",
+        "disabled": False,
     },
     "polygon": {
         "display_title": "Polygons",
@@ -433,14 +433,146 @@ def get_map_result_stats(request: Request, cog_id: str):
     )
 
 
+@router.get("/map-downloads/{cog_id}")
+def get_map_downloads(request: Request, cog_id: str):
+    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/maps/cog/projections/{cog_id}"
+    s3_prefix = f"{app_settings.cdr_s3_endpoint_url}/{app_settings.cdr_public_bucket}"
+
+    s3_download_products = f"{s3_prefix}/12/{cog_id}.zip"
+    s3_download_cog = f"{s3_prefix}/cogs/{cog_id}.cog.tif"
+    # Replaced by first status=validated projection found
+    # s3_download_projected_cog = f"{s3_prefix}/12/{cog_id}.projected.cog.tif"
+
+    projections_response = None
+
+    try:
+        projections_response = httpx.get(fetch_url, headers=auth, timeout=None).raise_for_status().json()
+
+    except httpx.HTTPError as he:
+        return templates.TemplateResponse(
+            "index/map-result-download.html.jinja",
+            {
+                "request": request,
+                "disabled": True,
+                "template_prefix": app_settings.template_prefix,
+            },
+        )
+
+    try:
+        if len(projections_response) > 0:
+            first_validated = next((prj for prj in projections_response if prj["status"] == "validated"), None)
+
+            if not first_validated:
+                raise Exception("No validated projections detected.")
+
+            downloads = {
+                "cog": s3_download_cog,
+                "projected": first_validated["download_url"],
+                "products": s3_download_products,
+            }
+
+            return templates.TemplateResponse(
+                "index/map-result-download.html.jinja",
+                {
+                    "request": request,
+                    "downloads": downloads,
+                    "template_prefix": app_settings.template_prefix,
+                },
+            )
+        else:
+            raise Exception("No projections detected.")
+    except:
+        return templates.TemplateResponse(
+            "index/map-result-download.html.jinja",
+            {
+                "request": request,
+                "disabled": True,
+                "template_prefix": app_settings.template_prefix,
+            },
+        )
+
+
 @router.get("/get-rock-units")
 def get_rock_units(request: Request, major_type: str):
     fetch_url = f"{app_settings.cdr_endpoint_url}/v1/sgmc/sgmc_rock_unit_names?major_type={major_type}"
     response = httpx.get(fetch_url, headers=auth, timeout=None).raise_for_status()
     return response.json()
 
+
 @router.get("/cma")
 def list_cmas(request: Request):
     fetch_url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/cmas?size=40"
     response = httpx.get(fetch_url, headers=auth, timeout=None).raise_for_status()
     return response.json()
+
+
+@router.post("/search-maps-ocr")
+def search_maps_ocr(
+    request: Request,
+    # Form data attributes (not json)
+    search_terms: Annotated[str, Form()] = "",
+    # query params
+    page: int = 0,
+    page_size: int = 20,
+):
+    url = app_settings.cdr_endpoint_url + "/v1/maps/search/ocr"
+
+    data = {
+        "search_terms": search_terms.split(" "),
+        "cogs_only": True,
+        "page": page,
+        "size": page_size,
+    }
+
+    response = httpx.post(url, json=data, headers=auth, timeout=None)
+
+    if response.status_code == 200:
+        response_data = response.json()
+
+        prev_page_url = False
+        next_page_url = False
+
+        if page > 0:
+            prev_page_url = patch_url(app_settings.template_prefix + "/search-maps-ocr", page=page - 1)
+        if len(response_data) >= page_size:
+            next_page_url = patch_url(app_settings.template_prefix + "/search-maps-ocr", page=page + 1)
+
+        if len(response_data) > 0:
+            maps_count = len(response_data)
+
+            return templates.TemplateResponse(
+                "index/map-list.html.jinja",
+                {
+                    "request": request,
+                    "maps": map(format_map, response_data),
+                    "page": page,
+                    "page_size": page_size,
+                    "prev_page_url": prev_page_url,
+                    "next_page_url": next_page_url,
+                    "template_prefix": app_settings.template_prefix,
+                    "maps_in_page": f"{(page * page_size) + 1}-{(page + 1) * maps_count}"
+                    if maps_count >= page_size
+                    else f"last {maps_count}",
+                    "use_maps_grid": maps_count > 2,
+                },
+            )
+        else:
+            return templates.TemplateResponse(
+                "index/map-list-empty.html.jinja",
+                {
+                    "request": request,
+                    "template_prefix": app_settings.template_prefix,
+                    "page": page,
+                    "prev_page_url": prev_page_url,
+                    "next_page_url": next_page_url,
+                },
+            )
+    else:
+        return templates.TemplateResponse(
+            "index/map-list-error.html.jinja",
+            {
+                "request": request,
+                "template_prefix": app_settings.template_prefix,
+                "error_details": f"Status returned by CDR: {response.status_code}.",
+            },
+        )

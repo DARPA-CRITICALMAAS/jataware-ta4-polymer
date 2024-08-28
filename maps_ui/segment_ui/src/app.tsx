@@ -1688,7 +1688,8 @@ const LayerCard = forwardRef(
 
                     // TODO: Make better zoom in
                     const isWindowWider = window.innerWidth > window.innerHeight;
-                    const padding = isWindowWider ? [500, 0, 500, 0] : [0, 200, 0, 200];
+                    const padding = isWindowWider ? [350, 0, 350, 0] : [0, 200, 0, 200];
+                    // const padding = [50, 50, 50, 50];
 
                     map.getView().fit(layer.legendItem.bbox, {
                       duration: 500,
@@ -2124,7 +2125,8 @@ if (!sessionStorage.getItem("hasLoaded")) {
 Element.pointsLink.href = `/points/${COG_ID}`;
 Element.projLink.href = `/projections/${COG_ID}`;
 Element.legendLink.href = `/swatchannotation/${COG_ID}`;
-Element.segmentLink.href = `/segment/${COG_ID}`;
+Element.linesLink.href = `/lines/${COG_ID}`;
+Element.polyLink.href = `/segment/${COG_ID}`;
 Element.cogIDBadge.textContent = COG_ID;
 Element.cogIDBadge.addEventListener("click", () => {
   AlertStore.show(copiedToClipboardAlert);

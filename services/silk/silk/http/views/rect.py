@@ -11,7 +11,9 @@ import pandas
 from fastapi import APIRouter, Form, Request, status
 from fastapi.responses import HTMLResponse
 from PIL import Image
+from pydantic import BaseModel, Field
 
+from ...common.utils import dget
 from ...db.db import db_session
 from ...db.models import DbAnnotation, DbAnnotationTag, DbPdf
 from ...pdf.utils import cache_open_pdf
@@ -27,7 +29,8 @@ router = APIRouter()
 @router.get("/r/{annotation_type}/{doc_id}/{page}/{x0}/{y0}/{x1}/{y1}")
 def index(annotation_type: str, doc_id: str, page: int, x0: float, y0: float, x1: float, y1: float, request: Request):
     doc = cache_open_pdf(doc_id)
-    p = doc[page]
+    page0 = page - 1
+    p = doc[page0]
     r = p.rect
     rotation = p.rotation
     logger.debug("page rect: %s", r)
@@ -331,13 +334,30 @@ def refresh_table(extract_text: Annotated[str, Form()], request: Request):
     return HTMLResponse(status_code=status.HTTP_200_OK, content=tbl)
 
 
-async def send_to_georeferencer(doc_id: str, page: int, x0: float, y0: float, x1: float, y1: float):
-    try:
-        with db_session() as session:
-            pdf = session.query(DbPdf).filter_by(id=doc_id).one()
-        doc = cache_open_pdf(pdf.id)
+# from cdr
+class UploadMap(BaseModel):
+    """JSON model for uploading new document"""
 
-        p = doc[page]
+    title: str = Field(..., description="Title of the Map")
+
+    system: str = Field(
+        ...,
+        description="""
+            The name of the system used.
+        """,
+    )
+    system_version: str = Field(
+        ...,
+        description="""
+            The version of the system used.
+        """,
+    )
+
+
+async def send_to_georeferencer(doc_id: str, page0: int, x0: float, y0: float, x1: float, y1: float):
+    try:
+        doc = cache_open_pdf(doc_id)
+        p = doc[page0]
 
         mb = p.mediabox
         r = fitz.Rect(x0, y0, x1, y1)
@@ -356,34 +376,73 @@ async def send_to_georeferencer(doc_id: str, page: int, x0: float, y0: float, x1
         tiff = BytesIO()
         img.save(tiff, format="TIFF")
 
-        url = f"{app_settings.georef_api_host}/api/map/processMap"
-        files = {"file": (f"silk_{doc_id}_{page}.tiff", tiff.getvalue())}
+        url = f"{app_settings.cdr_api_host}/v1/maps/upload/map"
+
+        upload_map: UploadMap = UploadMap(
+            title=f"{doc_id}_{page0}_silk",
+            system=app_settings.cdr_system_name,
+            system_version=app_settings.cdr_system_version,
+        )
+
+        files = {"map_file": (f"{doc_id}_{page0}_silk.tif", tiff.getvalue())}
+        token = app_settings.cdr_api_key
+        headers = {"Authorization": f"Bearer {token}"}
 
         async with httpx.AsyncClient(timeout=None) as client:
-            logger.debug("login")
-            await client.post(
-                "https://auth.polymer.rocks/api/firstfactor",
-                json={"username": app_settings.authelia_user, "password": app_settings.authelia_pass},
+            r = await client.post(
+                url,
+                headers=headers,
+                data={"map_data": upload_map.model_dump_json()},
+                files=files,
             )
-
-            logger.debug("post")
-            r = await client.post(url, files=files)
             r.raise_for_status()
-
             j = r.json()
-            map_id = j.get("map_id")
-
-            return map_id
+            return j
 
     except Exception:
         logger.exception("failed")
 
 
+waiting_job = """
+<div
+  hx-get="/partial/georef/job/{job_id}"
+  hx-trigger="every 2s"
+  class="text-sm"
+  disabled
+><span class="text-sm pr-4">waiting map processing</span>   <span class="loading loading-bars loading-sm"></span></div>
+"""
+
+
 @router.get("/partial/georef/img/{doc_id}/{page}/{x0}/{y0}/{x1}/{y1}")
 async def georef_image(request: Request, doc_id: str, page: int, x0: float, y0: float, x1: float, y1: float):
-    map_id = await send_to_georeferencer(doc_id, page, x0, y0, x1, y1)
-
-    html = f"""
-    <a target="_blank" class="link link-primary text-sm" href="https://georef.polymer.rocks/points/{map_id}">View Georeferenced</a>
-    """  # noqa: E501
+    res = await send_to_georeferencer(doc_id, page - 1, x0, y0, x1, y1)
+    html = waiting_job.format(job_id=res.get("job_id"))
     return HTMLResponse(status_code=status.HTTP_200_OK, content=html)
+
+
+job_failed = """<a class="link link-error text-sm cursor-not-allowed" disabled>upload failed</a>"""
+
+
+@router.get("/partial/georef/job/{job_id}")
+async def poll_job(request: Request, job_id):
+    url = f"{app_settings.cdr_api_host}/v1/jobs/result/{job_id}"
+
+    token = app_settings.cdr_api_key
+    headers = {"Authorization": f"Bearer {token}"}
+
+    res = httpx.get(url, headers=headers)
+    res.raise_for_status()
+
+    data = res.json()
+    logger.debug("job status %s", data.get("state"))
+
+    match data.get("state"):
+        case "failed":
+            return HTMLResponse(status_code=status.HTTP_200_OK, content=job_failed)
+        case "success":
+            map_id = dget(data, "result.map_id") or dget(data, "result.Ingested")
+            georef_link = f"""<a target="_blank" class="link link-primary text-sm" href="https://maps.polymer.rocks/points/{map_id}">View Georeferenced</a>"""  # noqa: E501
+            return HTMLResponse(status_code=status.HTTP_200_OK, content=georef_link)
+
+    logger.debug("still waiting on job: %s", job_id)
+    return HTMLResponse(status_code=status.HTTP_200_OK, content=waiting_job.format(job_id=job_id))

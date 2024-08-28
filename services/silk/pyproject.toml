@@ -4,10 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["scott <scott@jataware.com>"]
 readme = "README.md"
-packages = [
-         {include = "silk"},
-         {include = "silk/**/*.py"}
- ]
+packages = [{ include = "silk" }, { include = "silk/**/*.py" }]
 
 [tool.poetry.dependencies]
 python = "^3.11 <3.12"
@@ -26,7 +23,7 @@ python-multipart = "^0.0.6"
 # img2table = "^1.2.2"
 # transformers = "^4.34.0"
 # torch = "^2.1.0"
-cdr_schemas = { git = "https://github.com/DARPA-CRITICALMAAS/cdr_schemas.git", tag = "v0.4.3" }
+cdr_schemas = { git = "https://github.com/DARPA-CRITICALMAAS/cdr_schemas.git", tag = "v0.4.5" }
 openai = "^1.23.6"
 sqlalchemy = "^2.0.25"
 httpx = "^0.26.0"
@@ -77,23 +74,21 @@ line_length = 119
 
 [tool.ruff]
 line-length = 119
-exclude = [
-  "cdr/protos/*"
-]
+exclude = ["cdr/protos/*"]
 
 [tool.ruff.lint]
 select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
+  "E",  # pycodestyle errors
+  "W",  # pycodestyle warnings
+  "F",  # pyflakes
+  "I",  # isort
+  "B",  # flake8-bugbear
+  "C4", # flake8-comprehensions
+  "UP", # pyupgrade
 ]
 ignore = [
-    "E501",  # line too long, handled by black
-    "B008",  # do not perform function calls in argument defaults
-    "W191",  # indentation contains tabs
-    "E741",
+  "E501", # line too long, handled by black
+  "B008", # do not perform function calls in argument defaults
+  "W191", # indentation contains tabs
+  "E741",
 ]

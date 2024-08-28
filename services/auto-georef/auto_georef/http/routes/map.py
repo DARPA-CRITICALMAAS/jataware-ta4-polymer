@@ -32,7 +32,7 @@ from auto_georef.common.map_utils import (
     send_georef_to_cdr,
     send_new_legend_items_to_cdr,
 )
-from auto_georef.common.tiff_cache import load_tiff_cache
+from auto_georef.common.tiff_cache import get_cached_tiff
 from auto_georef.es import (
     delete_by_id,
     document_exists,
@@ -67,14 +67,15 @@ class Proj_Status(Enum):
 
 ########################### GETs ###########################
 @router.get("/load_tiff_into_cache")
-async def load_tiff_into_cache(cog_id):
-    await run_in_threadpool(load_tiff_cache, cache, cog_id)
+def load_tiff_into_cache(cog_id):
+    with get_cached_tiff(cache, cog_id):
+        logger.info(f"Loaded tiff in cache")
 
     return {"status": "Loaded image into disk cache", "cog_id": cog_id}
 
 
 @router.get("/cog_in_cache")
-async def check_cog_in_cache(cog_id):
+def check_cog_in_cache(cog_id):
     s3_key = f"{app_settings.cdr_s3_cog_prefix}/{cog_id}.cog.tif"
     if s3_key in list(cache.keys()):
         return True
@@ -82,9 +83,9 @@ async def check_cog_in_cache(cog_id):
 
 
 @router.get("/clip-tiff")
-async def clip_tiff(cog_id: str, coll: int, rowb: int):
+def clip_tiff(cog_id: str, coll: int, rowb: int):
     try:
-        resp = await clip_tiff_(cache, rowb, coll, cog_id)
+        resp = clip_tiff_(cache, rowb, coll, cog_id)
         return resp
     except Exception as e:
         logger.exception("Failed to clip image")
@@ -92,9 +93,9 @@ async def clip_tiff(cog_id: str, coll: int, rowb: int):
 
 
 @router.get("/clip-bbox")
-async def clip_bbox(cog_id: str, minx: int, miny: int, maxx: int, maxy: int):
+def clip_bbox(cog_id: str, minx: int, miny: int, maxx: int, maxy: int):
     try:
-        resp = await clip_bbox_(cache, minx, miny, maxx, maxy, cog_id)
+        resp = clip_bbox_(cache, minx, miny, maxx, maxy, cog_id)
         return resp
 
     except Exception as e:
@@ -128,17 +129,46 @@ def codes():
     return {"codes": [{"label": crs[0] + ":" + crs[1]} for crs in all_crs]}
 
 
-# todo fix
-@router.get("/maps_stats", status_code=HTTP_200_OK)
-def map_stats_():
-    # Hit cdr for this todo needs a bit more testing.
-    # if "stats" in stats_cache:
-    #     return stats_cache['stats']
-    return {"validated": 1, "georeferenced": 2, "not_georeferenced": 10, "not_a_map": 2}
+@router.get("/downloads/{cog_id}")
+def get_map_download_links(cog_id: str):
+    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/maps/cog/projections/{cog_id}"
+    s3_prefix = f"{app_settings.cdr_s3_endpoint_url}/{app_settings.cdr_public_bucket}"
+
+    s3_download_products = f"{s3_prefix}/12/{cog_id}.zip"
+    s3_download_cog = f"{s3_prefix}/cogs/{cog_id}.cog.tif"
+
+    projections_response = None
+
+    """
+    mock start
+    """
+    # return {
+    #     "cog": s3_download_cog,
+    #     "projected": f"{s3_prefix}/12/{cog_id}.projected.cog.tif",
+    #     "products": s3_download_products,
+    # }
+    """
+    mock end
+    """
+
+    try:
+        projections_response = httpx.get(fetch_url, headers=auth, timeout=None).raise_for_status().json()
+    except httpx.HTTPError as he:
+        raise HTTPException(status_code=he.response.status_code, detail={"error": str(he)})
+
+    if len(projections_response) > 0:
+        if first_validated := next((prj for prj in projections_response if prj["status"] == "validated"), None):
+            return {
+                "cog": s3_download_cog,
+                "projected": first_validated["download_url"],
+                "products": s3_download_products,
+            }
+
+    raise HTTPException(status_code=404, detail={"error": "No downloads available because there are no validated projections."})
 
 
 @router.get("/{cog_id}/legend_features_json")
-async def download_json(cog_id: str):
+def download_json(cog_id: str):
     legend_items = legend_by_cog_id_status(app_settings.polymer_legend_extractions, cog_id=cog_id, status="validated")
     return legend_items
 
@@ -216,15 +246,15 @@ async def list_map_unit_name():
     return names
 
 
-async def return_polymer_legend_items(cog_id):
-    height = await cog_height(cache=cache, cog_id=cog_id)
+def return_polymer_legend_items(cog_id):
+    height = cog_height(cache=cache, cog_id=cog_id)
     # legend swatches in polymer
     polymer_legend_items = search_by_cog_id(app_settings.polymer_legend_extractions, cog_id=cog_id)
     legend_ids_cached = []
     for legend in polymer_legend_items:
         legend_ids_cached.append(legend.get("legend_id", ""))
         legend["age_text"] = legend.get("age_text", "")
-        legend['in_cdr'] = False
+        legend["in_cdr"] = False
 
     # legend swatches in cdr
     url = app_settings.cdr_endpoint_url + f"/v1/features/{cog_id}/legend_items"
@@ -232,7 +262,7 @@ async def return_polymer_legend_items(cog_id):
     cdr_legend_items = []
     if response.status_code == 200:
         cdr_legend_items = response.json()
-        items_in_polymer_and_cdr=[]
+        items_in_polymer_and_cdr = []
         for item in cdr_legend_items:
             if item.get("legend_id") not in legend_ids_cached:
                 extent_from_bottom = []
@@ -270,7 +300,7 @@ async def return_polymer_legend_items(cog_id):
                         "reference_id": item.get("reference_id"),
                         "extent_from_bottom": extent_from_bottom,
                         "minimized": True,
-                        "in_cdr":False
+                        "in_cdr": False,
                     }
                 )
             else:
@@ -279,13 +309,13 @@ async def return_polymer_legend_items(cog_id):
         # now if the same legend id is in cdr as well as polymer set in_cdr to true
         for legend in polymer_legend_items:
             if legend.get("legend_id") in items_in_polymer_and_cdr:
-                legend['in_cdr']=True
+                legend["in_cdr"] = True
         return polymer_legend_items
 
 
 @router.get("/{cog_id}/px_extractions")
-async def load_extractions(cog_id: str):
-    polymer_legend_items = await return_polymer_legend_items(cog_id)
+def load_extractions(cog_id: str):
+    polymer_legend_items = return_polymer_legend_items(cog_id)
 
     return {"legend_swatches": polymer_legend_items}
 
@@ -707,7 +737,7 @@ async def save_proj_info(req: SaveProjInfo):
             #  send as georef result to cdr
             await send_georef_to_cdr(proj_id)
             response_data = {"status": "validated"}
-            
+
     else:
         #  just update the status in the cdr.
         url = app_settings.cdr_endpoint_url + f"/v1/maps/cog/projection/{proj_id}"
@@ -715,9 +745,8 @@ async def save_proj_info(req: SaveProjInfo):
         response = httpx.put(url, json=data, headers=auth)
         if response.status_code == 200:
             response_data = response.json()
-            return {"message": "projection updated", "projection": response_data['projection']}
+            return {"message": "projection updated", "projection": response_data["projection"]}
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"projection not updated in cdr")
-
 
 
 class SaveCogInfo(BaseModel):

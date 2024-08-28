@@ -13,7 +13,7 @@ from cdr_schemas.features.point_features import Point
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from ...common.tiff_cache import load_tiff_cache
+from ...common.tiff_cache import get_cached_tiff
 from ...http.routes.cache import cache
 from ...settings import app_settings
 from ...templates import templates
@@ -100,7 +100,9 @@ def get_features(
     request: Request, cog_id: str, ftype: Literal["line", "point"], system: str, version: str, max_num: int = 0
 ):
     client = CDRClient(cog_id, system=system, version=version)
-    _, height = load_tiff_cache(cache, cog_id)
+    with get_cached_tiff(cache, cog_id) as image_size:
+        image_size[0]
+        height = image_size[1]
 
     # Helper functions
     def fix_coordinate(x, y):
@@ -142,13 +144,13 @@ def get_features(
         FeatureResponse(
             geometry=flip_geometry(f.px_geojson),
             name=get_name(f.legend_item),
-            legend_id=f.legend_id,
+            legend_id=f.legend_id or "",
             bbox=flip_bbox(f.px_bbox),
         )
         for f in features
     ]
 
-    legend_id_key = lambda f: f.legend_id
+    legend_id_key: Callable[[FeatureResponse], str] = lambda f: f.legend_id
     features = sorted(features, key=legend_id_key)
     grouped_features = {lid: list(f) for lid, f in itertools.groupby(features, key=legend_id_key)}
     feature_groups = [FeatureGroup(name=f.name, legend_id=lid) for lid, (f, *_) in grouped_features.items()]
@@ -182,6 +184,7 @@ def index(request: Request, cog_id: str):
 
     cog_url = f"{app_settings.cdr_s3_endpoint_url}/{app_settings.cdr_public_bucket}/cogs/{cog_id}.cog.tif"
     context = {
+        "page_title": "Polymer Points & Lines",
         "cog_id": cog_id,
         "cog_url": cog_url,
         "line_systems": line_systems,

@@ -4,7 +4,7 @@ import os
 from functools import partial, wraps
 from logging import Logger
 from time import perf_counter
-from typing import Any, Callable
+from typing import Callable, ParamSpec, TypeVar
 
 import boto3
 import fitz
@@ -22,9 +22,12 @@ logger: Logger = logging.getLogger(__name__)
 
 
 def timeit(logger):
-    def dec(f: Callable[..., Any]) -> Any:
+    T = TypeVar("T")
+    P = ParamSpec("P")
+
+    def dec(f: Callable[P, T]):
         @wraps(f)
-        def w(*args: Any, **kwargs: Any) -> Any:
+        def w(*args: P.args, **kwargs: P.kwargs):
             start = perf_counter()
             rtn = f(*args, **kwargs)
             time_since(logger, f"{f.__name__}", start)

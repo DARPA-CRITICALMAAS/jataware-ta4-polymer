@@ -41,6 +41,15 @@ export default {
       },
     ],
   },
+  theme: {
+    extend: {
+      screens: {
+        // Small screens, vertically
+        'slim': {'raw': '(max-height: 775px)'},
+        // => @media (max-height: 700px) { ... }
+      }
+    }
+  },
   // tailwind might not work well with jinja templates or python code
   // may have to add some of these so that they aren't
   // tree-shaken and removed from final css build..
@@ -56,5 +65,6 @@ export default {
     "bg-accent",
     "bg-base-200",
     "badge-outline",
+    "size-2", "size-3", "size-4"
   ],
 };

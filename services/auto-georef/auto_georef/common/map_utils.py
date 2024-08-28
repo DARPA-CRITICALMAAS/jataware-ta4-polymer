@@ -15,13 +15,12 @@ import rasterio as rio
 import rasterio.transform as riot
 from cdr_schemas.georeference import GeoreferenceResults
 from fastapi import HTTPException, Response, status
-from fastapi.concurrency import run_in_threadpool
 from PIL import Image
 from pyproj import Transformer
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 from rasterio.windows import Window
 
-from auto_georef.common.tiff_cache import load_tiff_cache
+from auto_georef.common.tiff_cache import get_cached_tiff
 from auto_georef.common.utils import s3_client, time_since, upload_s3_file
 from auto_georef.es import cdr_GCP_by_id, return_ES_doc_by_id, save_ES_data, search_by_cog_id, update_GCPs
 from auto_georef.settings import app_settings
@@ -38,17 +37,21 @@ auth = {
 # async def cog_height(cache, cog_id):
 #     s3_key = f"{app_settings.cdr_s3_cog_prefix}/{cog_id}.cog.tif"
 
-#     src = await run_in_threadpool(load_tiff_cache, cache, s3_key)
+#     src = await run_in_threadpool(get_cached_tiff, cache, s3_key)
 #     return src.height
 
 
-async def cog_height(cache, cog_id):
-    img, height = await run_in_threadpool(load_tiff_cache, cache, cog_id)
+def cog_height(cache, cog_id):
+    with get_cached_tiff(cache, cog_id) as image_size:
+        height = image_size[1]
     return height
 
 
-async def clip_bbox_(cache, minx, miny, maxx, maxy, cog_id):
-    img, height = await run_in_threadpool(load_tiff_cache, cache, cog_id)
+def clip_bbox_(cache, minx, miny, maxx, maxy, cog_id):
+    with get_cached_tiff(cache, cog_id) as image_size:
+        img = image_size[0]
+        height = image_size[1]
+
     box = (minx, height - maxy, maxx, height - miny)
 
     clipped_img = img.crop(box)
@@ -62,11 +65,13 @@ async def clip_bbox_(cache, minx, miny, maxx, maxy, cog_id):
     return Response(content=img_byte_arr, media_type="image/png")
 
 
-async def clip_tiff_(cache, rowb, coll, cog_id):
+def clip_tiff_(cache, rowb, coll, cog_id):
     size = 225
 
-    img, height = await run_in_threadpool(load_tiff_cache, cache, cog_id)
-    y = height - rowb
+    with get_cached_tiff(cache, cog_id) as image_size:
+        img = image_size[0]
+        height = image_size[1]
+        y = height - rowb
 
     box = (coll - (size / 2), y - (size / 2), coll + (size / 2), y + (size / 2))
     clipped_img = img.crop(box)
@@ -113,7 +118,8 @@ def project_(cache, cog_id, pro_cog_path, geo_transform, crs):
     disk_cache_path = os.path.join(app_settings.disk_cache_dir, cog_id + ".cog.tif")
     if not os.path.isfile(disk_cache_path):
         logging.info(f"File was not found on disk")
-        load_tiff_cache(cache, cog_id)
+        with get_cached_tiff(cache, cog_id):
+            logger.info(f"Added file to disk")
     else:
         logging.warning("File found on disk so we can open that")
     with rio.open(disk_cache_path) as raw:
@@ -253,7 +259,6 @@ async def post_results(files, data):
         except Exception as e:
             logging.exception(e)
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"projection not updated in cdr")
-
 
 
 def get_gcp_from_cdr(gcp_id):
@@ -470,8 +475,8 @@ def get_cog_meta(cog_id):
     return response_data
 
 
-async def get_area_extractions(cache, cog_id):
-    height = await cog_height(cache=cache, cog_id=cog_id)
+def get_area_extractions(cache, cog_id):
+    height = cog_height(cache=cache, cog_id=cog_id)
     map_areas = search_by_cog_id(app_settings.polymer_area_extractions, cog_id=cog_id)
     for area in map_areas:
         area["coordinates_from_bottom"] = inverse_geojson(area.get("coordinates"), height)

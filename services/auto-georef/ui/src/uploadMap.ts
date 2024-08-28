@@ -2,7 +2,7 @@
 function sleep(delay) { return new Promise(resolve => setTimeout(resolve, delay)); }
 
 // Vars for waiting for map processing job to finish
-const MAX_POLL_RETRIES = 25;
+const MAX_POLL_RETRIES = 60;    //
 const POLL_INTERVAL = 5 * 1000; // 5 seconds
 
 /**

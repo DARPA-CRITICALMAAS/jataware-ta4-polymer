@@ -97,6 +97,7 @@ export const initAutocomplete = async (elem, valueElem, containerElem) => {
     customize: (input_elem, rect, autocomplete_elem, max_height) => {
       autocomplete_elem.style.top = `${rect.y + rect.height - 52}px`;
       autocomplete_elem.style.left = `${rect.x - 13}px`;
+      autocomplete_elem.style["max-height"] = "15rem";
     },
     render: (suggestion, current_value) => {
       const div = document.createElement('div');

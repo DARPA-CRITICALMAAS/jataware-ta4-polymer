@@ -25,9 +25,9 @@
   </header>
 
 
-  <header class="flex items-center absolute z-10 top-3.5 right-3 flex">
+  <header class="flex items-center absolute z-10 top-[0.75rem] right-3 flex">
     <aside
-      class="flex gap-2"
+      class="gap-2 flex hidden"
       hx-get="{{template_prefix}}/map-stats"
       hx-swap="outerHTML"
       hx-trigger="load"
@@ -54,6 +54,21 @@
     </label>
   </header>
 
+  <section class="absolute top-[0.75rem] start-1/3 z-10 flex join" id="cog-id-browse">
+    <label class="input input-bordered input-sm flex items-center join-item grow no-hover rounded-md">
+      <span class="w-16">
+      Browse
+      </span>
+      <input type="text" class="grow" placeholder="Enter Map ID" />
+    </label>
+    <a href="" target="_blank" class="btn btn-sm rounded-md join-item">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+      </svg>
+      Open
+    </a>
+  </section>
+
   <form
     id="search-maps-form"
     onkeydown="return event.key != 'Enter';"
@@ -61,201 +76,239 @@
     hx-swap="innerHTML"
     hx-target="#map-results-target"
     >
-    <section class="max-w-md card gap-2 p-3 prose z-10 absolute left-3 top-14 bg-base-200 rounded-lg shadow-md">
+    <section class="max-w-md card p-3 gap-2 prose z-10 absolute left-3 top-14 bg-base-200 rounded-lg shadow-md">
       <h2 class="mb-0 card-title dark:text-base-content text-slate-800">Search Maps</h2>
 
-      <label class="input input-md input-bordered flex items-center gap-2">
-        <input
-          type="text"
-          class="dark:neutral-content grow"
-          name="search_text"
-          placeholder="Legend Text"
-          />
-        <!-- filter icon -->
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
-      </label>
-
-      <label class="form-control mb-[-0.5rem]">
-        <div class="label mt-0 py-0">
-          <h4 class="m-0 label-text text-slate">Map Scale 1:n</h4>
+      <div class="flex items-center justify-between">
+        <h4 class="prose m-0 p-0">Search Type:</h4>
+        <div role="tablist" id="search-type-selection" class="tabs bg-base-300 rounded-md">
+          <span role="tab" id="main-tab-toggler" data-tab="main" class="tab tab-active bg-primary rounded-md text-base-100">Main</span>
+          <span role="tab" id="ocr-tab-toggler" data-tab="ocr" class="tab">OCR</span>
         </div>
-
-        <div class="mx-2 px-2">
-          <input type="text" id="scale" />
-          <input type="text" name="scale_min" class="hidden" />
-          <input type="text" name="scale_max" class="hidden" />
-        </div>
-      </label>
-
-      <label class="form-control">
-        <div class="label mt-0 py-0">
-          <h4 class="m-0 label-text text-slate">Map Years</h4>
-        </div>
-
-        <div class="mx-2 px-2">
-          <input type="text" id="publish_year" />
-          <input type="text" name="publish_year_min" class="hidden" />
-          <input type="text" name="publish_year_max" class="hidden" />
-        </div>
-      </label>
-
-      <select
-        name="georeferenced_status"
-        class="select select-md select-bordered w-full max-w-xs"
-        >
-        <option selected value="">Any Georeferenced Status</option>
-        <option value="georeferenced">Georeferenced</option>
-        <option value="not_georeferenced">Not Georeferenced</option>
-        <option value="validated">Georeferenced & Validated</option>
-      </select>
-
-      <div>
-        <div class="divider my-1"></div>
-        <h4 class="my-0 label-text text-slate">Bounding Box</h4>
-
-        <div class="grid grid-cols-2 gap-1">
-          <div class="form-control">
-            <label class="label cursor-pointer flex pt-1 pb-0 justify-start gap-2">
-              <input type="radio" value="state" name="radio-bounds" class="radio radio-sm radio-accent" checked />
-              <span class="label-text">Select State</span>
-            </label>
-          </div>
-          <div class="form-control">
-            <label class="label cursor-pointer flex pt-1 pb-0 justify-start gap-2">
-              <input type="radio" value="draw" name="radio-bounds" class="radio radio-sm radio-accent" />
-              <span class="label-text">Draw on Map</span>
-            </label>
-          </div>
-
-          <div class="form-control">
-            <label class="label cursor-pointer flex pt-0 pb-1 justify-start gap-2">
-              <input type="radio" value="upload" name="radio-bounds" class="radio radio-sm radio-accent" />
-              <span class="label-text">Use Shapefile</span>
-            </label>
-          </div>
-
-          <div class="form-control">
-            <label class="label cursor-pointer flex pt-0 pb-1 justify-start gap-2">
-              <input type="radio" value="cma" name="radio-bounds" class="radio radio-sm radio-accent" />
-              <span class="label-text">Existing CMA</span>
-            </label>
-          </div>
-        </div>
-
-        <div>
-          <input
-            id="state_input"
-            class="input input-md input-bordered min-w-[16rem] my-1"
-            type="text"
-            placeholder="Enter US State"
-            />
-          <div
-            id="state-autocomplete-results"
-            class="border border-solid border-neutral/25 bg-base-100"
-            >
-          </div>
-        </div>
-
-        <label id="shapefiles-input-wrapper" class="form-control max-w-xs cursor-pointer hidden opacity-90 mt-1">
-          <div class="label flex align-center justify-start py-0">
-            <h4 class="not-prose label-text inline-block m-0 p-0 text-neutral-content">Select Shapefile (.zip)</h4>
-            <span class="hidden loading-xs text-primary ml-1 text-xs text-neutral-content">Processing...</span>
-          </div>
-          <!-- No name field as we don't send the file itself for search, only extracted polygon coords -->
-          <input
-            type='file'
-            id="shapefiles-file-input"
-            accept=".zip"
-            class="file-input file-input-bordered file-input-sm h-6 pe-0 text-xs file-input-accent" />
-        </label>
-
-        <div id="cma-filter-wrapper" class="hidden">
-          <input
-            id="cma-input"
-            class="input input-md input-bordered min-w-[16rem] my-1"
-            type="text"
-            placeholder="Enter CMA name"
-            />
-          <div
-            id="cma-autocomplete-results"
-            class="border border-solid border-slate-400 bg-base-100"
-            >
-          </div>
-        </div>
-
-        <input type="hidden" name="multi_polygons_intersect" />
-
       </div>
 
-      {# Unused and hidden while we implement on CDR search #}
-      {# <div class="mt-[-0.25rem]"> #}
-      {#   <h4 class="my-0 label-text text-slate" style="">Extracted Data</h4> #}
-      {#   <div class="grid grid-cols-2 gap-x-3 gap-y-0"> #}
-      {#     <div class="form-control"> #}
-      {#       <label class="label cursor-pointer justify-start gap-2 py-1"> #}
-      {#         <input #}
-      {#           name="features_extracted" #}
-      {#           type="checkbox" #}
-      {#           class="checkbox checkbox-xs checkbox-accent" #}
-      {#           /> #}
-      {#         <span class="label-text">Features</span> #}
-      {#       </label> #}
-      {#     </div> #}
-      {#     <div class="form-control"> #}
-      {#       <label class="label cursor-pointer justify-start gap-2 py-1"> #}
-      {#         <input #}
-      {#           name="legends_extracted" #}
-      {#           type="checkbox" class="checkbox checkbox-xs checkbox-accent" /> #}
-      {#         <span class="label-text">Legends</span> #}
-      {#       </label> #}
-      {#     </div> #}
-      {#   </div> #}
-      {# </div> #}
+      <div id="main-search" class="flex flex-col gap-2 slim:h-60 overflow-y-auto px-1">
 
-      <div class="hidden" id="rock-units-section">
-        <h4 class="label-text text-slate mt-0 mb-1">Geology Rock Units</h4>
+        <label class="input input-md input-bordered flex items-center gap-2 mt-1">
+          <input
+            type="text"
+            class="dark:neutral-content grow"
+            name="search_text"
+            placeholder="Legend Text"
+            />
+          <!-- filter icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+        </label>
+
+        <label class="form-control mb-[-0.5rem]">
+          <div class="label mt-0 py-0">
+            <h4 class="m-0 label-text text-slate">Map Scale 1:n</h4>
+          </div>
+
+          <div class="mx-2 px-2">
+            <input type="text" id="scale" />
+            <input type="text" name="scale_min" class="hidden" />
+            <input type="text" name="scale_max" class="hidden" />
+          </div>
+        </label>
+
+        <label class="form-control">
+          <div class="label mt-0 py-0">
+            <h4 class="m-0 label-text text-slate">Map Years</h4>
+          </div>
+
+          <div class="mx-2 px-2">
+            <input type="text" id="publish_year" />
+            <input type="text" name="publish_year_min" class="hidden" />
+            <input type="text" name="publish_year_max" class="hidden" />
+          </div>
+        </label>
+
+        <select
+          name="georeferenced_status"
+          class="select select-md select-bordered w-full max-w-xs"
+          >
+          <option selected value="">Any Georeferenced Status</option>
+          <option value="georeferenced">Georeferenced</option>
+          <option value="not_georeferenced">Not Georeferenced</option>
+          <option value="validated">Georeferenced & Validated</option>
+        </select>
 
         <div>
-          <ul id="selected-rock-units" class="hidden flex flex-wrap max-w-60 max-h-40 overflow-y-auto overflow-x-hidden not-prose"> </ul>
-          <input
-            id="rock-units-autocomplete"
-            class="input input-md input-bordered min-w-[16rem] mb-1"
-            type="text"
-            placeholder="Start Typing Rock Units"
-            />
-          <div
-            id="rock-units-autocomplete-results"
-            class="border border-solid border-neutral/25 bg-base-100 overflow-y-auto overflow-x-hidden"
-            >
-          </div>
-        </div>
-        <input type="hidden" name="sgmc_geology_major_1" class="sgmc_geology_input" />
-        <input type="hidden" name="sgmc_geology_major_2" class="sgmc_geology_input" />
-        <input type="hidden" name="sgmc_geology_major_3" class="sgmc_geology_input" />
-        <input type="hidden" name="sgmc_geology_minor_1" class="sgmc_geology_input" />
-        <input type="hidden" name="sgmc_geology_minor_2" class="sgmc_geology_input" />
-        <input type="hidden" name="sgmc_geology_minor_3" class="sgmc_geology_input" />
-        <input type="hidden" name="sgmc_geology_minor_4" class="sgmc_geology_input" />
-        <input type="hidden" name="sgmc_geology_minor_5" class="sgmc_geology_input" />
+          <div class="divider my-1"></div>
+          <h4 class="my-0 label-text text-slate">Bounding Box</h4>
 
+          <div class="grid grid-cols-2 gap-1">
+            <div class="form-control">
+              <label class="label cursor-pointer flex pt-1 pb-0 justify-start gap-2">
+                <input type="radio" value="state" name="radio-bounds" class="radio radio-sm radio-accent" checked />
+                <span class="label-text">Select State</span>
+              </label>
+            </div>
+            <div class="form-control">
+              <label class="label cursor-pointer flex pt-1 pb-0 justify-start gap-2">
+                <input type="radio" value="draw" name="radio-bounds" class="radio radio-sm radio-accent" />
+                <span class="label-text">Draw on Map</span>
+              </label>
+            </div>
+
+            <div class="form-control">
+              <label class="label cursor-pointer flex pt-0 pb-1 justify-start gap-2">
+                <input type="radio" value="upload" name="radio-bounds" class="radio radio-sm radio-accent" />
+                <span class="label-text">Use Shapefile</span>
+              </label>
+            </div>
+
+            <div class="form-control">
+              <label class="label cursor-pointer flex pt-0 pb-1 justify-start gap-2">
+                <input type="radio" value="cma" name="radio-bounds" class="radio radio-sm radio-accent" />
+                <span class="label-text">Existing CMA</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <input
+              id="state_input"
+              class="input input-md input-bordered min-w-[16rem] my-1"
+              type="text"
+              placeholder="Enter US State"
+              />
+            <div
+              id="state-autocomplete-results"
+              class="border border-solid border-neutral/25 bg-base-100"
+              >
+            </div>
+          </div>
+
+          <label id="shapefiles-input-wrapper" class="form-control max-w-xs cursor-pointer hidden opacity-90 mt-1">
+            <div class="label flex align-center justify-start py-0">
+              <h4 class="not-prose label-text inline-block m-0 p-0 text-neutral-content">Select Shapefile (.zip)</h4>
+              <span class="hidden loading-xs text-primary ml-1 text-xs text-neutral-content">Processing...</span>
+            </div>
+            <!-- No name field as we don't send the file itself for search, only extracted polygon coords -->
+            <input
+              type='file'
+              id="shapefiles-file-input"
+              accept=".zip"
+              class="file-input file-input-bordered file-input-sm h-6 pe-0 text-xs file-input-accent" />
+          </label>
+
+          <div id="cma-filter-wrapper" class="hidden">
+            <input
+              id="cma-input"
+              class="input input-md input-bordered min-w-[16rem] my-1"
+              type="text"
+              placeholder="Enter CMA name"
+              />
+            <div
+              id="cma-autocomplete-results"
+              class="border border-solid border-slate-400 bg-base-100 overflow-y-auto overflow-x-hidden"
+              >
+            </div>
+          </div>
+
+          <input type="hidden" name="multi_polygons_intersect" />
+
+        </div>
+
+        {# Unused and hidden while we implement on CDR search #}
+        {# <div class="mt-[-0.25rem]"> #}
+          {#   <h4 class="my-0 label-text text-slate" style="">Extracted Data</h4> #}
+          {#   <div class="grid grid-cols-2 gap-x-3 gap-y-0"> #}
+            {#     <div class="form-control"> #}
+              {#       <label class="label cursor-pointer justify-start gap-2 py-1"> #}
+                {#         <input #}
+                                  {#           name="features_extracted" #}
+                                  {#           type="checkbox" #}
+                                  {#           class="checkbox checkbox-xs checkbox-accent" #}
+                                  {#           /> #}
+                {#         <span class="label-text">Features</span> #}
+                {#       </label> #}
+              {#     </div> #}
+            {#     <div class="form-control"> #}
+              {#       <label class="label cursor-pointer justify-start gap-2 py-1"> #}
+                {#         <input #}
+                                  {#           name="legends_extracted" #}
+                                  {#           type="checkbox" class="checkbox checkbox-xs checkbox-accent" /> #}
+                {#         <span class="label-text">Legends</span> #}
+                {#       </label> #}
+              {#     </div> #}
+            {#   </div> #}
+          {# </div> #}
+
+        <div class="hidden" id="rock-units-section">
+          <h4 class="label-text text-slate mt-0 mb-1">Geology Rock Units</h4>
+          <div>
+            <ul id="selected-rock-units" class="hidden flex flex-wrap max-w-60 max-h-40 overflow-y-auto overflow-x-hidden not-prose"> </ul>
+            <input
+              id="rock-units-autocomplete"
+              class="input input-md input-bordered min-w-[16rem] mb-1"
+              type="text"
+              placeholder="Start Typing Rock Units"
+              />
+            <div
+              id="rock-units-autocomplete-results"
+              class="border border-solid border-neutral/25 bg-base-100 overflow-y-auto overflow-x-hidden"
+              >
+            </div>
+          </div>
+          <input type="hidden" name="sgmc_geology_major_1" class="sgmc_geology_input" />
+          <input type="hidden" name="sgmc_geology_major_2" class="sgmc_geology_input" />
+          <input type="hidden" name="sgmc_geology_major_3" class="sgmc_geology_input" />
+          <input type="hidden" name="sgmc_geology_minor_1" class="sgmc_geology_input" />
+          <input type="hidden" name="sgmc_geology_minor_2" class="sgmc_geology_input" />
+          <input type="hidden" name="sgmc_geology_minor_3" class="sgmc_geology_input" />
+          <input type="hidden" name="sgmc_geology_minor_4" class="sgmc_geology_input" />
+          <input type="hidden" name="sgmc_geology_minor_5" class="sgmc_geology_input" />
+        </div>
+
+      </div><!--/main-search-->
+
+      <div id="ocr-search" class="hidden min-w-[16.25rem] flex flex-col gap-2">
+          <label class="input input-md input-bordered flex items-center gap-2">
+            <input
+              type="text"
+              class="dark:neutral-content grow"
+              name="search_terms"
+              placeholder="OCR Terms"
+              />
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+          </label>
+
+          <div class="flex items-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              class="stroke-info h-6 w-6 shrink-0 mr-1">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>Use spaces to separate terms</span>
+          </div>
       </div>
 
       <button
         class="btn btn-primary hover:btn-active"
-        type="submit"
         id="submit-search-button"
         hx-disabled-elt
         >
         Search
       </button>
+
     </section> <!-- end left filters -->
 
 
     <!-- browse map results -->
     <section
       id="browse-results"
-      class="hidden flex overflow-x-hidden flex-column absolute z-10 card w-[31rem] lg:w-[60rem] right-3 top-14 h-[51rem] bg-base-200 rounded-lg shadow-md p-3"
+      class="hidden flex overflow-x-hidden flex-column absolute z-10 card left-3 sm:left-auto max-w-95vw w-[31rem] lg:w-[60rem] right-3 top-14 h-[51rem] slim:h-[33rem] bg-base-200 rounded-lg shadow-md p-3"
       >
       <div class="flex justify-between w-full items-center">
         <h2 class="m-0 card-title text-2xl dark:text-base-content text-slate-800">Map Results</h2>
@@ -279,7 +332,7 @@
       </div>
 
       <p
-        class="text-sm text-neutral-content mb-1 pr-2 dark:saturate-50 hidden"
+        class="text-sm text-base-content dark:text-neutral-content mb-1 pr-2 hidden"
         id="maps-results-count-total"
         >
         <span id="map-results-on-page"></span> <span id="maps-results-count"></span>

@@ -1,0 +1,66 @@
+<div class="tooltip tooltip-right"
+     {%if disabled%}
+       data-tip="Get projected COG & vector products when validated."
+     {%endif%}
+     >
+     <div class="join">
+       <a
+         class="btn btn-primary join-item btn-outline opacity-90
+         {%if disabled%}btn-disabled{%endif%}
+         px-2 py-0 min-h-6 h-6 rounded-sm"
+         download
+         {%if not disabled %}
+           href={{downloads["projected"]}}
+         {%endif%}
+         >
+         Download
+       </a>
+       <div
+         class="dropdown dropdown-hover rounded-sm
+         {%if disabled%}btn-disabled{%endif%}"
+         >
+         <div
+           class="btn btn-primary opacity-90
+           {%if disabled%}btn-disabled{%endif%}
+           btn-outline join-item p-1 min-h-6 h-6
+           ">
+           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+             <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+           </svg>
+         </div>
+         <ul tabindex="0" class="dropdown-content menu bg-base-100 border-primary border-solid border z-[1] w-52 p-2 shadow">
+           <li>
+             <a
+               {%if not disabled %}
+                 href={{downloads["products"]}}
+               {%endif%}
+               download
+               >
+               Get Projected Features
+           </a>
+           </li>
+
+           <li>
+             <a
+               {%if not disabled %}
+                 href={{downloads["projected"]}}
+               {%endif%}
+               download
+               >
+               Get Projected COG
+           </a>
+           </li>
+           <li>
+             <a
+               {%if not disabled %}
+               href={{downloads["cog"]}}
+               {%endif%}
+               download
+               >
+               Get Pixel-Space COG
+             </a>
+           </li>
+         </ul>
+       </div>
+     </div>
+</div>

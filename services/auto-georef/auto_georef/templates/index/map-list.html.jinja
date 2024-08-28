@@ -3,8 +3,7 @@
     {% for map in maps %}
       <div
         class="flex flex-col {%if use_maps_grid %}justify-evenly{%endif%} card bg-base-100 bg-opacity-80
-               rounded-none lg:rounded-md border border-slate-300 dark:border-neutral border-solid
-               relative py-1 px-2"
+               rounded-none lg:rounded-md border border-slate-300 dark:border-neutral border-solid py-1 px-2"
         >
         <h5
           title="{{map.cog_name}}"
@@ -42,26 +41,38 @@
           </div><!-- /map-result-data -->
         </div>
 
-        <div class="mt-1">
-          <div class="flex prose text-sm">
-            <div class="flex gap-1 mr-4">
+        <div class="flex mt-2 justify-between items-center">
+
+          <div hx-get="{{template_prefix}}/map-downloads/{{map.cog_id}}"
+               hx-swap="outerHTML"
+               hx-trigger="load"
+               hx-target="this"
+               >
+              <div class="flex inset-0 w-full">
+                <span class="loading loading-ring loading-sm"></span>
+                &nbsp;
+                <span class="text-neutral whitespace-nowrap">Preparing</span>
+              </div>
+          </div>
+
+          <div class="flex prose text-sm gap-3 pr-2 items-center">
+            <div class="flex gap-1">
               <div class="">Scale</div>
               <div class="text-base-content font-bold">
                 1:<span class="">{{map.fmt_scale}}</span>
               </div>
             </div>
-            <div class="flex gap-1 mr-4">
+            <div class="flex gap-1">
               <div class="">Year</div>
               <div class=""><span class="text-base-content font-bold">{{map.publish_year}}</span></div>
             </div>
-            <div class="flex gap-1 mr-4">
+            <div class="flex gap-1">
               <div>Source</div>
               <a class="font-bold" target="_blank" href="{{map.provider_catalog_url}}">
                 {{'ngmdb' if 'NGMDB' in map.provider_name else map.provider_name}}
               </a>
             </div>
           </div>
-          {# <span title="Publisher" class="text-sm">{{map.publisher}}</span> #}
         </div>
       </div>
     {%endfor%}

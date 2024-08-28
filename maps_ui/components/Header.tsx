@@ -20,7 +20,7 @@ import GitHubIcon from "@mui/icons-material/GitHub";
 import polymerLogo from "../assets/polymer_logo.svg?react";
 import IconButton from "@mui/material/IconButton";
 import Button from "@mui/material/Button";
-import LoadingButton from '@mui/lab/LoadingButton';
+import LoadingButton from "@mui/lab/LoadingButton";
 import Text from "@mui/material/Typography";
 import SvgIcon from "@mui/material/SvgIcon";
 
@@ -30,10 +30,13 @@ import MenuItem from "@mui/material/MenuItem";
 import AdbIcon from "@mui/icons-material/Adb";
 import Snackbar from "@mui/material/Snackbar";
 import CloseIcon from "@mui/icons-material/Close";
+import CopyIcon from "@mui/icons-material/ContentCopy";
 
+import CMASelection from "./AddToCMA";
 import { ErrorBoundary } from "react-error-boundary";
 
 import { Spinner } from "../Spinner";
+import COGDownloads from "./COGDownloads";
 import Tooltip from "./Tooltip";
 
 import "../css/header.scss";
@@ -119,6 +122,11 @@ const pages = [
     urlPath: "segment",
     external: true,
   },
+  {
+    label: "Points/Lines",
+    urlPath: "lines",
+    external: true,
+  },
 ];
 
 export default function Header({ navigate, forceLoading, cog_id }) {
@@ -158,21 +166,23 @@ export default function Header({ navigate, forceLoading, cog_id }) {
       });
     },
     onError: (e) => {
-      window.localStorage.setItem("polymer:cdr-last-process-map-result", JSON.stringify(e));
+      window.localStorage.setItem(
+        "polymer:cdr-last-process-map-result",
+        JSON.stringify(e),
+      );
     },
   });
 
   const SnackbarActions = (
-      <IconButton
-        size="small"
-        aria-label="close"
-        color="inherit"
-        onClick={submitProcessMap.reset}
-      >
-        <CloseIcon fontSize="small" />
-      </IconButton>
+    <IconButton
+      size="small"
+      aria-label="close"
+      color="inherit"
+      onClick={submitProcessMap.reset}
+    >
+      <CloseIcon fontSize="small" />
+    </IconButton>
   );
-
 
   const theme = useTheme();
   const isLargeScreen = useMediaQuery(theme.breakpoints.up("xl"));
@@ -242,7 +252,9 @@ export default function Header({ navigate, forceLoading, cog_id }) {
               {pages.map((page) => (
                 <MenuItem
                   key={page.label}
-                  onClick={page.external ? undefined : () => onNavClick(page.urlPath)}
+                  onClick={
+                    page.external ? undefined : () => onNavClick(page.urlPath)
+                  }
                   href={page.external && toV2Url(page.urlPath)}
                   component={external ? "a" : undefined}
                 >
@@ -250,6 +262,7 @@ export default function Header({ navigate, forceLoading, cog_id }) {
                 </MenuItem>
               ))}
             </Menu>
+
             <Tooltip
               title="Queue the map for processing for georeferencing and feature extraction"
               arrow
@@ -257,7 +270,9 @@ export default function Header({ navigate, forceLoading, cog_id }) {
               <LoadingButton
                 loading={submitProcessMap.isPending}
                 loadingIndicator="Queueing…"
-                onClick={() => submitProcessMap.mutate(cog_id)} variant="contained">
+                onClick={() => submitProcessMap.mutate(cog_id)}
+                variant="contained"
+              >
                 Process Map
               </LoadingButton>
             </Tooltip>
@@ -291,6 +306,10 @@ export default function Header({ navigate, forceLoading, cog_id }) {
               </li>
 
               <li>
+                <NavButton href={toV2Url("lines")}>Points/Lines</NavButton>
+              </li>
+
+              <li>
                 <Tooltip
                   title="Queue the map for processing for georeferencing and feature extraction"
                   arrow
@@ -298,7 +317,9 @@ export default function Header({ navigate, forceLoading, cog_id }) {
                   <LoadingButton
                     loading={submitProcessMap.isPending}
                     loadingIndicator="Queueing…"
-                    onClick={() => submitProcessMap.mutate(cog_id)} variant="contained">
+                    onClick={() => submitProcessMap.mutate(cog_id)}
+                    variant="contained"
+                  >
                     {isLargeScreen ? (
                       <span>Process Map</span>
                     ) : (
@@ -307,69 +328,80 @@ export default function Header({ navigate, forceLoading, cog_id }) {
                   </LoadingButton>
                 </Tooltip>
               </li>
+
+              {cog_id && (
+                <li>
+                  <COGDownloads cog_id={cog_id}/>
+                </li>
+              )}
             </ul>
           </nav>
         )}
       </div>
       <ErrorBoundary fallback={<div>...</div>}>
         <div className="right-header">
-          {cog_id && !isMobile && (
-            <Box sx={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
-              <Text
-                sx={{
-                  fontWeight: "bold",
-                  color: "text.secondary",
-                  fontSize: "0.85rem",
+          {cog_id && (
+            <CMASelection cog_id={cog_id} sx={{ maxWidth: "75%", mr: 2 }} />
+          )}
+
+          <div style={{ display: "flex" }}>
+            {cog_id && (
+              <Tooltip
+                title="Copy COG ID to Clipboard"
+                placement="bottom"
+                arrow
+              >
+                <IconButton onClick={() => copyTextToClipboard(cog_id)}>
+                  <CopyIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            <Tooltip title="Toggle theme" placement="left" arrow>
+              <IconButton
+                onClick={() => {
+                  if (mode === ThemeModes.Light) {
+                    setMode(ThemeModes.Dark);
+                  } else {
+                    setMode(ThemeModes.Light);
+                  }
                 }}
               >
-                COG
-              </Text>
-              <Tooltip title="Copy to Clipboard" placement="bottom" arrow>
-                <Chip
-                  label={cog_id}
-                  onClick={() => copyTextToClipboard(cog_id)}
-                  sx={{
-                    border: "1px solid var(--mui-palette-background-paper)",
-                    maxWidth: !isLargeScreen ? "12rem" : "unset",
-                  }}
-                />
-              </Tooltip>
-            </Box>
-          )}
-          <IconButton
-            sx={{ ml: 1 }}
-            onClick={() => {
-              if (mode === ThemeModes.Light) {
-                setMode(ThemeModes.Dark);
-              } else {
-                setMode(ThemeModes.Light);
-              }
-            }}
-          >
-            {mode === ThemeModes.Dark ? (
-              <Brightness7Icon />
-            ) : (
-              <Brightness4Icon />
-            )}
-          </IconButton>
+                {mode === ThemeModes.Dark ? (
+                  <Brightness7Icon />
+                ) : (
+                  <Brightness4Icon />
+                )}
+              </IconButton>
+            </Tooltip>
+          </div>
         </div>
       </ErrorBoundary>
 
       <Snackbar
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
-        open={!submitProcessMap.isPending && submitProcessMap.isSuccess || submitProcessMap.isError}
+        open={
+          (!submitProcessMap.isPending && submitProcessMap.isSuccess) ||
+          submitProcessMap.isError
+        }
         autoHideDuration={5000}
         onClose={submitProcessMap.reset}
       >
         <Alert
           onClose={submitProcessMap.reset}
-          severity={submitProcessMap.isSuccess ? "success" : submitProcessMap.isError ? "error" : ""}
+          severity={
+            submitProcessMap.isSuccess
+              ? "success"
+              : submitProcessMap.isError
+                ? "error"
+                : ""
+          }
           variant="filled"
-          sx={{ width: '100%' }}
+          sx={{ width: "100%" }}
         >
-          {submitProcessMap.isSuccess ?
-           "The map has been queued for georeferencing and feature extraction. Please check back later to view results."
-           : "Failed to queue map for processing."}
+          {submitProcessMap.isSuccess
+            ? "The map has been queued for georeferencing and feature extraction. Please check back later to view results."
+            : "Failed to queue map for processing."}
         </Alert>
       </Snackbar>
     </header>

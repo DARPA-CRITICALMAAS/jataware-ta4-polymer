@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from tifffile import imread as tiffread
 from transformers import SamModel, SamProcessor
 
-from auto_georef.common.tiff_cache import load_tiff_cache
+from auto_georef.common.tiff_cache import get_cached_tiff
 from auto_georef.common.utils import download_file_polymer, s3_key_exists, timeit, upload_s3_file
 from auto_georef.http.routes.cache import cache, segment_cache
 from auto_georef.settings import app_settings
@@ -37,7 +37,7 @@ class SegmentFloodFill:
     class ModelWeightsNotFoundError(IOError):
         pass
 
-    def __init__(self, cog_id, tile_size=1024):
+    def __init__(self, cog_id, *, tile_size=1024):
         logger.info("Initializing SegmentFloodFill")
 
         self.cog_id = cog_id
@@ -45,10 +45,16 @@ class SegmentFloodFill:
         self.s3_embeds_path = f"{app_settings.polymer_s3_cog_embedding_prefix}/{self.cog_id}/embeds.pt"
 
         self.image = read_cog(cog_id)
-        self.nrow, self.ncol = self.image.shape[:2]
+        logger.info(f"Image shape: {self.image.shape}")
+        self.image = normalize_image(self.image)
+        logger.info(f"Image shape: {self.image.shape}")
 
-        self.pad_image(tile_size)
+        self.nrow, self.ncol, self.nchannels = self.image.shape
+
+        self.tile_size = tile_size
+        self.pad_image()
         self.make_tiles()
+
         self.device = "mps" if torch.backends.mps.is_available() else "cpu"
         self.device = "cuda" if torch.cuda.is_available() else self.device
         self.device = torch.device(self.device)
@@ -69,19 +75,15 @@ class SegmentFloodFill:
 
         logger.info("Finished initializing SegmentFloodFill")
 
-    def pad_image(self, tile_size):
+    def pad_image(self):
         """
         Pad the image to be divisible by the tile size
         """
-        self.tile_size = tile_size
-        self.row_pad = (self.tile_size - self.nrow % self.tile_size) % self.tile_size
-        self.col_pad = (self.tile_size - self.ncol % self.tile_size) % self.tile_size
-        self.image = np.pad(
-            self.image,
-            ((0, self.row_pad), (0, self.col_pad), (0, 0)),
-            mode="constant",
-            constant_values=0,
-        )
+        self.row_pad = self.tile_size - self.nrow % self.tile_size
+        self.col_pad = self.tile_size - self.ncol % self.tile_size
+        logger.info(f"Padding image by {self.row_pad} rows and {self.col_pad} columns")
+        self.image = np.pad(self.image, ((0, self.row_pad), (0, self.col_pad), (0, 0)))
+        logger.info(f"Image shape: {self.image.shape}")
 
     def make_tiles(self):
         """
@@ -223,7 +225,7 @@ class SegmentFloodFill:
         """
         pts, lbs = {}, {}
         for i, p in enumerate(points):
-            _, (r, c), point, tile_idx = self.get_tile_point(p)
+            _, _, point, tile_idx = self.get_tile_point(p)
             if tile_idx not in pts:
                 pts[tile_idx] = []
                 lbs[tile_idx] = []
@@ -333,6 +335,13 @@ class SegmentFloodFill:
                 masks[ii][: r_end - r_start, : c_end - c_start].cpu().numpy().astype(np.uint8)
             )
 
+        # Shift the mask to center after downsampling offset
+        # TODO: This is a temporary fix for the offset issue
+        shift = 4
+        mask_out = np.roll(mask_out, shift=(-shift, -shift), axis=(0, 1))
+        mask_out[:shift, :] = 0  # Set the top 2 rows to zeros
+        mask_out[:, :shift] = 0  # Set the left 2 columns to zeros
+
         return None, mask_out  # possibly return the points / labels to display / debug
 
 
@@ -350,6 +359,7 @@ class LassoTool:
         self.crop_size = 1024
 
         self.image = read_cog(cog_id)
+        self.image = normalize_image(self.image)
 
         self.height, self.width, self.channels = self.image.shape
 
@@ -579,6 +589,22 @@ class CDRClient:
             logger.info(f"Published {features} features")
 
 
+def normalize_image(image):
+    """
+    Normalize the image to have 3 channels
+    """
+
+    # If no channels, copy the image to 3 channels
+    if image.ndim == 2:
+        image = np.stack((image,) * 3, axis=-1)
+
+    # If 1 channel, copy the channel to 3 channels
+    if image.shape[2] == 1:
+        image = np.stack((image.squeeze(axis=2),) * 3, axis=-1)
+
+    return image
+
+
 @timeit(logger)
 def quick_cog(cog_id):
     """
@@ -590,9 +616,9 @@ def quick_cog(cog_id):
 
     lasso_tool = ToolCache(cog_id).lasso
     if lasso_tool is None:
-        load_tiff_cache(cache, cog_id)
-        logger.info(f"Slow reading of COG {cog_id} from disk cache")
-        return read_cog(cog_id)
+        with get_cached_tiff(cache, cog_id):
+            logger.info(f"Slow reading of COG {cog_id} from disk cache")
+            return read_cog(cog_id)
     else:
         logger.info(f"Quick reading of COG {cog_id} from lasso tool")
         return lasso_tool.image

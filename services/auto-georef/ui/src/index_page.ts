@@ -295,9 +295,16 @@ document.getElementById("clear-search-results")
 
 
 document.getElementById('submit-search-button')
-  .addEventListener("click", () => {
+  .addEventListener("click", (e) => {
+
+    const {target} = e;
 
     document.getElementById("maps-results-count").classList.add("hidden");
+
+    if (target.dataset.mode === "ocr") {
+      document.getElementById('browse-results').classList.remove("hidden");
+      return;
+    }
 
     const form = document.getElementById("search-maps-form");
     const body = new FormData(form);
@@ -326,3 +333,45 @@ document.getElementById('submit-search-button')
   });
 
 setUpZipFileHandler();
+
+const searchTabs = document.getElementById("search-type-selection").querySelectorAll("span");
+const ocrSearchContainer = document.getElementById("ocr-search");
+const mainSearchContainer = document.getElementById("main-search");
+
+searchTabs
+  .forEach(tab => {
+    tab.addEventListener('click', evt => {
+      const selectedTab = evt.target;
+      const { tab: tabName} = evt.target.dataset;
+      const id = `${tabName}-tab-toggler`;
+      const hiddenTab = [...searchTabs].find(it => it.id !== id);
+
+      selectedTab.classList.add("tab-active", "bg-primary", "rounded-md", "text-base-100");
+      hiddenTab.classList.remove("tab-active", "bg-primary", "rounded-md", "text-base-100");
+
+      document.getElementById(`${tabName}-search`).classList.remove("hidden");
+      document.getElementById(`${hiddenTab.dataset.tab}-search`).classList.add("hidden");
+
+      const form = document.getElementById("search-maps-form");
+
+      if (tabName === "main") {
+        form.setAttribute("hx-post", form.getAttribute("hx-post").replace("search-maps-ocr", "search-maps"));
+      } else {
+        form.setAttribute("hx-post", form.getAttribute("hx-post").replace("search-maps", "search-maps-ocr"))
+      }
+
+      htmx.process(form);
+
+      document.getElementById("submit-search-button").dataset.mode = tabName;
+
+    });
+  });
+
+
+const cogIDBrowseSection = document.getElementById("cog-id-browse");
+
+cogIDBrowseSection.querySelector("input")
+  .addEventListener("change", e => {
+    const link = cogIDBrowseSection.querySelector("a");
+    link.setAttribute("href", "/points/" + e.target.value);
+  });

@@ -3,7 +3,7 @@ import itertools
 import logging
 import operator
 from logging import Logger
-from typing import Any, Iterable, Literal, TypeAlias
+from typing import Any, Callable, Iterable, Literal, TypeAlias
 
 import cv2
 import numpy as np
@@ -13,7 +13,7 @@ from cdr_schemas.features.polygon_features import (
     PolygonFeature,
     PolygonFeatureCollection,
     PolygonLegendAndFeaturesResult,
-    PolygonProperty,
+    PolygonProperties,
 )
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
@@ -23,9 +23,10 @@ from rasterio.features import shapes as rio_shapes
 from starlette.status import HTTP_204_NO_CONTENT
 
 from auto_georef.common.segment_utils import CDRClient, LassoTool, SegmentFloodFill, ToolCache, quick_cog, rgb_to_hsl
-from auto_georef.common.tiff_cache import load_tiff_cache
+from auto_georef.common.tiff_cache import get_cached_tiff
 from auto_georef.common.utils import timeit
 from auto_georef.http.routes.cache import cache
+from auto_georef.settings import app_settings
 
 logger: Logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -79,7 +80,7 @@ def check_lasso_in_cache(cog_id):
     return ToolCache(cog_id).lasso is not None
 
 
-@router.post("/embeddings_to_s3", status_code=HTTP_204_NO_CONTENT)
+@router.post("/embeddings_to_s3")
 def create_send_embeds(background_tasks: BackgroundTasks, cog_id: str, overwrite: bool = False):
     """
     Create embeddings and send to S3
@@ -90,9 +91,17 @@ def create_send_embeds(background_tasks: BackgroundTasks, cog_id: str, overwrite
         ToolCache(cog_id).segment = segment
 
     try:
-        load_tiff_cache(cache, cog_id)
+        with get_cached_tiff(cache, cog_id):
+            logger.info(f"Loaded tiff in cache")
         segment = SegmentFloodFill(cog_id)
+
+        # Save embeddings in the background
         background_tasks.add_task(save_embeds, segment)
+
+        # Estimate time to completion
+        millis_per_embed = app_settings.time_per_embedding
+        time = len(segment.tiles) * millis_per_embed / 1000 / 60
+        return {"time": time}
     except SegmentFloodFill.ModelWeightsNotFoundError:
         message = "Failed to load model weights"
         logger.exception(message)
@@ -105,7 +114,8 @@ def load_segment(cog_id: str):
     Load the segment for the specified `cog_id`
     """
     try:
-        load_tiff_cache(cache, cog_id)
+        with get_cached_tiff(cache, cog_id):
+            logger.info(f"Loaded tiff in cache")
         segment = SegmentFloodFill(cog_id)
         segment.load_embeds()
         ToolCache(cog_id).segment = segment
@@ -124,7 +134,8 @@ def load_lasso(cog_id: str):
     """
     Load the lasso tool for the specified `cog_id`
     """
-    load_tiff_cache(cache, cog_id)
+    with get_cached_tiff(cache, cog_id):
+        logger.info(f"Loaded tiff in cache")
     ToolCache(cog_id).lasso = LassoTool(cog_id)
 
 
@@ -291,7 +302,8 @@ def import_polygons(cog_id: str, system: str, version: str, max_polygons: int = 
             return None
 
     # TODO: Maybe use non-consecutive groupby without sorting for performance?
-    legend_id_key = lambda x: x[2].legend_id
+    TupleType: TypeAlias = tuple[Polygon, bool | None, LegendItemResponse | None]
+    legend_id_key: Callable[[TupleType], str] = lambda x: x[2].legend_id
     it = (
         (
             Polygon(coordinates=fix_coordinates(e.px_geojson.coordinates)),
@@ -303,7 +315,7 @@ def import_polygons(cog_id: str, system: str, version: str, max_polygons: int = 
     it = sorted(it, key=legend_id_key)
     it = itertools.groupby(it, key=legend_id_key)
 
-    def generate_multipolygon(groups: Iterable[tuple[Polygon, bool | None, LegendItemResponse | None]]):
+    def generate_multipolygon(groups: Iterable[TupleType]):
         ps: list[Polygon]
         vs: list[bool | None]
         li: LegendItemResponse | None
@@ -402,7 +414,7 @@ def upload_layers(req: UploadLayersRequest):
             coordinates = [[[x, height - y] for (x, y) in linear_rings] for linear_rings in polygon_coordinates]
             polygon = Polygon(coordinates=coordinates)
             polygon_id = hashlib.sha256(str(polygon).encode()).hexdigest()
-            properties = PolygonProperty(
+            properties = PolygonProperties(
                 model=POLYMER,
                 model_version=latest_version,
                 validated=True,

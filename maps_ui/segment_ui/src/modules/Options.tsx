@@ -51,25 +51,11 @@ const Options = ({
   const [hasImported, setHasImported] = useState<Map<string, boolean>>(new Map());
 
   const handleImport = (system: string, version: string) => async () => {
-    const loadingAlert = AlertStore.create({
-      message: `Importing polygons for ${system} ${version}...`,
-      type: "info",
-    });
-    AlertStore.show(loadingAlert);
-
     const sysver = `${system}__${version}`;
     setIsLoading(new Map(isLoading.set(sysver, true)));
     await importPolygons(system, version);
     setIsLoading(new Map(isLoading.set(sysver, false)));
     setHasImported(new Map(hasImported.set(sysver, true)));
-
-    AlertStore.close(loadingAlert.id);
-    AlertStore.show(
-      AlertStore.create({
-        message: `Finished importing polygons for ${system} ${version}.`,
-        type: "success",
-      }),
-    );
   };
 
   const [systems, setSystems] = useState<Map<string, string[]>>(new Map());
@@ -103,7 +89,14 @@ const Options = ({
   });
 
   const importPolygons = async (system: string, version: string) => {
+    const loadingAlert = AlertStore.create({
+      message: `Importing polygons for ${system} ${version}...`,
+      type: "info",
+    });
+
     try {
+      AlertStore.show(loadingAlert);
+
       const response = await fetchAPI("import_polygons", {
         method: "GET",
         query: { cog_id, system, version },
@@ -140,7 +133,17 @@ const Options = ({
         console.info(layer);
         LayerStore.setLayer(layer, true);
       }
+
+      AlertStore.close(loadingAlert.id);
+      AlertStore.show(
+        AlertStore.create({
+          message: `Finished importing polygons for ${system} ${version}.`,
+          type: "success",
+          time: 5000,
+        }),
+      );
     } catch (error) {
+      AlertStore.close(loadingAlert.id);
       AlertStore.show(
         AlertStore.create({
           message: "Error retrieving polygons from the server. Please try again later.",
@@ -185,15 +188,7 @@ const Options = ({
   const createEmbeds = async () => {
     Element.options.close();
 
-    AlertStore.show(
-      AlertStore.create({
-        message: "Creating image embeddings... Check back in a few minutes.",
-        type: "info",
-        time: 5 * 60 * 1000,
-      }),
-    );
-
-    const response = await fetchAPI("embeddings_to_s3", {
+    const response = await fetchAPI<{ time: number }>("embeddings_to_s3", {
       method: "POST",
       query: { cog_id },
     });
@@ -201,6 +196,24 @@ const Options = ({
     if (!response.ok) {
       console.error("Error creating image embeddings:", response.statusText);
     }
+
+    const { time } = await response.json();
+
+    const roundInterval = 5;
+    const roundedTime =
+      time < roundInterval
+        ? Math.max(1, Math.ceil(time))
+        : Math.ceil(time / roundInterval) * roundInterval;
+
+    const timeUnit = roundedTime === 1 ? "minute" : "minutes";
+
+    AlertStore.show(
+      AlertStore.create({
+        message: `Creating image embeddings... Check back in about ${roundedTime} ${timeUnit}.`,
+        type: "info",
+        time: 10_000,
+      }),
+    );
   };
 
   const checkEmbeds = async () => {

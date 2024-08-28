@@ -43,6 +43,7 @@ class Settings(BaseSettings):
 
     disk_cache_dir: str = "/home/apps/auto-georef/disk_cache"
     sam_model_path: str = "/home/apps/auto-georef/model_weights/sam_model_best.pth"
+    time_per_embedding: int = 10_000
 
 
 app_settings = Settings()

@@ -24,40 +24,48 @@ def populate_cache(cog_id, cache_key):
     redis_client.set(cache_key, "true", nx=True, ex=app_settings.redis_cache_timeout)
 
 
+def load(cache, cog_id):
+    cache_key = cache_prefix + ":" + cog_id
+    download_key = cache_prefix + ":" + cog_id + "_download"
+    disk_read_key = cache_prefix + ":" + cog_id + "_disk_read"
+
+    if cache.get(cog_id):
+        return
+    with redis.lock.Lock(redis=redis_client, name=download_key, blocking_timeout=120):
+        with redis.lock.Lock(redis=redis_client, name=disk_read_key, blocking_timeout=15):
+            if cache.get(cog_id):
+                return
+
+            if check_file_exists(cache_key.split(":")[1] + ".cog.tif"):
+                cache[cog_id] = load_from_disk(cog_id)
+                return
+
+            populate_cache(cog_id, cache_key)
+            cache[cog_id] = load_from_disk(cog_id)
+    return
+
+
 @contextmanager
-def get_cached_tiff(cog_id):
+def get_cached_tiff(cache, cog_id):
     logger.info(f"Checking cache: {cog_id}")
     try:
-        cache_key = cache_prefix + ":" + cog_id
-        download_key = cache_prefix + ":" + cog_id + "_download"
-        disk_read_key = cache_prefix + ":" + cog_id + "_disk_read"
+        load(cache, cog_id)
+        yield cache[cog_id]
 
-        if redis_client.getex(cache_key, ex=app_settings.redis_cache_timeout) is not None:
-            with redis.lock.Lock(redis=redis_client, name=disk_read_key, blocking_timeout=15):
-                if check_file_exists(cache_key.split(":")[1] + ".cog.tif"):
-                    yield load_from_disk(cog_id)
-        else:
-            with redis.lock.Lock(redis=redis_client, name=download_key, blocking_timeout=120):
-                if not redis_client.getex(cache_key, ex=app_settings.redis_cache_timeout):
-                    populate_cache(cog_id, cache_key)
-
-            # file is on disk now.
-            with redis.lock.Lock(redis=redis_client, name=disk_read_key, blocking_timeout=15):
-                yield load_from_disk(cog_id)
     except Exception:
         logger.exception("context manager error")
         raise
 
 
-def load_tiff_cache(cache, cog_id):
-    s3_key = f"{app_settings.cdr_s3_cog_prefix}/{cog_id}.cog.tif"
-    if s3_key in cache:
-        logger.debug("Loading image from cache: %s", s3_key)
-        return cache[s3_key]
+# def load_tiff_cache(cache, cog_id):
+#     s3_key = f"{app_settings.cdr_s3_cog_prefix}/{cog_id}.cog.tif"
+#     if s3_key in cache:
+#         logger.debug("Loading image from cache: %s", s3_key)
+#         return cache[s3_key]
 
-    with get_cached_tiff(cog_id) as src:
-        cache[s3_key] = src
-    return src
+#     with get_cached_tiff(cog_id) as src:
+#         cache[s3_key] = src
+#     return src
 
 
 def clear_disk():
