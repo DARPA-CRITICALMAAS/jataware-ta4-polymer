@@ -1,0 +1,21 @@
+<a
+  class="rounded-none {%if selected %}active{% endif %} hover:brightness-125"
+  hx-target="this"
+  hx-swap="outerHTML"
+  hx-on="click"
+  hx-post="{{template_prefix}}/cma-{%if selected %}unlink{%else%}link{%endif%}/{{cma_id}}?cog_id={{cog_id}}&mineral={{mineral}}"
+  >
+  <input
+    type="checkbox"
+    {%if selected %}
+    checked="checked"
+    {%endif%}
+    class="checkbox pointer-events-none"
+    />{{mineral}}
+    {% block javascript %}
+      <script>
+        toggleCMAInput('{{cog_id}}', '{{mineral}}', '{{selected}}');
+      </script>
+    {% endblock %}
+</a>
+

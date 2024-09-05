@@ -1,0 +1,77 @@
+<!-- bottom upload map -->
+<section class="absolute z-10 bottom-3 left-3 drop-shadow-md">
+  <div class="bg-base-200 m-auto p-3 pb-4 rounded-lg shadow-md">
+    <div class="mt-[-0.75rem]">
+      <form
+        id="upload-map-form"
+        hx-encoding="multipart/form-data"
+        data-url="{{upload_map_url|safe}}"
+        data-job_url="{{job_url|safe}}"
+        >
+        <label class="form-control w-full max-w-xs cursor-pointer">
+          <div class="label prose flex align-center justify-start">
+            <svg
+              xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+              class="size-6 text-blue-500 -rotate-45 mr-0.5 mt-[-0.25rem]"
+              >
+              <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+            </svg>
+
+            <h3 class="inline-block m-0 p-0">Upload Map to CDR</h3>
+          </div>
+          <input
+            type='file'
+            id="cdr-map-file-input"
+            name='map_file'
+            onchange="document.getElementById('map-upload-details').classList.remove('hidden'); document.getElementById('upload-title-input').focus();"
+            class="file-input file-input-bordered file-input-sm file-input-primary" />
+        </label>
+
+        <div id="map-upload-details" class="hidden">
+          <br class="br h-2"/>
+
+          <label class="input input-bordered flex items-center gap-2 input-sm">
+            Title
+            <input type="text" id="upload-title-input" placeholder="Optional Title" class="grow" />
+          </label>
+
+          <input type="hidden" name="map_data" id="map-data-input" />
+
+          <br class="br h-2"/>
+
+          <div class="flex justify-end w-full m-auto">
+            <button id="upload-cancel-button" class="btn btn-error btn-outline btn-sm">
+              Cancel
+            </button>
+            &nbsp;&nbsp;
+            <button type="button" id="upload-button" class="btn btn-outline btn-success btn-sm">
+              Upload
+            </button>
+          </div>
+        </div>
+
+      </form>
+
+      <div class="hidden" id="upload-loading">
+
+        <div class="label prose mb-0 flex align-center justify-start">
+          <svg
+            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+            class="size-6 text-blue-500 -rotate-45 mr-0.5 mt-[-0.25rem]"
+            >
+            <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+          </svg>
+
+          <h3 class="inline-block m-0 p-0">Uploading Map to CDR</h3>
+        </div>
+        <div class="flex prose">
+          <span class="loading loading-spinner loading-xs"></span>
+          &nbsp;
+          <h5 id="map-processing-message">Please stay on this page until processed.</h5>
+        </div>
+      </div>
+
+      <div id="upload-failed" class="hidden mt-1 text-red-500 dark:text-red-400"></div>
+    </div>
+  </div>
+</section><!-- end bottom controls -->

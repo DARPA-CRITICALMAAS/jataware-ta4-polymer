@@ -1,6 +1,6 @@
 import pprint
 import pytest
-from auto_georef.http.views.index import format_map_stats
+from auto_georef.http.views.index import format_map_stats, update_selected_CMAs
 
 pp = pprint.PrettyPrinter(indent=2)
 
@@ -63,3 +63,27 @@ def test_format_map_stats__projections_count():
 
     assert projection_output["total_count"] == 3, "georeference_count=3 did not result in total_count=3 for projections"
     assert projection_output["disabled"] == False, "georeference_count=3 did not result in enabled projections"
+
+
+def test_update_selected_CMAs_empty():
+    cog_meta = {}
+    cma_list = {}
+
+    update_selected_CMAs(cog_meta, cma_list)
+
+
+def test_update_selected_CMAs_base():
+    cog_meta = {
+        "cog_id": "cog-id-test-mock1",
+        "cmas": [{"mineral": "zinc-mock", "cma_id": "cma-id-mock1"}]
+    }
+    cma_list = [{"mineral": "zinc-mock", "cma_id": "cma-id-mock1"}, {"mineral": "nickel-mock", "cma_id": "cma-id-mock2"}]
+
+    out = update_selected_CMAs(cog_meta, cma_list)
+
+    # does not mutate input list
+    assert cma_list[0].get("selected") == None
+    assert cma_list[1].get("selected") == None
+
+    assert out[0].get("selected") == True
+    assert out[1].get("selected") == False

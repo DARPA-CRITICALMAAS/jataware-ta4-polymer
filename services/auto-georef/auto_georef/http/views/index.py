@@ -4,6 +4,8 @@ import logging
 from logging import Logger
 from typing import Annotated
 from urllib.parse import parse_qsl, urlencode, urlparse
+import time
+from functools import lru_cache
 
 import httpx
 from fastapi import APIRouter, Form, Request
@@ -19,6 +21,28 @@ router = APIRouter()
 auth = {
     "Authorization": app_settings.cdr_bearer_token,
 }
+
+
+def ttl_lru_cache(seconds_to_live: int, maxsize: int = 128):
+    """
+    Time aware lru caching
+    """
+    def wrapper(func):
+
+        @lru_cache(maxsize)
+        def inner(__ttl, *args, **kwargs):
+            # Note that __ttl is not passed down to func,
+            # as it's only used to trigger cache miss after some time
+            return func(*args, **kwargs)
+        return lambda *args, **kwargs: inner(time.time() // seconds_to_live, *args, **kwargs)
+    return wrapper
+
+
+@ttl_lru_cache(seconds_to_live=10)
+def get_cmas():
+    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/cmas?size=40"
+    response = httpx.get(fetch_url, headers=auth, timeout=None).raise_for_status()
+    return response.json()
 
 
 @router.get("/")
@@ -65,6 +89,7 @@ def format_map(m):
     scale.
     """
     provider_catalog_url = m["provider_url"]
+    cog_id = m["cog_id"]
 
     if m["ngmdb_prod"]:
         provider_catalog_url = f"{m['provider_url']}/Prodesc/proddesc_{m['ngmdb_prod']}.htm"
@@ -72,6 +97,7 @@ def format_map(m):
         "provider_catalog_url": provider_catalog_url,
         "fmt_scale": format_scale(m["scale"]),
         "gcp_url": f"/points/{m['cog_id']}",
+        "thumbnail": f"https://s3.amazonaws.com/public.cdr.land/cogs/thumbnails/{cog_id}_300x300.jpg",
     }
 
 
@@ -185,7 +211,7 @@ def search_maps(
                     "maps_in_page": f"{(page * page_size) + 1}-{(page + 1) * maps_count}"
                     if maps_count >= page_size
                     else f"last {maps_count}",
-                    "use_maps_grid": maps_count > 2,
+                    "use_maps_grid": maps_count > 1,
                 },
             )
         else:
@@ -433,8 +459,10 @@ def get_map_result_stats(request: Request, cog_id: str):
     )
 
 
-@router.get("/map-downloads/{cog_id}")
-def get_map_downloads(request: Request, cog_id: str):
+def get_map_downloads(cog_id: str):
+    """
+    Converted to a helper to get all downloads. Route handled under map-actions now.
+    """
     fetch_url = f"{app_settings.cdr_endpoint_url}/v1/maps/cog/projections/{cog_id}"
     s3_prefix = f"{app_settings.cdr_s3_endpoint_url}/{app_settings.cdr_public_bucket}"
 
@@ -443,20 +471,25 @@ def get_map_downloads(request: Request, cog_id: str):
     # Replaced by first status=validated projection found
     # s3_download_projected_cog = f"{s3_prefix}/12/{cog_id}.projected.cog.tif"
 
+    """
+    mock start
+    """
+    # downloads = {
+    #     "cog": s3_download_cog,
+    #     "projected": f"{s3_prefix}/12/{cog_id}.projected.cog.tif",
+    #     "products": s3_download_products,
+    # }
+    # return downloads
+    """
+    mock end
+    """
+
     projections_response = None
 
     try:
         projections_response = httpx.get(fetch_url, headers=auth, timeout=None).raise_for_status().json()
-
     except httpx.HTTPError as he:
-        return templates.TemplateResponse(
-            "index/map-result-download.html.jinja",
-            {
-                "request": request,
-                "disabled": True,
-                "template_prefix": app_settings.template_prefix,
-            },
-        )
+        return {"disabled": True}
 
     try:
         if len(projections_response) > 0:
@@ -471,25 +504,100 @@ def get_map_downloads(request: Request, cog_id: str):
                 "products": s3_download_products,
             }
 
-            return templates.TemplateResponse(
-                "index/map-result-download.html.jinja",
-                {
-                    "request": request,
-                    "downloads": downloads,
-                    "template_prefix": app_settings.template_prefix,
-                },
-            )
+            return downloads
         else:
             raise Exception("No projections detected.")
     except:
-        return templates.TemplateResponse(
-            "index/map-result-download.html.jinja",
-            {
-                "request": request,
-                "disabled": True,
-                "template_prefix": app_settings.template_prefix,
-            },
-        )
+        return {"disabled": True}
+
+
+def update_selected_CMAs(cog_meta, cmas):
+    cog_cmas = [cog_cma["cma_id"] for cog_cma in cog_meta.get("cmas", [])]
+    return list(map(
+        lambda c: c|{"selected": c["cma_id"] in cog_cmas},
+        cmas,
+    ))
+
+@router.get("/map-actions/{cog_id}")
+def get_map_actions(request: Request, cog_id: str):
+    try:
+        cmas = get_cmas()
+    except httpx.HttpError:
+        cmas = []
+
+    # returns disabled or actual download links:
+    downloads = get_map_downloads(cog_id)
+
+    cog_meta_url = f"{app_settings.cdr_endpoint_url}/v1/maps/cog/meta/{cog_id}"
+
+    cog_meta = {}
+    try:
+        cog_response = httpx.get(cog_meta_url, headers=auth, timeout=None).raise_for_status()
+        cog_meta = cog_response.json()
+    except httpx.HttpError:
+        # Ignore and return {} for now.
+        pass
+
+    all_cmas = update_selected_CMAs(cog_meta, cmas)
+    has_linked_cmas = next((cma for cma in all_cmas if cma.get("selected")), False)
+
+    linked_cmas = ""
+    if has_linked_cmas:
+        linked_cmas = ",".join([cma["mineral"] for cma in all_cmas if cma.get("selected", False)])
+        logger.info(f"linked_cmas: {linked_cmas}")
+
+    return templates.TemplateResponse(
+        "index/map-actions.html.jinja",
+        {
+            "request": request,
+            "cog_id": cog_id,
+            "downloads": downloads,
+            "cmas": all_cmas,
+            "has_linked_cmas": has_linked_cmas,
+            "linked_cmas": linked_cmas,
+            "template_prefix": app_settings.template_prefix,
+        },
+    )
+
+
+@router.post("/cma-link/{cma_id}")
+def link_cma(request: Request, cma_id, cog_id, mineral):
+    url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/link_cma_cogs"
+    data = {"cma_id": cma_id, "cog_ids": [cog_id]}
+
+    response = httpx.post(url, headers=auth, timeout=None, json=data).raise_for_status()
+
+    return templates.TemplateResponse(
+        "index/map-actions-updated-cma.html.jinja",
+        {
+            "request": request,
+            "cog_id": cog_id,
+            "selected": True,
+            "cma_id": cma_id,
+            "mineral": mineral,
+            "template_prefix": app_settings.template_prefix,
+        },
+    )
+
+
+@router.post("/cma-unlink/{cma_id}")
+def unlink_cma(request: Request, cma_id, cog_id, mineral):
+    url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/unlink_cma_cogs"
+    data = {"cma_id": cma_id, "cog_ids": [cog_id]}
+
+    response = httpx.post(url, headers=auth, timeout=None, json=data).raise_for_status()
+
+    return templates.TemplateResponse(
+        "index/map-actions-updated-cma.html.jinja",
+        {
+            "request": request,
+            "cog_id": cog_id,
+            "mineral": mineral,
+            "selected": False,
+            "cma_id": cma_id,
+            "template_prefix": app_settings.template_prefix,
+        },
+    )
 
 
 @router.get("/get-rock-units")
@@ -501,9 +609,7 @@ def get_rock_units(request: Request, major_type: str):
 
 @router.get("/cma")
 def list_cmas(request: Request):
-    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/cmas?size=40"
-    response = httpx.get(fetch_url, headers=auth, timeout=None).raise_for_status()
-    return response.json()
+    return get_cmas()
 
 
 @router.post("/search-maps-ocr")

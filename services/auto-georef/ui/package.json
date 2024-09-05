@@ -7,7 +7,7 @@
     "@tailwindcss/typography": "^0.5.14",
     "@types/geojson": "^7946.0.14",
     "@types/jest": "^29.5.12",
-    "@zip.js/zip.js": "^2.7.48",
+    "@zip.js/zip.js": "^2.7.52",
     "autocompleter": "^9.3.2",
     "daisyui": "^4.12.10",
     "htmx.org": "^1.9.12",
@@ -15,16 +15,16 @@
     "jest-environment-jsdom": "^29.7.0",
     "jest-matcher-deep-close-to": "^3.0.2",
     "node-notifier": "^10.0.1",
-    "ol": "^10.0.0",
+    "ol": "^10.1.0",
     "postcss-import": "^16.1.0",
     "prettier": "^3.3.3",
-    "proj4": "^2.11.0",
+    "proj4": "^2.12.0",
     "shapefile": "^0.6.6",
-    "tailwindcss": "^3.4.9",
+    "tailwindcss": "^3.4.10",
     "theme-change": "^2.5.0",
-    "ts-jest": "^29.2.4",
+    "ts-jest": "^29.2.5",
     "typescript": "^5.5.4",
-    "vite": "^5.4.0",
+    "vite": "^5.4.2",
     "vite-plugin-static-copy": "^1.0.6",
     "web-streams-polyfill": "^4.0.0"
   },
@@ -39,5 +39,8 @@
     "format": "prettier src --write",
     "test": "NODE_OPTIONS=--experimental-vm-modules node_modules/jest/bin/jest.js --watch"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "json5": "^2.2.3"
+  }
 }

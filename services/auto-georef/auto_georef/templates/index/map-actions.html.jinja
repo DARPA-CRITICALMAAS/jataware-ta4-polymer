@@ -1,0 +1,113 @@
+<div class="flex mt-1 justify-between items-center">
+
+  <!-- downloads -->
+  <div
+    class="tooltip tooltip-right"
+    {%if downloads['disabled']%}
+    data-tip="Downloads available for maps with validated projections."
+    {%endif%}
+    >
+    <div
+      class="dropdown dropdown-hover"
+      >
+      <div
+        class="btn btn-outline btn-sm
+               btn-primary
+               {%if downloads['disabled']%}btn-disabled{%endif%}
+               rounded-sm cursor-default"
+        >
+        Download
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+        </svg>
+      </div>
+      {%if not downloads['disabled'] %}
+      <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-sm border-primary border-solid border z-[1] w-52 p-2 shadow-md">
+        <li>
+          <a
+            class="rounded-none"
+            href={{downloads["products"]}}
+            download
+            >
+            Get Projected Features
+          </a>
+        </li>
+
+        <li>
+          <a
+            class="rounded-none"
+            href={{downloads["projected"]}}
+            download
+            >
+            Get Projected COG
+          </a>
+        </li>
+        <li>
+          <a
+            class="rounded-none"
+            href={{downloads["cog"]}}
+            download
+            >
+            Get Pixel-Space COG
+          </a>
+        </li>
+      </ul>
+      {%endif%}
+
+    </div>
+  </div>
+
+  <!-- cma -->
+  <div class="dropdown dropdown-bottom dropdown-end">
+    <label class="input input-sm m-1 input-bordered rounded-sm flex items-center gap-2">
+      <input
+        data-cog_id="{{cog_id}}"
+        tabindex="0"
+        role="button"
+        type="text"
+        class="grow cma-cog-assoc-input"
+        placeholder="CMA"
+        {%if has_linked_cmas %}
+          value="{{linked_cmas}}"
+        {%endif%}
+        />
+      <svg
+        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+        stroke-width="1.5"
+        stroke="currentColor"
+        class="size-4"
+        >
+        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+      </svg>
+    </label>
+    <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded z-[1] w-52 p-2 shadow max-h-96 border border-solid border-base-300">
+      {%for cma in cmas%}
+      <li class="cursor-pointer">
+        <a
+          class="rounded-none {%if cma.selected %}active{% endif %} hover:brightness-125 cma-toggler-link"
+          data-cog_id="{{cog_id}}"
+          hx-target="this"
+          hx-swap="outerHTML"
+          hx-on="click"
+          hx-post="{{template_prefix}}/cma-{%if cma.selected %}unlink{%else%}link{%endif%}/{{cma.cma_id}}?cog_id={{cog_id}}&mineral={{cma.mineral}}"
+          >
+          <input
+            type="checkbox"
+            {%if cma.selected %}
+            checked="checked"
+            {%endif%}
+            class="checkbox pointer-events-none"
+            />{{cma.mineral}}
+        </a>
+      </li>
+      {%endfor%}
+    </ul>
+  </div>
+
+</div>
+
+{% block javascript %}
+<script>
+  updateCMAInput("{{cog_id}}");
+</script>
+{% endblock %}

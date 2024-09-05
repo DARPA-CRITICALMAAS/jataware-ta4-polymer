@@ -1,5 +1,2 @@
-
-import { themeChange } from 'theme-change';
+import { themeChange } from "theme-change";
 themeChange();
-
-

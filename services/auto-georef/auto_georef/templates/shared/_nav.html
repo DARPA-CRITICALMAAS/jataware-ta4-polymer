@@ -47,7 +47,7 @@
   <div class="gap-4 transition-[gap] xl:gap-16 min-w-0 flex-1 justify-end">
     <div class="hidden items-center gap-2 text-sm lg:flex min-w-0">
       <script type="module">
-        import { copyTextToClipboard as copy } from "/static/js/clipboard.js";
+        import { copyTextToClipboard as copy } from "/static/js/utils/clipboard.js";
         const cogID = document.querySelector("#cog-id");
         cogID.addEventListener("click", () => copy("{{cog_id}}"));
       </script>

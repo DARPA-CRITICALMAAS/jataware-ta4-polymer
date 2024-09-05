@@ -10,7 +10,11 @@ import { Vector as VectorSource } from "ol/source";
 import { Vector as VectorLayer } from "ol/layer";
 import proj4 from "proj4";
 
-import { clearShapeOpenLayers, transformPolygonCoordinates } from "./geo";
+import {
+  clearShapeOpenLayers,
+  transformPolygonCoordinates,
+  defaultLayerStyle
+} from "./geo";
 
 /**
  * This file parses a selected .zip file from landing page shapefile input
@@ -196,7 +200,9 @@ function parseCoordinatesForOpenLayers(shapeArrays) {
   const vectorLayer = new VectorLayer({
     id: SHAPEFILE_LAYER_ID,
     source: vectorSource,
+    style: defaultLayerStyle
   });
+  vectorLayer.setZIndex(2);
   window.polymer_map.addLayer(vectorLayer);
 
   // TODO use center of coordinates, not first coordinate (corner...)
@@ -316,6 +322,7 @@ async function readZipFile(evt) {
     updateMultiPolygon(shapes);
 
   } catch(e) {
+    console.log("e", e);
     toast.querySelector("span").innerText = e.message;
     displayElemTemporarily(toast);
     multiPolygonElem.value = null;

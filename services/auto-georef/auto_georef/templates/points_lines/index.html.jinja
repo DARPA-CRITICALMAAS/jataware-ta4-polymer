@@ -10,12 +10,14 @@
   }
 </style>
 
-<div id="map"
-  class="pointer-events-auto absolute inset-0 transition-[padding-right] duration-[350ms] group-has-[#sidebar-toggle:checked]/page:pr-[--side-bar-width]">
+{% set width_with_sidebar = "transition-[padding-right] duration-[350ms]
+group-has-[#sidebar-toggle:checked]/page:pr-[--side-bar-width]" %}
+
+<div id="map" class="pointer-events-auto absolute inset-0 {{ width_with_sidebar }}">
 </div>
 
-{% call modal.modal("Welcome", "Select a Mode and System", id="session-start", closeable=false) %}
-<form id="mode-system" method="dialog">
+{% call modal.modal("Welcome", "Select a Mode and System", id="session-start") %}
+<form class="modal-form" method="dialog">
 
   {% call modal.header() %}
   <i class="fa-solid fa-hand-pointer"></i>
@@ -29,13 +31,11 @@
       <span>Viewing</span>
     </label>
 
-    <div class="tooltip" data-tip="Validation is yet implemented">
-      <label class="btn btn-ghost btn-block btn-disabled has-[:checked]:btn-active" tabindex="0">
-        <input type="radio" name="mode" value="validate" autocomplete="off" disabled class="hidden">
-        <i class="fa-solid fa-user-check"></i>
-        <span>Validating</span>
-      </label>
-    </div>
+    <label class="btn btn-ghost btn-block has-[:checked]:btn-active" tabindex="0">
+      <input type="radio" name="mode" value="validate" autocomplete="off" class="hidden">
+      <i class="fa-solid fa-user-check"></i>
+      <span>Validating</span>
+    </label>
   </div>
 
   {% call modal.header() %}
@@ -55,7 +55,7 @@
   {{ modal.header() }}
 
   <label class="btn btn-primary btn-block" tabindex="0">
-    <span class="loading loading-spinner hidden"></span>
+    <i class="loading loading-spinner hidden"></i>
     <span>Begin</span>
     <input type="submit" class="hidden">
   </label>
@@ -63,44 +63,15 @@
 </form>
 {% endcall %}
 
-<div class="pointer-events-none absolute inset-0 z-30 ml-auto flex w-fit flex-row gap-2 overflow-clip pl-[100vw]">
-  <div class="flex flex-col justify-between">
-    <div
-      class="tooltip tooltip-left my-2 size-fit transition-transform duration-[350ms] translate-x-[--side-bar-width] group-has-[#sidebar-toggle:checked]/page:translate-x-0"
-      data-tip="Toggle Groups">
-      <label class="btn btn-square swap pointer-events-auto text-lg shadow-md" tabindex="0">
-        <input type="checkbox" id="sidebar-toggle" class="hidden" autocomplete="off" />
-        <i class="fa-solid fa-layer-group swap-off fill-current"></i>
-        <i class="fa-solid fa-angles-right swap-on fill-current"></i>
-      </label>
-    </div>
-  </div>
+{% call modal.modal("Validation", "Select a Group", id="validation-start") %}
+<form class="modal-form" method="dialog">
+  <div id="group-select"></div>
+</form>
+{% endcall %}
 
-  <div class="pointer-events-auto flex h-full w-[--side-bar-width] flex-col bg-base-200 shadow-2xl
-    transition-[transform,opacity] duration-[350ms] translate-x-full opacity-0 
-    group-has-[#sidebar-toggle:checked]/page:translate-x-0 
-    group-has-[#sidebar-toggle:checked]/page:opacity-100">
-    <div class="flex items-center justify-between bg-base-300 p-4">
-      <h2 class="text-3xl font-bold">Groups</h2>
-      <div class="tooltip tooltip-left" data-tip="Visibility">
-        <label class="flex flex-row items-center justify-center gap-2">
-          <i class="fa-solid fa-eye text-2xl"></i>
-          <input type="checkbox" checked id="master-toggle" class="checkbox" />
-        </label>
-      </div>
-    </div>
-    <div id="groups"
-      class="relative flex size-full flex-col gap-3 overflow-y-auto overflow-x-hidden scroll-smooth p-4 [scrollbarGutter:'auto']">
-    </div>
-  </div>
-</div>
 
+{# Both - the action buttons #}
 <div class="absolute left-2 top-2 flex flex-col gap-2">
-  <div class="tooltip tooltip-right pointer-events-auto" data-tip="New Session">
-    <button class="btn btn-square text-lg shadow-md" id="new-session" tabindex="0">
-      <i class="fa-solid fa-rotate"></i>
-    </button>
-  </div>
 
   <div class="tooltip tooltip-right pointer-events-auto" data-tip="Hide Features (,)">
     <button class="btn btn-square swap text-lg shadow-md" id="hide-features" tabindex="0">
@@ -115,8 +86,92 @@
       <i class="fa-solid fa-eye-slash swap-on -ml-[0.055rem]"></i>
     </button>
   </div>
+
+  <div class="tooltip tooltip-right pointer-events-auto" data-tip="New Session">
+    <button class="btn btn-square text-lg shadow-md" id="new-session" tabindex="0">
+      <i class="fa-solid fa-rotate"></i>
+    </button>
+  </div>
+
+  {# Validating - switch group #}
+  <div id="switch-group" class="hidden">
+    <div class="tooltip tooltip-right pointer-events-auto" data-tip="Change Group">
+      <button class="btn btn-square text-lg shadow-md" id="new-group" tabindex="0">
+        <i class="fa-solid fa-right-left"></i>
+      </button>
+    </div>
+  </div>
+
 </div>
 
+{# Viewing - the group sidebar #}
+<div id="group-sidebar" class="hidden">
+  <div class="pointer-events-none absolute inset-0 z-30 ml-auto flex w-fit flex-row gap-2 overflow-clip pl-[100vw]">
+    <div class="flex flex-col justify-between">
+      <div
+        class="tooltip tooltip-left my-2 size-fit transition-transform duration-[350ms] translate-x-[--side-bar-width] group-has-[#sidebar-toggle:checked]/page:translate-x-0"
+        data-tip="Toggle Groups">
+        <label class="btn btn-square swap pointer-events-auto text-lg shadow-md" tabindex="0">
+          <input type="checkbox" id="sidebar-toggle" class="hidden" autocomplete="off" />
+          <i class="fa-solid fa-layer-group swap-off fill-current"></i>
+          <i class="fa-solid fa-angles-right swap-on fill-current"></i>
+        </label>
+      </div>
+    </div>
+
+    <div class="pointer-events-auto flex h-full w-[--side-bar-width] flex-col bg-base-200 shadow-2xl
+    transition-[transform,opacity] duration-[350ms] translate-x-full opacity-0 
+    group-has-[#sidebar-toggle:checked]/page:translate-x-0 
+    group-has-[#sidebar-toggle:checked]/page:opacity-100">
+      <div class="flex items-center justify-between bg-base-300 p-4">
+        <h2 class="text-3xl font-bold">Groups</h2>
+        <div class="tooltip tooltip-left" data-tip="Visibility">
+          <label class="flex flex-row items-center justify-center gap-2">
+            <i class="fa-solid fa-eye text-2xl"></i>
+            <input type="checkbox" checked id="master-toggle" class="checkbox" />
+          </label>
+        </div>
+      </div>
+      <div id="groups"
+        class="relative flex size-full flex-col gap-3 overflow-y-auto overflow-x-hidden scroll-smooth p-4 [scrollbarGutter:'auto']">
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+{# Validating - the controls #}
+<div id="validate-controls" class="hidden">
+  <div class="absolute right-2 top-2 flex flex-col gap-2">
+    <div class="flex w-96 pointer-events-auto size-fit bg-base-100 shadow-md card p-2 px-3">
+      <div class="w-full flex items-center gap-2">
+        <span class="font-semibold text-sm opacity-65">Progress</span>
+        <progress id="progress" class="progress progress-primary"></progress>
+      </div>
+    </div>
+  </div>
+  <div class="absolute inset-0 p-2 flex justify-center items-end">
+    <div class="flex w-[32.5rem] pointer-events-auto size-fit bg-base-100 shadow-md card p-2">
+      <div class="join grid grid-cols-3">
+        <button id="bad" class="btn btn-error join-item shadow-sm">
+          <i class="fa-solid fa-times"></i>
+          <span>Bad</span>
+        </button>
+        <button id="skip" class="btn btn-default join-item shadow-sm z-20">
+          <i class="fa-solid"></i>
+          <span>Undefined</span>
+        </button>
+        <button id="good" class="btn btn-success join-item shadow-sm">
+          <i class="fa-solid fa-check"></i>
+          <span>Good</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Global `polymer` object #}
 <script>
   window.polymer = {
     "cogID": "{{cog_id}}",
@@ -125,6 +180,6 @@
 </script>
 
 <script src="/static/js/label_tab_fix.js"></script>
-<script type="module" src="/static/js/points_lines_page.js"></script>
+<script type="module" src="/static/js/points-lines/index.js"></script>
 
 {% endblock %}

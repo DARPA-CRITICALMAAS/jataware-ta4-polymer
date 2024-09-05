@@ -47,6 +47,7 @@ export default {
         // Small screens, vertically
         'slim': {'raw': '(max-height: 775px)'},
         // => @media (max-height: 700px) { ... }
+        '3xl': {'raw': '(min-width: 2000px)'}
       }
     }
   },

@@ -4,6 +4,7 @@
 @import "tailwindcss/utilities";
 @import "./rSlider.css";
 @import "@fortawesome/fontawesome-free/css/all.min.css";
+@import "ol/ol.css";
 
 :root {
   font-family: Inter, system-ui, sans-serif;
@@ -61,7 +62,7 @@ html[data-theme='dark'] {
 }
 
 .abs {
-  @apply top-0 right-0 bottom-0 left-0;
+  @apply inset-0;
 }
 
 .input:hover, .select:hover, .textarea:hover {
