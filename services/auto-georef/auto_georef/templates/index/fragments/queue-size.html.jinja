@@ -1,0 +1,8 @@
+<div id="queue-size">
+  <p class="my-1 text-base-300-content dark:text-zinc-500">
+    Total Jobs in Queue: {{queue_size}}
+  </p>
+
+  <button id="reload-job-queue-button" class="hidden" hx-get="{{template_prefix}}/jobs-queue" hx-swap="outerHTML"
+    hx-trigger="click" hx-target="#queue-size"></button>
+</div>

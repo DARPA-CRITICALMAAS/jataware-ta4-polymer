@@ -179,7 +179,6 @@ def query_gpt4(prompt_text):
 
     if response.status_code == 200:
         choices = response.json()["choices"]
-        print(choices)
         first_message = choices[0]["message"]["content"]
         matches = re.findall(r"EPSG:\d+", first_message)
 
@@ -231,7 +230,6 @@ async def post_results(files, data):
         data_ = {"georef_result": data}  # Marking the part as JSON
         files_ = []
         for file_path, file_name in files:
-            print(file_path, file_name)
             files_.append(("files", (file_name, open(file_path, "rb"))))
         try:
             if len(files_) > 0:
@@ -401,21 +399,28 @@ async def send_new_legend_items_to_cdr(data):
     return
 
 
+def getMapUnits(age_texts, ages):
+    map_units = []
+
+    for age in age_texts:
+        found_age_info = getMapUnit(age, ages)
+        if found_age_info:
+            map_units.append(found_age_info)
+
+    return map_units
+
+
 # todo update to point to cdr for this data
-def getMapUnit(age_text):
+def getMapUnit(age_text, ages):
     if age_text == "":
         return None
-    map_units = httpx.get("https://macrostrat.org/api/v2/defs/intervals?all")
-    mapper = {}
-    for unit in map_units.json()["success"]["data"]:
-        mapper[unit["name"].lower()] = unit
 
-    if age_text.lower() not in mapper.keys():
+    if age_text not in ages.keys():
         return None
     return {
-        "age_text": mapper[age_text.lower()].get("name"),
-        "t_age": mapper[age_text.lower()].get("t_age", None),
-        "b_age": mapper[age_text.lower()].get("b_age", None),
+        "age_text": age_text,
+        "t_age": ages[age_text].get("max_ma", None),
+        "b_age": ages[age_text].get("min_ma", None),
     }
 
 
@@ -562,10 +567,14 @@ def ocr_bboxes(req):
 
 
 def cog_height_not_in_memory(cog_id):
+    
+    
     s3_key = f"{app_settings.cdr_s3_cog_prefix}/{cog_id}.cog.tif"
     gdal_env = {
         "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
     }
+    
+    print(f"{app_settings.cdr_s3_endpoint_url}/{app_settings.cdr_public_bucket}/{s3_key}")
 
     with rio.Env(**gdal_env) as rio_env:
         with rio.open(f"{app_settings.cdr_s3_endpoint_url}/{app_settings.cdr_public_bucket}/{s3_key}") as src:

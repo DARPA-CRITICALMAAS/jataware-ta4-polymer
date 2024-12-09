@@ -25,9 +25,9 @@ const optionIndexToKey = {
   "0": "products",
   "1": "projected",
   "2": "cog",
-}
+};
 
-export default function DownloadButton({cog_id}) {
+export default function DownloadButton({ cog_id }) {
   const [open, setOpen] = React.useState(false);
   const anchorRef = React.useRef<HTMLDivElement>(null);
 
@@ -54,9 +54,11 @@ export default function DownloadButton({cog_id}) {
       onMouseEnter={() => setOpen(!isError)}
       onMouseLeave={() => setOpen(false)}
     >
-
       <Tooltip
-        title={isError && "Downloads available for maps with validated projections only."}
+        title={
+          isError &&
+          "Downloads available for maps with validated projections only."
+        }
         arrow
       >
         <span>
@@ -64,7 +66,7 @@ export default function DownloadButton({cog_id}) {
             ref={anchorRef}
             variant="outlined"
             endIcon={<ArrowDropDownIcon />}
-            sx={{cursor: "default"}}
+            sx={{ cursor: "default" }}
             disabled={isError}
           >
             Download

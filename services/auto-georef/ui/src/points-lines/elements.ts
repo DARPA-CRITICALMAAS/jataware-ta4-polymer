@@ -85,35 +85,53 @@ export function queryAll<T extends Element = HTMLElement>(
 }
 
 export const sessionModal = query<HTMLDialogElement>("#session-start");
-export const validationModal = query<HTMLDialogElement>("#validation-start");
+export const validateModal = query<HTMLDialogElement>("#validate-start");
+export const createModal = query<HTMLDialogElement>("#create-start");
 export const sessionForm = query<HTMLFormElement>(
   sessionModal,
   "form.modal-form",
 );
-export const validationForm = query<HTMLFormElement>(
-  validationModal,
+export const validateForm = query<HTMLFormElement>(
+  validateModal,
+  "form.modal-form",
+);
+export const createForm = query<HTMLFormElement>(
+  createModal,
   "form.modal-form",
 );
 export const hideMapButton = query("#hide-map");
 export const hideFeaturesButton = query("#hide-features");
 export const newSessionButton = query("#new-session");
-export const goodButton = query<HTMLButtonElement>("#good");
-export const skipButton = query<HTMLButtonElement>("#skip");
-export const badButton = query<HTMLButtonElement>("#bad");
-export const progress = query<HTMLProgressElement>("#progress");
 export const validateControls = query("#validate-controls");
-export const switchGroup = query("#switch-group");
-
-// export const sessionModal = document.querySelector<HTMLDialogElement>("#session-start");
-// export const validationModal = document.querySelector<HTMLDialogElement>("#validation-start");
-// export const sessionForm = sessionModal.querySelector<HTMLFormElement>("form.modal-form");
-// export const validationForm = validationModal.querySelector<HTMLFormElement>("form.modal-form");
-// export const hideMapButton = document.querySelector("#hide-map");
-// export const hideFeaturesButton = document.querySelector("#hide-features");
-// export const newSessionButton = document.querySelector("#new-session");
-// export const goodButton = document.querySelector("#good");
-// export const skipButton = document.querySelector("#skip");
-// export const badButton = document.querySelector("#bad");
-// export const progress = document.querySelector<HTMLProgressElement>("#progress");
-// export const validateControls = document.querySelector("#validate-controls");
-// export const switchGroup = document.querySelector("#switch-group");
+export const createControls = query("#create-controls");
+export const validateGoodButton = query<HTMLButtonElement>(
+  validateControls,
+  "#validate-good",
+);
+export const validateMiscButton = query<HTMLButtonElement>(
+  validateControls,
+  "#validate-misc",
+);
+export const validateBadButton = query<HTMLButtonElement>(
+  validateControls,
+  "#validate-bad",
+);
+export const progress = query<HTMLProgressElement>(
+  validateControls,
+  "#progress",
+);
+export const createGoodButton = query<HTMLButtonElement>(
+  createControls,
+  "#create-good",
+);
+export const createMiscButton = query<HTMLButtonElement>(
+  createControls,
+  "#create-misc",
+);
+export const newValidateButton = query("#new-validate");
+export const newCreateButton = query("#new-create");
+export const linePattern = query("#line-pattern");
+export const linePatternSelect = query<HTMLSelectElement>(
+  linePattern,
+  "select",
+);

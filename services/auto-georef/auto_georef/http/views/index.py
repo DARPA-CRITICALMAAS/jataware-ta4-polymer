@@ -1,17 +1,19 @@
 import copy
 import json
 import logging
+import time
+from datetime import datetime
+from functools import lru_cache
 from logging import Logger
 from typing import Annotated
 from urllib.parse import parse_qsl, urlencode, urlparse
-import time
-from functools import lru_cache
 
 import httpx
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form, HTTPException, Request, status
 
 from ...settings import app_settings
 from ...templates import templates
+from .common import extraction_colors, format_map
 
 logger: Logger = logging.getLogger(__name__)
 
@@ -27,14 +29,16 @@ def ttl_lru_cache(seconds_to_live: int, maxsize: int = 128):
     """
     Time aware lru caching
     """
-    def wrapper(func):
 
+    def wrapper(func):
         @lru_cache(maxsize)
         def inner(__ttl, *args, **kwargs):
             # Note that __ttl is not passed down to func,
             # as it's only used to trigger cache miss after some time
             return func(*args, **kwargs)
+
         return lambda *args, **kwargs: inner(time.time() // seconds_to_live, *args, **kwargs)
+
     return wrapper
 
 
@@ -52,10 +56,11 @@ def index(request: Request):
         {
             "request": request,
             "upload_map_url": "/ui/upload/v1/maps/upload/map",
-            "job_url": "/ui/upload/v1/jobs/status/",
+            "job_url": f"{app_settings.template_prefix}/features/creation-job-status",
             "template_prefix": app_settings.template_prefix,
             "rock_units_uri": f"{app_settings.template_prefix}/get-rock-units",
-            "list_cmas_uri": f"{app_settings.template_prefix}/cma",
+            "list_cmas_uri": f"{app_settings.template_prefix}/list-cmas",
+            "map_by_ngmdb_id": f"{app_settings.template_prefix}/get-ngmdb",
         },
     )
 
@@ -70,46 +75,18 @@ def patch_url(url, **kwargs):
     return urlparse(url)._replace(query=urlencode(dict(parse_qsl(urlparse(url).query), **kwargs))).geturl()
 
 
-def format_scale(scale):
-    """
-    Adds metric scale to numbers. Examples:
-    2000 => 2k
-    1000000 => 1000K
-    1 => 1
-    """
-    try:
-        return "{:,.0f}".format(scale / 1000).replace(",", "") + "K"
-    except TypeError:
-        return scale
-
-
-def format_map(m):
-    """
-    Formats a map entry, for now adds the proper catalog ngmdb url and formats
-    scale.
-    """
-    provider_catalog_url = m["provider_url"]
-    cog_id = m["cog_id"]
-
-    if m["ngmdb_prod"]:
-        provider_catalog_url = f"{m['provider_url']}/Prodesc/proddesc_{m['ngmdb_prod']}.htm"
-    return m | {
-        "provider_catalog_url": provider_catalog_url,
-        "fmt_scale": format_scale(m["scale"]),
-        "gcp_url": f"/points/{m['cog_id']}",
-        "thumbnail": f"https://s3.amazonaws.com/public.cdr.land/cogs/thumbnails/{cog_id}_300x300.jpg",
-    }
-
-
 # TODO features_extracted and legends_extracted is not implemented in CDR yet, so we ignore those
 @router.post("/search-maps")
 def search_maps(
     request: Request,
     # Form data attributes (not json)
+    multi_polygons_intersect: Annotated[str, Form()] = {},
     search_text: Annotated[str, Form()] = "",
+    ocr_text: Annotated[str, Form()] = "",
     scale_min: Annotated[int, Form()] = 0,
     scale_max: Annotated[int, Form()] = 0,
-    multi_polygons_intersect: Annotated[str, Form()] = None,
+    map_name: Annotated[str, Form()] = "",
+    authors: Annotated[str, Form()] = "",
     georeferenced_status: Annotated[str, Form()] = "",
     features_extracted: Annotated[bool, Form()] = False,
     legends_extracted: Annotated[bool, Form()] = False,
@@ -139,6 +116,10 @@ def search_maps(
         "sgmc_geology_minor_3": json.loads(sgmc_geology_minor_3),
         "sgmc_geology_minor_4": json.loads(sgmc_geology_minor_4),
         "sgmc_geology_minor_5": json.loads(sgmc_geology_minor_5),
+        # Left original UI field/payload of *_text; transform to *_terms here:
+        "search_terms": search_text.split() if search_text else [],
+        "ocr_search_terms": ocr_text.split() if ocr_text else [],
+        "authors": authors.split() if authors else [],
     }
 
     match georeferenced_status:
@@ -153,17 +134,20 @@ def search_maps(
     data = {
         "publish_year_min": publish_year_min,
         "publish_year_max": publish_year_max,
-        "search_text": search_text,
         "min_lat": 0,
         "max_lat": 0,
         "min_lon": 0,
         "max_lon": 0,
         "scale_min": scale_min,
         "scale_max": scale_max,
+        "map_name": map_name,
         "page": page,
         "size": page_size,
         "count": count,
     } | formatted_params
+
+    # TODO get current year, compare to publish_year_max
+    # .    if they match, and pub_year_min=0 just dont send those
 
     if multi_polygons_intersect:
         data["multi_polygons_intersect"] = json.loads(multi_polygons_intersect)
@@ -208,6 +192,7 @@ def search_maps(
                     "prev_page_url": prev_page_url,
                     "next_page_url": next_page_url,
                     "template_prefix": app_settings.template_prefix,
+                    "maps_ui_base_url": app_settings.maps_ui_base_url,
                     "maps_in_page": f"{(page * page_size) + 1}-{(page + 1) * maps_count}"
                     if maps_count >= page_size
                     else f"last {maps_count}",
@@ -236,64 +221,98 @@ def search_maps(
         )
 
 
+@router.get("/search-one-map")
+def search_one_map(request: Request, cog_id):
+    cog_meta_url = f"{app_settings.cdr_endpoint_url}/v1/maps/cog/meta/{cog_id}"
+    cog_meta = {}
+
+    try:
+        cog_response = httpx.get(cog_meta_url, headers=auth, timeout=None).raise_for_status()
+        cog_meta = cog_response.json()
+
+        return templates.TemplateResponse(
+            "index/map-list.html.jinja",
+            {
+                "request": request,
+                "maps": map(format_map, [cog_meta]),
+                "page": 0,
+                "page_size": 1,
+                "prev_page_url": None,
+                "next_page_url": None,
+                "template_prefix": app_settings.template_prefix,
+                "maps_ui_base_url": app_settings.maps_ui_base_url,
+                "maps_in_page": f"map matching ID {cog_id[:25]}...",
+                "use_maps_grid": False,
+            },
+        )
+    except httpx.HTTPStatusError:
+        return templates.TemplateResponse(
+            "index/map-list-empty.html.jinja",
+            {
+                "request": request,
+                "template_prefix": app_settings.template_prefix,
+            },
+        )
+
+
 stat_display_data = {
-    "projection": {
+    "projections": {
         "display_title": "Projections",
         "icon": """<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" />
                       </svg>""",
-        "main_color": "red-500",
+        "main_color": extraction_colors["projections"],
         "alt_color": "orange-500",
         "link_segment": "/projections/",
         "disabled": False,
     },
-    "gcp": {
+    "gcps": {
         "display_title": "GCPs",
         "icon": """<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
                       </svg>""",
-        "main_color": "blue-500",
+        "main_color": extraction_colors["gcps"],
         "alt_color": "cyan-400",
         "link_segment": "/points/",
         "disabled": False,
     },
-    "point": {
+    "points": {
         "display_title": "Points",
         "icon": """<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672Zm-7.518-.267A8.25 8.25 0 1 1 20.25 10.5M8.288 14.212A5.25 5.25 0 1 1 17.25 10.5" />
                       </svg>""",
-        "main_color": "violet-500",
+        "main_color": extraction_colors["points"],
         "alt_color": "violet-300",
         "link_segment": "/lines/",
         "disabled": False,
     },
-    "line": {
+    "lines": {
         "display_title": "Lines",
         "icon": """<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5m.75-9 3-3 2.148 2.148A12.061 12.061 0 0 1 16.5 7.605" />
                       </svg>""",
-        "main_color": "amber-500",
+        "main_color": extraction_colors["lines"],
         "alt_color": "amber-300",
         "link_segment": "/lines/",
         "disabled": False,
     },
-    "polygon": {
+    "polygons": {
         "display_title": "Polygons",
         "icon": """<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3" />
                       </svg>""",
-        "main_color": "teal-500",
+        "main_color": extraction_colors["polygons"],
         "alt_color": "teal-400",
         "link_segment": "/segment/",
         "disabled": False,
     },
-    "legend_item": {
+    "legend_items": {
         "display_title": "Legends",
         "icon": """<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 16.875h3.375m0 0h3.375m-3.375 0V13.5m0 3.375v3.375M6 10.5h2.25a2.25 2.25 0 0 0 2.25-2.25V6a2.25 2.25 0 0 0-2.25-2.25H6A2.25 2.25 0 0 0 3.75 6v2.25A2.25 2.25 0 0 0 6 10.5Zm0 9.75h2.25A2.25 2.25 0 0 0 10.5 18v-2.25a2.25 2.25 0 0 0-2.25-2.25H6a2.25 2.25 0 0 0-2.25 2.25V18A2.25 2.25 0 0 0 6 20.25Zm9.75-9.75H18a2.25 2.25 0 0 0 2.25-2.25V6A2.25 2.25 0 0 0 18 3.75h-2.25A2.25 2.25 0 0 0 13.5 6v2.25a2.25 2.25 0 0 0 2.25 2.25Z" />
                       </svg>""",
-        "main_color": "lime-500",
+        "main_color": extraction_colors["legend_items"],
         "alt_color": "emerald-500",
         "link_segment": "/swatchannotation/",
         "disabled": False,
@@ -301,29 +320,21 @@ stat_display_data = {
 }
 
 count_data_keys = {
-    "projection": ["georeferenced_count", "validated_projection_count"],
-    "gcp": ["total_gcp_count"],
-    "point": ["total_point_count", "total_validated_point_count"],
-    "line": ["total_line_count", "total_validated_line_count"],
-    "polygon": ["total_polygon_count", "total_validated_polygon_count"],
-    "legend_item": ["total_legend_items_count", "total_validated_legend_item_count"],
-}
-
-
-available_data_keys = {
-    "projection": ["georeferenced_count", "validated_projection_count"],
-    "gcp": ["total_gcp_count"],
-    "point": ["points_exist", "validated_points_exist"],
-    "line": ["lines_exist", "validated_lines_exist"],
-    "polygon": ["polygons_exist", "validated_polygons_exist"],
-    "legend_item": ["legend_items_exist", "validated_legend_items_exist"],
+    "projections": ["georeferenced_count", "validated_projection_count"],
+    "gcps": ["total_gcp_count"],
+    "points": ["total_point_count", "total_validated_point_count"],
+    "lines": ["total_line_count", "total_validated_line_count"],
+    "polygons": ["total_polygon_count", "total_validated_polygon_count"],
+    "legend_items": ["total_legend_items_count", "total_validated_legend_item_count"],
 }
 
 
 def format_map_stats(stats_count_data, cog_id):
+    """ """
     acc = []
     for name, count_types in count_data_keys.items():
         formatted = copy.deepcopy(stat_display_data[name])
+        formatted["name"] = name
 
         if formatted["link_segment"]:
             formatted["link_url"] = f"{formatted['link_segment']}{cog_id}"
@@ -339,60 +350,6 @@ def format_map_stats(stats_count_data, cog_id):
             formatted["validated_count"] = "-"
         acc.append(formatted)
     return acc
-
-
-def format_map_stats_available(boolean_stat_data, cog_id):
-    acc = []
-    for name, count_types in available_data_keys.items():
-        formatted = stat_display_data[name]
-        formatted["link_url"] = f"{formatted['link_segment']}{cog_id}"
-        if "count" in count_types[0]:
-            formatted["total_count"] = boolean_stat_data[count_types[0]]
-        acc.append(formatted)
-    return acc
-
-
-# Unused, eventually remove..
-@router.get("/map-stats-available/{cog_id}")
-def get_map_results_stats_available(request: Request, cog_id: str):
-    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/features/{cog_id}/statistics"
-    response = httpx.get(fetch_url, headers=auth, timeout=None)
-
-    response_data = None
-
-    try:
-        if response.status_code == 200:
-            response_data = response.json()
-    finally:
-        if not response_data:
-            logger.error(f"Error loading map available statistics for cog {cog_id}")
-            response_data = {
-                "georeferenced_count": "error",
-                "validated_projection_count": "error",
-                "total_gcp_count": "error",
-                "points_exist": "error",
-                "validated_points_exist": "error",
-                "lines_exist": "error",
-                "validated_lines_exist": "error",
-                "polygons_exist": "error",
-                "validated_polygons_exist": "error",
-                "area_extraction_exist": "error",
-                "validated_area_extraction_exist": "error",
-                "legend_items_exist": "error",
-                "validated_legend_items_exist": "error",
-            }
-
-    formatted_data = format_map_stats_available(response_data, cog_id)
-
-    return templates.TemplateResponse(
-        "index/map-list-stats-available.html.jinja",
-        {
-            "request": request,
-            "stats": formatted_data,
-            "cog_id": cog_id,
-            "template_prefix": app_settings.template_prefix,
-        },
-    )
 
 
 @router.get("/map-stats")
@@ -455,13 +412,15 @@ def get_map_result_stats(request: Request, cog_id: str):
             "request": request,
             "stats": formatted_data,
             "template_prefix": app_settings.template_prefix,
+            "maps_ui_base_url": app_settings.maps_ui_base_url,
         },
     )
 
 
 def get_map_downloads(cog_id: str):
     """
-    Converted to a helper to get all downloads. Route handled under map-actions now.
+    Helper fn to get all downloads. Route /map-actions includes both downloads
+    and cma selector.
     """
     fetch_url = f"{app_settings.cdr_endpoint_url}/v1/maps/cog/projections/{cog_id}"
     s3_prefix = f"{app_settings.cdr_s3_endpoint_url}/{app_settings.cdr_public_bucket}"
@@ -488,7 +447,7 @@ def get_map_downloads(cog_id: str):
 
     try:
         projections_response = httpx.get(fetch_url, headers=auth, timeout=None).raise_for_status().json()
-    except httpx.HTTPError as he:
+    except httpx.HTTPError:
         return {"disabled": True}
 
     try:
@@ -507,22 +466,25 @@ def get_map_downloads(cog_id: str):
             return downloads
         else:
             raise Exception("No projections detected.")
-    except:
+    except:  # TODO How should we handle this? For now, silently fail and disallow downloads
         return {"disabled": True}
 
 
 def update_selected_CMAs(cog_meta, cmas):
     cog_cmas = [cog_cma["cma_id"] for cog_cma in cog_meta.get("cmas", [])]
-    return list(map(
-        lambda c: c|{"selected": c["cma_id"] in cog_cmas},
-        cmas,
-    ))
+    return list(
+        map(
+            lambda c: c | {"selected": c["cma_id"] in cog_cmas},
+            cmas,
+        )
+    )
+
 
 @router.get("/map-actions/{cog_id}")
 def get_map_actions(request: Request, cog_id: str):
     try:
         cmas = get_cmas()
-    except httpx.HttpError:
+    except httpx.HTTPError:
         cmas = []
 
     # returns disabled or actual download links:
@@ -534,7 +496,7 @@ def get_map_actions(request: Request, cog_id: str):
     try:
         cog_response = httpx.get(cog_meta_url, headers=auth, timeout=None).raise_for_status()
         cog_meta = cog_response.json()
-    except httpx.HttpError:
+    except httpx.HTTPError:
         # Ignore and return {} for now.
         pass
 
@@ -544,7 +506,6 @@ def get_map_actions(request: Request, cog_id: str):
     linked_cmas = ""
     if has_linked_cmas:
         linked_cmas = ",".join([cma["mineral"] for cma in all_cmas if cma.get("selected", False)])
-        logger.info(f"linked_cmas: {linked_cmas}")
 
     return templates.TemplateResponse(
         "index/map-actions.html.jinja",
@@ -565,19 +526,23 @@ def link_cma(request: Request, cma_id, cog_id, mineral):
     url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/link_cma_cogs"
     data = {"cma_id": cma_id, "cog_ids": [cog_id]}
 
-    response = httpx.post(url, headers=auth, timeout=None, json=data).raise_for_status()
+    try:
+        httpx.post(url, headers=auth, timeout=None, json=data).raise_for_status()
 
-    return templates.TemplateResponse(
-        "index/map-actions-updated-cma.html.jinja",
-        {
-            "request": request,
-            "cog_id": cog_id,
-            "selected": True,
-            "cma_id": cma_id,
-            "mineral": mineral,
-            "template_prefix": app_settings.template_prefix,
-        },
-    )
+        return templates.TemplateResponse(
+            "index/map-actions-updated-cma.html.jinja",
+            {
+                "request": request,
+                "cog_id": cog_id,
+                "selected": True,
+                "cma_id": cma_id,
+                "mineral": mineral,
+                "template_prefix": app_settings.template_prefix,
+            },
+        )
+    except httpx.HTTPError as he:
+        if he.response.status_code == 500:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown map id.")
 
 
 @router.post("/cma-unlink/{cma_id}")
@@ -585,19 +550,125 @@ def unlink_cma(request: Request, cma_id, cog_id, mineral):
     url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/unlink_cma_cogs"
     data = {"cma_id": cma_id, "cog_ids": [cog_id]}
 
-    response = httpx.post(url, headers=auth, timeout=None, json=data).raise_for_status()
+    try:
+        httpx.post(url, headers=auth, timeout=None, json=data).raise_for_status()
+
+        return templates.TemplateResponse(
+            "index/map-actions-updated-cma.html.jinja",
+            {
+                "request": request,
+                "cog_id": cog_id,
+                "mineral": mineral,
+                "selected": False,
+                "cma_id": cma_id,
+                "template_prefix": app_settings.template_prefix,
+            },
+        )
+    except httpx.HTTPError as he:
+        if he.response.status_code == 500:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown map id.")
+
+
+@router.get("/map-process-status/{cog_id}")
+def get_map_process_status(request: Request, cog_id):
+    """
+    Retrieves if map has been fired before. Is so, returns template with
+    checked mark + time when map was last processed. Else returns an empty check
+    and a tooltip to inform user that checking it will process map.
+    """
+    url = f"{app_settings.cdr_endpoint_url}/v1/maps/fired_cog?cog_id={cog_id}"
+
+    response = httpx.get(url, headers=auth, timeout=None)
+
+    completed_on = None
+    message = None
+    pending = None
+
+    if response.status_code == 200:
+        event_data = response.json()
+        idx = len(event_data) - 1
+        if "timestamp" in event_data[idx]:
+            completed_on = event_data[idx]["timestamp"]
+            completed_on = completed_on[:26]  # ignore extra msecs decimals...
+            dt = datetime.strptime(completed_on, "%Y-%m-%dT%H:%M:%S.%f")
+            completed_on = datetime.strftime(dt, "Map processed %Y-%m-%d %I:%M%p UTC")
+        else:
+            message = "Map is queued for processing."
+            pending = True
+    elif response.status_code == 400:
+        # Map has not been processed before, we get 400
+        #   and inform user that checking box queues the map:
+        message = "Select to start processing map."
+    else:
+        message = "Server failed to fetch information."
 
     return templates.TemplateResponse(
-        "index/map-actions-updated-cma.html.jinja",
+        "index/fragments/fired-map-status.html.jinja",
         {
             "request": request,
-            "cog_id": cog_id,
-            "mineral": mineral,
-            "selected": False,
-            "cma_id": cma_id,
             "template_prefix": app_settings.template_prefix,
+            "completed_on": completed_on,
+            "message": message,
+            "cog_id": cog_id,
+            "pending": pending,
         },
     )
+
+
+@router.post("/process-map/{cog_id}")
+def process_fire_map(request: Request, cog_id):
+    """
+    Returns result template if queuing a map for processing is successful.
+    """
+    url = f"{app_settings.cdr_endpoint_url}/v1/maps/fire/{cog_id}"
+
+    response = httpx.post(url, headers=auth, timeout=None)
+
+    message = None
+    completed_on = None
+    pending = False
+
+    if response.status_code == 200:
+        message = "Map is queued for processing."
+        pending = True
+    elif response.status_code == 400:
+        message = "Cog not found."
+    else:
+        message = "A server error ocurred."
+
+    return templates.TemplateResponse(
+        "index/fragments/fired-map-status.html.jinja",
+        {
+            "request": request,
+            "template_prefix": app_settings.template_prefix,
+            "completed_on": completed_on,
+            "message": message,
+            "pending": pending,
+            "cog_id": cog_id,
+         },
+    )
+
+
+@router.get("/jobs-queue")
+def jobs_queue(request: Request):
+    url = f"{app_settings.cdr_endpoint_url}/v1/jobs/q/size"
+    response = httpx.get(url, headers=auth, timeout=None).raise_for_status()
+    data = response.json()
+    queue_size = data["size"]
+
+    return templates.TemplateResponse(
+        "index/fragments/queue-size.html.jinja",
+        {
+            "request": request, 
+            "queue_size": queue_size
+         },
+    )
+
+
+###############################################################################
+#         Non-htmx,jinja-template Responses
+#         TODO possibly move to ../routes
+###############################################################################
 
 
 @router.get("/get-rock-units")
@@ -607,78 +678,23 @@ def get_rock_units(request: Request, major_type: str):
     return response.json()
 
 
-@router.get("/cma")
+@router.get("/list-cmas")
 def list_cmas(request: Request):
     return get_cmas()
 
 
-@router.post("/search-maps-ocr")
-def search_maps_ocr(
-    request: Request,
-    # Form data attributes (not json)
-    search_terms: Annotated[str, Form()] = "",
-    # query params
-    page: int = 0,
-    page_size: int = 20,
-):
-    url = app_settings.cdr_endpoint_url + "/v1/maps/search/ocr"
+@router.get("/get-ngmdb/{product_id}")
+def get_map_by_ngmdb_id(request: Request, product_id):
+    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/maps/ngmdb/{product_id}"
 
-    data = {
-        "search_terms": search_terms.split(" "),
-        "cogs_only": True,
-        "page": page,
-        "size": page_size,
-    }
+    response = None
 
-    response = httpx.post(url, json=data, headers=auth, timeout=None)
-
-    if response.status_code == 200:
-        response_data = response.json()
-
-        prev_page_url = False
-        next_page_url = False
-
-        if page > 0:
-            prev_page_url = patch_url(app_settings.template_prefix + "/search-maps-ocr", page=page - 1)
-        if len(response_data) >= page_size:
-            next_page_url = patch_url(app_settings.template_prefix + "/search-maps-ocr", page=page + 1)
-
-        if len(response_data) > 0:
-            maps_count = len(response_data)
-
-            return templates.TemplateResponse(
-                "index/map-list.html.jinja",
-                {
-                    "request": request,
-                    "maps": map(format_map, response_data),
-                    "page": page,
-                    "page_size": page_size,
-                    "prev_page_url": prev_page_url,
-                    "next_page_url": next_page_url,
-                    "template_prefix": app_settings.template_prefix,
-                    "maps_in_page": f"{(page * page_size) + 1}-{(page + 1) * maps_count}"
-                    if maps_count >= page_size
-                    else f"last {maps_count}",
-                    "use_maps_grid": maps_count > 2,
-                },
-            )
+    try:
+        response = httpx.get(fetch_url, headers=auth, timeout=None).raise_for_status()
+    except httpx.HTTPError as he:
+        if he.response.status_code == 500:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please enter numbers only.")
         else:
-            return templates.TemplateResponse(
-                "index/map-list-empty.html.jinja",
-                {
-                    "request": request,
-                    "template_prefix": app_settings.template_prefix,
-                    "page": page,
-                    "prev_page_url": prev_page_url,
-                    "next_page_url": next_page_url,
-                },
-            )
-    else:
-        return templates.TemplateResponse(
-            "index/map-list-error.html.jinja",
-            {
-                "request": request,
-                "template_prefix": app_settings.template_prefix,
-                "error_details": f"Status returned by CDR: {response.status_code}.",
-            },
-        )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(he))
+
+    return response.json()

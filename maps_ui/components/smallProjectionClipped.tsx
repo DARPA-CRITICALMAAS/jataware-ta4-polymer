@@ -16,11 +16,9 @@ import View from "ol/View";
 import { transformExtent, get as getProjection } from "ol/proj";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Switch from "@mui/material/Switch";
+import { useConfig } from '../ConfigContext';
 
-const CDR_COG_URL = import.meta.env.VITE_CDR_COG_URL;
-const CDR_PUBLIC_BUCKET = import.meta.env.VITE_CDR_PUBLIC_BUCKET;
-const CDR_S3_COG_PREFEX = import.meta.env.VITE_CDR_S3_COG_PREFEX;
-const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
+// const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
 function SmallProjectionClipped({
   cog_id,
@@ -30,6 +28,8 @@ function SmallProjectionClipped({
   parentBaseMap,
   crs_names,
 }) {
+  const config = useConfig();
+
   let bbox = clippedState["clipExentRef"];
   let center = clippedState["clippedCenter"];
   let sourceProjection = clippedState["clippedProjection"];
@@ -42,7 +42,7 @@ function SmallProjectionClipped({
   const map_source = new GeoTIFF({
     sources: [
       {
-        url: determineMapSourceURL(proj_info, cog_id),
+        url: determineMapSourceURL(proj_info, cog_id, config),
         nodata: -1,
       },
     ],
@@ -58,7 +58,7 @@ function SmallProjectionClipped({
   // --
   const base_source = new XYZ({
     // projection: mapData['proj_info'][proj_index.current]['epsg_code'],
-    url: `https://api.maptiler.com/tiles/satellite/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
+    url: `https://api.maptiler.com/tiles/satellite/{z}/{x}/{y}.jpg?key=${config.MAPTILER_KEY}`,
     crossOrigin: "",
   });
 

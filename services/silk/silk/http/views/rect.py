@@ -441,7 +441,7 @@ async def poll_job(request: Request, job_id):
             return HTMLResponse(status_code=status.HTTP_200_OK, content=job_failed)
         case "success":
             map_id = dget(data, "result.map_id") or dget(data, "result.Ingested")
-            georef_link = f"""<a target="_blank" class="link link-primary text-sm" href="https://maps.polymer.rocks/points/{map_id}">View Georeferenced</a>"""  # noqa: E501
+            georef_link = f"""<a target="_blank" class="link link-primary text-sm" href="https://maps.{app_settings.polymer_internal_domain}/points/{map_id}">View Georeferenced</a>"""  # noqa: E501
             return HTMLResponse(status_code=status.HTTP_200_OK, content=georef_link)
 
     logger.debug("still waiting on job: %s", job_id)

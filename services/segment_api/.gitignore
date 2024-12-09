@@ -1,0 +1,3 @@
+disk_cache/*.tif
+disk_cache/*.pt
+model_weights/*.pth

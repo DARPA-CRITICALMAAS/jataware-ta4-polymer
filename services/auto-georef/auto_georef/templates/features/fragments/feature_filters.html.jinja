@@ -1,0 +1,44 @@
+<div
+    class="feature-filters gap-3 flex justify-evenly items-start border border-solid border-base-300 dark:border-none dark:bg-base-300 py-1 my-1 rounded hidden">
+    <div class="prose flex-[2]">
+        <div class="form-control px-1" id="search-terms-form-{{feature_type}}">
+            <div class="label my-0 py-0">
+                <span class="label-text font-semibold my-0 py-0">Search Terms</span>
+                <div class="tooltip tooltip-bottom tooltip-accent" data-tip="Use spaces to match multiple terms per layer. Insert * to match all features.">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                        stroke="currentColor" class="size-5">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+                    </svg>
+                </div>
+            </div>
+            <div class="flex justify-between items-center gap-2" data-feature="{{feature_type}}">
+                <input type="text" 
+                class="search-term-input input input-sm w-full input-bordered my-1"
+                 placeholder="Terms" 
+                />
+                <button class="btn btn-sm btn-accent opacity-95 btn-outline font-bold add-search-term-button btn-disabled">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                        stroke="currentColor" class="size-3">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    Add
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <label class="form-control mb-1" for="validated_selection_{{feature_type}}">
+            <div class="label my-0 pt-0 pb-1">
+                <span class="label-text my-0 font-semibold">Validation Status</span>
+            </div>
+            <select class="select select-sm select-bordered my-0" id="validated_selection_{{feature_type}}">
+                <option value="" selected>Any</option>
+                <option value="true">Validated</option>
+                <option value="false">Pending</option>
+            </select>
+        </label>
+    </div>
+
+</div>

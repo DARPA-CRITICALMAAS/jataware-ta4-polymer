@@ -592,7 +592,7 @@ def png_thumb(request: Request, doc_id: str, page1: int, term: str = "", blocks:
 def doc_info(request: Request, doc_id: str):
     token = app_settings.cdr_api_key
     headers = {"Authorization": f"Bearer {token}"}
-    url = f"https://api.cdr.land/v1/docs/document/meta/{doc_id}"
+    url = f"{app_settings.cdr_api_host}/v1/docs/document/meta/{doc_id}"
     res = httpx.get(url, headers=headers, timeout=None)
     res.raise_for_status()
     doc = res.json()
@@ -644,7 +644,7 @@ def doc_info_metadata(
 
     token = app_settings.cdr_api_key
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    url = f"https://api.cdr.land/v1/docs/documents/meta/{doc_id}"
+    url = f"{app_settings.cdr_api_host}/v1/docs/documents/meta/{doc_id}"
 
     logger.debug(meta.model_dump(exclude_none=True))
 
@@ -668,7 +668,7 @@ def doc_info_add_provenance(
 ):
     token = app_settings.cdr_api_key
     headers = {"Authorization": f"Bearer {token}"}
-    cdrurl = f"https://api.cdr.land/v1/docs/documents/provenance/{doc_id}"
+    cdrurl = f"{app_settings.cdr_api_host}/v1/docs/documents/provenance/{doc_id}"
 
     name = provname.strip()
     id = provid.strip()

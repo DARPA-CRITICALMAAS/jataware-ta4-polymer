@@ -9,6 +9,8 @@
 
 <script>
   console.log("groups.html.jinja");
+  window.polymer.system = "{{ system }}";
+  window.polymer.version = "{{ version }}";
   window.polymer.rawFeatures = {{ features | tojson }};
 </script>
 <script src="/static/js/label_tab_fix.js"></script>

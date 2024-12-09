@@ -39,6 +39,7 @@ export interface GlobalObject {
   labelState: "off" | "waiting";
   labelPoints: LabelPoint[];
   selectedFeatures: Set<Feature>;
+  lassoTimestamp: number;
   lassoState: "waiting" | "off" | "active";
   lassoStartCoordinate: Coordinate | null;
   lassoPoints: LassoPoint[];

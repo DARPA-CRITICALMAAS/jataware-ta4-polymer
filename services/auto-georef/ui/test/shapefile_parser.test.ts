@@ -2,7 +2,7 @@ import "web-streams-polyfill/polyfill";
 import { toBeDeepCloseTo,toMatchCloseTo } from 'jest-matcher-deep-close-to';
 expect.extend({toBeDeepCloseTo, toMatchCloseTo});
 
-import { parseShapeCoordinates } from "../src/shapefile_parser";
+import { parseShapeCoordinates } from "../src/index/shapefile_parser";
 
 const cdrDefaultProjection = "EPSG:4326";
 

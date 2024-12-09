@@ -11,9 +11,12 @@ import ProjectionViewer from "./projectionViewer.jsx";
 import MapExtractionWrapper from "./MapExtractionWrapper";
 import Landing from "./landing.tsx";
 import SwatchAnnotationPage from "./components/swatchAnnotation.tsx";
+import AreaExtractionsComponent from "./components/areaExtractions.tsx";
 import NotFound from "./NotFoundPage";
 
 import { theme } from "./theme";
+
+import { ConfigProvider } from "./ConfigContext";
 
 import "./app.css";
 
@@ -38,6 +41,11 @@ const router = createBrowserRouter([
     element: <SwatchAnnotationPage />,
     errorElement: <NotFound />,
   },
+  {
+    path: "/areas/:cog_id",
+    element: <AreaExtractionsComponent />,
+    errorElement: <NotFound />,
+  },
 ]);
 
 const queryClient = new QueryClient({
@@ -60,8 +68,10 @@ const App = () => {
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 root.render(
-  <QueryClientProvider client={queryClient}>
-    <App />
-    <ReactQueryDevtools initialIsOpen={false} />
-  </QueryClientProvider>,
+  <ConfigProvider>
+    <QueryClientProvider client={queryClient}>
+      <App />
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
+  </ConfigProvider>,
 );

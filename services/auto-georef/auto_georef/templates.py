@@ -34,6 +34,10 @@ def human_delta(t: datetime):
     return naturaldelta(delta, minimum_unit="milliseconds")
 
 
+def snake_to_title(snake_str):
+    return snake_str.replace("_", " ").title()
+
+
 funcs = {
     "dget": dget,
     "some": some,
@@ -45,4 +49,6 @@ funcs = {
 
 templates = Jinja2Templates(directory=app_settings.ui_templates_dir)
 templates.env.globals.update(funcs)
+templates.env.globals["MTK"] = app_settings.maptiler_key
 templates.env.filters["jsonify"] = json.dumps
+templates.env.filters["snake_to_title"] = snake_to_title

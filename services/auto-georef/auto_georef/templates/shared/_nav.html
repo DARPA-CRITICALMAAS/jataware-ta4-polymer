@@ -8,9 +8,9 @@
   }
 </style>
 <div
-  class="navbar pointer-events-auto relative z-40 flex w-screen flex-row justify-between bg-base-200 shadow-md gap-8 transition-[gap] xl:gap-16"
+  class="navbar pointer-events-auto relative z-40 flex w-screen flex-row justify-between bg-base-200 shadow-md gap-8 transition-[gap] 2xl:gap-16"
 >
-  <div class="gap-4 transition-[gap] xl:gap-16">
+  <div class="gap-4 transition-[gap] 2xl:gap-16">
     <a
       href="/"
       class="btn btn-ghost text-3xl gap-2 w-fit p-1 place-content-center"
@@ -21,35 +21,92 @@
       <h1>Polymer</h1>
     </a>
     <div class="flex gap-2">
-      <a href="/points/{{cog_id}}" class="btn btn-ghost">
+      <div class="dropdown dropdown-hover lg:hidden">
+        <div role="button" class="btn btn-ghost">
+          <i class="fa-solid fa-map"></i>
+          <span>Map</span>
+          <i class="fa-solid fa-chevron-down"></i>
+        </div>
+        <ul
+          tabindex="0"
+          class="dropdown-content menu bg-base-100 rounded-box z-10 w-48 p-2 shadow gap-2"
+        >
+          <a href="/points/{{cog_id}}" class="btn btn-ghost">
+            <i class="fa-solid fa-map-pin"></i>
+            <span>Map GCPs</span>
+          </a>
+          <a href="/projections/{{cog_id}}" class="btn btn-ghost">
+            <i class="fa-solid fa-earth-americas"></i>
+            <span>Projections</span>
+          </a>
+          <a href="/areas/{{cog_id}}" class="btn btn-ghost">
+            <i class="fa-solid fa-chart-area"></i>
+            <span>Areas</span>
+          </a>
+        </ul>
+      </div>
+      <a href="/points/{{cog_id}}" class="hidden lg:btn lg:btn-ghost">
         <i class="fa-solid fa-map-pin"></i>
         <span>Map GCPs</span>
       </a>
-      <a href="/projections/{{cog_id}}" class="btn btn-ghost">
+      <a href="/projections/{{cog_id}}" class="hidden lg:btn lg:btn-ghost">
         <i class="fa-solid fa-earth-americas"></i>
         <span>Projections</span>
       </a>
-      <a href="/swatchannotation/{{cog_id}}" class="btn btn-ghost">
+      <a href="/areas/{{cog_id}}" class="hidden lg:btn lg:btn-ghost">
+        <i class="fa-solid fa-chart-area"></i>
+        <span>Areas</span>
+      </a>
+      <div class="dropdown dropdown-hover xl:hidden">
+        <div role="button" class="btn btn-ghost">
+          <i class="fa-solid fa-shapes"></i>
+          <span>Features</span>
+          <i class="fa-solid fa-chevron-down"></i>
+        </div>
+        <ul
+          tabindex="0"
+          class="dropdown-content menu bg-base-100 rounded-box z-10 w-48 p-2 shadow gap-2"
+        >
+          <a href="/swatchannotation/{{cog_id}}" class="btn btn-ghost">
+            <i class="fa-solid fa-list"></i>
+            <span>Legends</span>
+          </a>
+          <a href="/lines/{{cog_id}}" class="btn btn-ghost">
+            <i class="fa-solid fa-arrow-trend-up"></i>
+            <span>Points & Lines</span>
+          </a>
+          <a href="/segment/{{cog_id}}" class="btn btn-ghost">
+            <i class="fa-solid fa-shapes"></i>
+            <span>Polygons</span>
+          </a>
+        </ul>
+      </div>
+      <a href="/swatchannotation/{{cog_id}}" class="hidden xl:btn xl:btn-ghost">
         <i class="fa-solid fa-list"></i>
         <span>Legends</span>
       </a>
-      <a href="/lines/{{cog_id}}" class="btn btn-ghost">
+      <a href="/lines/{{cog_id}}" class="hidden xl:btn xl:btn-ghost">
         <i class="fa-solid fa-arrow-trend-up"></i>
         <span>Points & Lines</span>
       </a>
-      <a href="/segment/{{cog_id}}" class="btn btn-ghost">
+      <a href="/segment/{{cog_id}}" class="hidden xl:btn xl:btn-ghost">
         <i class="fa-solid fa-shapes"></i>
         <span>Polygons</span>
       </a>
     </div>
   </div>
 
-  <div class="gap-4 transition-[gap] xl:gap-16 min-w-0 flex-1 justify-end">
-    <div class="hidden items-center gap-2 text-sm lg:flex min-w-0">
+  <div
+    class="gap-2 transition-[gap] sm:gap-4 2xl:gap-16 min-w-0 flex-1 justify-end"
+  >
+    <div class="hidden items-center gap-2 text-sm sm:flex min-w-0">
       <script type="module">
         import { copyTextToClipboard as copy } from "/static/js/utils/clipboard.js";
         const cogID = document.querySelector("#cog-id");
         cogID.addEventListener("click", () => copy("{{cog_id}}"));
+
+        const cogIDAlt = document.querySelector("#cog-id-alt");
+        cogIDAlt.addEventListener("click", () => copy("{{cog_id}}"));
       </script>
       <h2 class="font-semibold uppercase opacity-65">COG</h2>
 
@@ -67,6 +124,15 @@
     </div>
 
     <div
+      class="tooltip tooltip-bottom sm:hidden pointer-events-auto cursor-pointer before:-translate-x-[66%]"
+      data-tip="Copy COG ID to Clipboard"
+    >
+      <button class="btn btn-square btn-ghost text-lg" id="cog-id-alt">
+        <i class="fa-solid fa-copy"></i>
+      </button>
+    </div>
+
+    <div
       class="tooltip tooltip-bottom pointer-events-auto before:-translate-x-[79%]"
       data-tip="Change Theme"
     >
@@ -80,7 +146,7 @@
         <button class="btn btn-square btn-ghost text-lg" data-set-theme="dark">
           <i class="fa-solid fa-paint-roller"></i>
           <i
-            class="fa-solid fa-user-gear absolute text-xs translate-x-3/4 translate-y-3/4"
+            class="fa-solid fa-computer absolute text-xs translate-x-[75%] translate-y-[90%] text-stroke-ghost-button"
           ></i>
         </button>
       </div>

@@ -1,5 +1,5 @@
 <a
-  class="rounded-none {%if selected %}active{% endif %} hover:brightness-125"
+  class="rounded-none {%if selected %}active{% endif %} hover:brightness-125 skip-link no-underline"
   hx-target="this"
   hx-swap="outerHTML"
   hx-on="click"
@@ -15,6 +15,14 @@
     {% block javascript %}
       <script>
         toggleCMAInput('{{cog_id}}', '{{mineral}}', '{{selected}}');
+
+        {% if not selected %}
+            if (window.parent_cma_id && window.parent_cma_id === "{{cma_id}}") {
+              const parentCard = document.querySelector(".cog-result-card[data-cog_id='{{cog_id}}']");
+              parentCard.classList.add("hidden");
+          }
+        {% endif %}
+
       </script>
     {% endblock %}
 </a>

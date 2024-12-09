@@ -1,15 +1,21 @@
 import copy
+import json
 import logging
+import os
+import tempfile
 from enum import Enum
 from logging import Logger
 from typing import Any, List, Optional, Union
 
 import httpx
 import pyproj
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from cdr_schemas.feature_results import FeatureResults
+from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
 from PIL import Image
 from pydantic import BaseModel, Field
+from pyproj import CRS
+from shapely.geometry import shape
 from starlette.status import HTTP_200_OK
 
 from auto_georef.common.generate_ids import generate_legend_id, generate_map_area_id
@@ -18,12 +24,11 @@ from auto_georef.common.map_utils import (
     clip_tiff_,
     cog_height,
     cog_height_not_in_memory,
-    get_area_extractions,
     get_cdr_gcps,
     get_cog_meta,
     get_projections_from_cdr,
     get_projections_from_polymer,
-    getMapUnit,
+    getMapUnits,
     inverse_bbox,
     inverse_geojson,
     ocr_bboxes,
@@ -31,6 +36,16 @@ from auto_georef.common.map_utils import (
     query_gpt4,
     send_georef_to_cdr,
     send_new_legend_items_to_cdr,
+)
+from auto_georef.common.shapefile_extraction import (
+    get_transform,
+    load_shapefiles,
+    prepare_line_data,
+    prepare_point_data,
+    prepare_polygon_data,
+    required_column_names,
+    unzip_file,
+    walk_shp_prj_files,
 )
 from auto_georef.common.tiff_cache import get_cached_tiff
 from auto_georef.es import (
@@ -164,7 +179,31 @@ def get_map_download_links(cog_id: str):
                 "products": s3_download_products,
             }
 
-    raise HTTPException(status_code=404, detail={"error": "No downloads available because there are no validated projections."})
+    raise HTTPException(
+        status_code=404, detail={"error": "No downloads available because there are no validated projections."}
+    )
+
+
+@router.post("/{cog_id}/georeference-features")
+def georeference_features_refresh(cog_id: str):
+    url = f"{app_settings.cdr_endpoint_url}/v1/georeference/refresh"
+    response = httpx.post(url, headers=auth, timeout=None, json={"cog_id": cog_id})
+
+    if response.status_code == 200:
+        response_data = response.json()
+        return response_data
+    else:
+        try:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=response.json() # {job_id: ""}
+            )
+        except Exception as e:
+            logger.error(f"Failed to parse georeferce features error as json, returning as text...: {type(e)}")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=response.text
+            )
 
 
 @router.get("/{cog_id}/legend_features_json")
@@ -178,8 +217,21 @@ async def cog_gcps(cog_id: str):
     cdr_gcps = await run_in_threadpool(get_cdr_gcps, cog_id)
 
     polymer_gcps = search_by_cog_id(app_settings.polymer_gcps_index, cog_id)
+    all_gcps = cdr_gcps + polymer_gcps
+    epsg_unit_mapper = {}
+    for gcp in all_gcps:
+        if gcp.get("crs") not in epsg_unit_mapper.keys():
+            try:
+                crs = CRS.from_epsg(gcp.get("crs").split(":")[1])
+                logger.info(crs)
+                epsg_unit_mapper[gcp.get("crs")] = crs.axis_info[0].unit_name
+            except Exception as e:
+                epsg_unit_mapper[gcp.get("crs")] = "unknown"
+                logger.exception(e)
 
-    return cdr_gcps + polymer_gcps
+        gcp["crs_unit"] = epsg_unit_mapper[gcp.get("crs")]
+
+    return all_gcps
 
 
 @router.get("/{cog_id}/proj_info", status_code=HTTP_200_OK)
@@ -188,19 +240,26 @@ async def cog_projs(cog_id: str):
 
     polymer_projections = await run_in_threadpool(get_projections_from_polymer, cog_id)
 
-    return cdr_projections + polymer_projections
+    projections = cdr_projections + polymer_projections
+
+    epsg_unit_mapper = {}
+    for projection in projections:
+        for gcp in projection.get("gcps"):
+            if gcp.get("crs") not in epsg_unit_mapper.keys():
+                try:
+                    crs = CRS.from_epsg(gcp.get("crs").split(":")[1])
+                    epsg_unit_mapper[gcp.get("crs")] = crs.axis_info[0].unit_name
+                except Exception:
+                    epsg_unit_mapper[gcp.get("crs")] = "unknown"
+
+            gcp["crs_unit"] = epsg_unit_mapper[gcp.get("crs")]
+    return projections
 
 
 @router.get("/{cog_id}/meta", status_code=HTTP_200_OK)
 async def cog_info(cog_id: str):
     cog_meta = await run_in_threadpool(get_cog_meta, cog_id)
     return cog_meta
-
-
-@router.get("/{cog_id}/area_extractions")
-async def get_area_extraction(cog_id: str):
-    map_areas = await get_area_extractions(cache, cog_id)
-    return map_areas
 
 
 def get_systems(cog_id, type):
@@ -246,6 +305,13 @@ async def list_map_unit_name():
     return names
 
 
+def return_cdr_area_extractions(cog_id):
+    url = app_settings.cdr_endpoint_url + f"/v1/features/{cog_id}/area_extractions"
+    response = httpx.get(url, headers=auth)
+    response.raise_for_status()
+    return response.json()
+
+
 def return_polymer_legend_items(cog_id):
     height = cog_height(cache=cache, cog_id=cog_id)
     # legend swatches in polymer
@@ -276,6 +342,9 @@ def return_polymer_legend_items(cog_id):
                         ]
                 except Exception:
                     pass
+                descriptions = []
+                if item.get("description"):
+                    descriptions.append({"text": item.get("description")})
                 polymer_legend_items.append(
                     {
                         "system": item.get("system"),
@@ -287,14 +356,14 @@ def return_polymer_legend_items(cog_id):
                         "coordinates_from_bottom": inverse_geojson(item.get("px_geojson"), height),
                         "color": item.get("color", ""),
                         "pattern": item.get("pattern", ""),
-                        "descriptions": [],
+                        "descriptions": descriptions,
                         "legend_id": item.get("legend_id"),
                         "status": "created",
                         "validated": item.get("validated", False),
                         "cog_id": item.get("cog_id"),
                         "polygon_features": [],
-                        "map_unit_age_text": item.get("map_unit_age_text"),
-                        "map_unit_lithology": item.get("map_unit_lithology"),
+                        "map_unit_age_texts": item.get("map_unit_age_text"),
+                        "map_unit_lithologies": item.get("map_unit_lithology"),
                         "map_unit_b_age": item.get("map_unit_b_age"),
                         "map_unit_t_age": item.get("map_unit_t_age"),
                         "reference_id": item.get("reference_id"),
@@ -318,6 +387,19 @@ def load_extractions(cog_id: str):
     polymer_legend_items = return_polymer_legend_items(cog_id)
 
     return {"legend_swatches": polymer_legend_items}
+
+
+@router.get("/{cog_id}/area_extractions")
+def load_extractions(cog_id: str):
+    areas = return_cdr_area_extractions(cog_id)
+    height = cog_height(cache=cache, cog_id=cog_id)
+
+    for area in areas:
+        area["coordinates_from_bottom"] = inverse_geojson(area["px_geojson"], height)
+        area_shape = shape(area["coordinates_from_bottom"])
+        area["extent_from_bottom"] = area_shape.bounds
+
+    return {"areas": areas}
 
 
 @router.get("/{cog_id}", status_code=HTTP_200_OK)
@@ -460,6 +542,9 @@ async def send_validated_legend_items_to_cdr(cog_id: str = Query(default=None)):
         "cog_metadata_extractions": [],
     }
 
+    # get map_unit ages
+    ages = get_sgmc_ages()
+
     for poly in legend_polygon_swatchs_items:
         poly_geom = validateCoords(poly["coordinates"].get("coordinates", []))
         add_poly = {
@@ -472,7 +557,7 @@ async def send_validated_legend_items_to_cdr(cog_id: str = Query(default=None)):
             "legend_contour": poly_geom,
             "color": poly.get("color", ""),
             "pattern": poly.get("pattern", ""),
-            "map_unit": getMapUnit(poly.get("age_text", "")),
+            "map_unit": getMapUnits(poly.get("age_texts", ""), ages),
             "polygon_features": {},
             "reference_id": poly.get("reference_id", ""),
             "validated": True,
@@ -510,7 +595,6 @@ async def send_validated_legend_items_to_cdr(cog_id: str = Query(default=None)):
             "validated": True,
         }
         feature_results["point_feature_results"].append(add_point)
-
     await send_new_legend_items_to_cdr(feature_results)
     logger.info("Finished sending legend items to cdr")
 
@@ -534,13 +618,13 @@ def save_swatch_feature(request_dict):
     height = cog_height_not_in_memory(cog_id)
 
     legend_swatch = request_dict["legend_swatch"]
-    coords_from_bottom = copy.deepcopy(legend_swatch["coordinates_from_bottom"])
+    coords_from_bottom = copy.deepcopy(legend_swatch.get("coordinates_from_bottom"))
 
     legend_swatch["coordinates"] = inverse_geojson(legend_swatch["coordinates_from_bottom"], height)
     legend_swatch["coordinates_from_bottom"] = coords_from_bottom
 
     for child in legend_swatch["descriptions"]:
-        coords_from_bottom = copy.deepcopy(child["coordinates_from_bottom"])
+        coords_from_bottom = copy.deepcopy(child.get("coordinates_from_bottom"))
         if coords_from_bottom:
             child["coordinates"] = inverse_geojson(child["coordinates_from_bottom"], height)
             child["coordinates_from_bottom"] = coords_from_bottom
@@ -836,3 +920,133 @@ class DeleteExtraction(BaseModel):
 async def delete_area_extraction(request: DeleteExtraction):
     delete_by_id(index=app_settings.polymer_area_extractions, id=request.id)
     return
+
+
+@router.post("/upload_shapefiles_zip")
+async def parse_shapefile_zip(
+    cog_id: str,
+    file: UploadFile = File(...),
+):
+    projections = get_projections_from_cdr(cog_id)
+    gcps = []
+    for proj in projections:
+        if proj.get("status") == "validated":
+            gcps = proj.get("gcps", [])
+            break
+
+    if not gcps:
+        logger.info("hereere")
+        raise HTTPException(status_code=400, detail="validated projection not found")
+
+    if not file.filename.endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Only .zip files are allowed.")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        zip_file_path = os.path.join(tmpdir, file.filename)
+
+        with open(zip_file_path, "wb") as f:
+            f.write(await file.read())
+
+        unzip_file(zip_file_path, tmpdir)
+
+        shapefiles = walk_shp_prj_files(tmpdir)
+
+        if not shapefiles:
+            raise HTTPException(
+                status_code=400, detail="No valid shapefiles (.shp and .prj) found in the uploaded zip."
+            )
+
+        point_df, line_df, polygon_df, found_crs = load_shapefiles(shapefiles=shapefiles)
+
+        projection = {"crs": found_crs, "gcps": gcps}
+        geo_transform = get_transform(projection=projection)
+
+        point_legend_results=[]
+        if point_df is not None:
+            point_legend_results = prepare_point_data(required_column_names, point_df, geo_transform)
+        line_legend_results=[]
+        if line_df is not None:
+            line_legend_results = prepare_line_data(required_column_names, line_df, geo_transform)
+        polygon_legend_results=[]
+        if polygon_df is not None:
+            polygon_legend_results = prepare_polygon_data(required_column_names, polygon_df, geo_transform)
+
+        f = FeatureResults(
+            **{
+                "system": "upload",
+                "system_version": "1.0",
+                "cog_id": cog_id,
+                "point_feature_results": point_legend_results,
+                "line_feature_results": line_legend_results,
+                "polygon_feature_results": polygon_legend_results,
+            }
+        )
+        try:
+            client = httpx.Client()
+
+            cdrland = app_settings.cdr_endpoint_url + "/v1/maps/publish/features"
+            cdr_local_token = app_settings.cdr_bearer_token
+            r = client.post(
+                cdrland,
+                data=json.dumps(f.model_dump(mode="json")),
+                headers={"accept": "application/json", "Authorization": f"{cdr_local_token}"},
+            )
+            r.raise_for_status()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Failed to send payload to the cdr.")
+
+        return r.json()
+
+
+class StatState(Enum):
+    VALIDATED = "validated"
+    PENDING = "pending"
+    EMPTY = "empty"
+
+
+count_data_keys = {
+    "projections": ["georeferenced_count", "validated_projection_count"],
+    "points": ["total_point_count", "total_validated_point_count"],
+    "lines": ["total_line_count", "total_validated_line_count"],
+    "polygons": ["total_polygon_count", "total_validated_polygon_count"],
+    "legend_items": ["total_legend_items_count", "total_validated_legend_item_count"],
+}
+
+def highest_extraction_state(dict_data):
+    features = ["projections", "points", "lines", "polygons", "legend_items"]
+    acc = {}
+    for feature in features:
+        total_key, validated_key = count_data_keys[feature]
+        total = dict_data[total_key]
+        validated = dict_data[validated_key]
+        acc[feature] = {
+            "total": total,
+            "validated": validated,
+        }
+        if total == 0:
+            acc[feature]["status"] = StatState.EMPTY
+        elif validated > 0:
+            acc[feature]["status"] = StatState.VALIDATED
+        else:
+            acc[feature]["status"] = StatState.PENDING
+    return acc
+
+
+@router.get("/{cog_id}/cog-stats-status")
+def get_cog_stats_status(cog_id: str):
+    """
+    Return the highest level of feture/data available for each feature type
+    That is, for each of Projections, points, lines, polygons, legend_items
+    possible states => no data vs some data in pending state vs some validated data available
+    """
+    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/features/{cog_id}/statistics_verbose?verbose=false"
+    response = httpx.get(fetch_url, headers=auth, timeout=None)
+
+    if response.status_code == 200:
+        stat_data = response.json()
+        return highest_extraction_state(stat_data)
+    else:
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=response.text
+        )

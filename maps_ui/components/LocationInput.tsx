@@ -32,12 +32,26 @@ export default function LocationInput({
   }, [gcp]);
 
   function updateValue(value, type) {
-    if (type == "degree")
+    if (type == "degree") {
+      // let current_minute = minute
+      // if (current_minute === "") {
+      //   current_minute = "0"
+      //   setMinute("0")
+      // }
+
+      // let current_second = second
+      // if (current_second === "") {
+      //   current_second = "0"
+      //   setSecond("0")
+      // }
       updateDMS(input_label, value + "° " + minute + "' " + second + '"');
+    }
     if (type == "minute")
       updateDMS(input_label, degree + "° " + value + "' " + second + '"');
     if (type == "second")
       updateDMS(input_label, degree + "° " + minute + "' " + value + '"');
+
+
   }
 
   return (

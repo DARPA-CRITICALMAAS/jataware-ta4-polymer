@@ -25,7 +25,7 @@ COPY . /home/apps/auto-georef
 COPY ./policy.xml /etc/ImageMagick-6/policy.xml
 
 COPY --from=ui-dist /app/auto-georef/static/css/*.css /home/apps/auto-georef/static/css/
-COPY --from=ui-dist /app/auto-georef/static/js/*.js /home/apps/auto-georef/static/js/
+COPY --from=ui-dist /app/auto-georef/static/js /home/apps/auto-georef/static/js
 COPY --from=ui-dist /app/auto-georef/static/webfonts/* /home/apps/auto-georef/static/webfonts/
 
 RUN useradd --user-group --create-home apps

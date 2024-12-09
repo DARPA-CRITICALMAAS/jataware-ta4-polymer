@@ -26,7 +26,7 @@ import { forwardRef, useEffect, useRef, useState, useSyncExternalStore } from "r
 
 import Cursor from "./modules/Cursor";
 import EditHistory from "./modules/EditHistory";
-import * as Element from "./modules/Elements";
+import * as E from "./modules/Elements";
 import * as Convert from "./modules/Convert";
 import ModifierKey from "./modules/ModifierKey";
 import Mouse from "./modules/Mouse";
@@ -101,37 +101,37 @@ const copiedToClipboardAlert = AlertStore.create({
 // ------------------------------------------------------------------------------------------------------------------------------------
 
 const startLoading = () => {
-  Element.selectedMode.classList.remove("fade-in");
+  E.selectedMode.classList.remove("fade-in");
   setTimeout(() => {
-    Element.modeLoading.classList.remove("hidden");
-    Element.selectedMode.classList.add("fade-in");
+    E.modeLoading.classList.remove("hidden");
+    E.selectedMode.classList.add("fade-in");
   }, ANIMATION_TIMEOUT);
 };
 
 const stopLoading = () => {
-  Element.selectedMode.classList.remove("fade-in");
+  E.selectedMode.classList.remove("fade-in");
   setTimeout(() => {
-    Element.modeLoading.classList.add("hidden");
-    Element.selectedMode.classList.add("fade-in");
+    E.modeLoading.classList.add("hidden");
+    E.selectedMode.classList.add("fade-in");
   }, ANIMATION_TIMEOUT);
 };
 
 type LabelMode = "positive" | "negative";
 const LabelModeSM = new StateManager<LabelMode>({
   defaultState: "positive",
-  parentElement: Element.labelMode,
+  parentElement: E.labelMode,
 });
 
 type LassoMode = "add" | "erase";
 const LassoModeSM = new StateManager<LassoMode>({
   defaultState: "add",
-  parentElement: Element.lassoMode,
+  parentElement: E.lassoMode,
 });
 
 type LassoDrawMode = "magnetic" | "manual";
 const LassoDrawModeSM = new StateManager<LassoDrawMode>({
   defaultState: "magnetic",
-  parentElement: Element.lassoDrawMode,
+  parentElement: E.lassoDrawMode,
 });
 
 // Setup the draw mode manager
@@ -195,17 +195,17 @@ const onDrawModeChange = (drawMode: DrawMode, oldDrawMode: DrawMode) => {
 const DrawModeSM = new StateManager<DrawMode>({
   defaultState: "fill",
   cycleStates: ["fill", "no-fill"],
-  parentElement: Element.drawMode,
+  parentElement: E.drawMode,
   onChange: onDrawModeChange,
 });
 
 // Setup the mode manager
 const onModeChange = (mode: Mode, oldMode: Mode) => {
   if (mode !== oldMode) {
-    Element.selectedMode.classList.remove("fade-in");
+    E.selectedMode.classList.remove("fade-in");
     setTimeout(() => {
-      Element.modeName.innerText = mode;
-      Element.selectedMode.classList.add("fade-in");
+      E.modeName.innerText = mode;
+      E.selectedMode.classList.add("fade-in");
     }, ANIMATION_TIMEOUT);
   }
 
@@ -234,9 +234,9 @@ const onModeChange = (mode: Mode, oldMode: Mode) => {
   }
 
   if (mode === "label") {
-    Element.sendLabels.classList.remove("hidden");
+    E.sendLabels.classList.remove("hidden");
   } else {
-    Element.sendLabels.classList.add("hidden");
+    E.sendLabels.classList.add("hidden");
   }
 
   if (mode === "lasso") {
@@ -268,7 +268,7 @@ const onModeChange = (mode: Mode, oldMode: Mode) => {
   if (mode === "view") {
     setDeleteElements();
   } else {
-    Element.selectDelete.classList.add("hidden");
+    E.selectDelete.classList.add("hidden");
   }
 
   if (mode === "erase") {
@@ -290,7 +290,7 @@ const onModeChange = (mode: Mode, oldMode: Mode) => {
 
 const ModeSM = new StateManager<Mode>({
   defaultState: "view",
-  parentElement: Element.mode,
+  parentElement: E.mode,
   onChange: onModeChange,
 });
 
@@ -416,7 +416,7 @@ const onRedo = (type, data) => {
 EditHistory.init(onUndo, onRedo);
 
 // Setup the radius manager
-Radius.init(Element.radius, () => ModeSM.get());
+Radius.init(E.radius, () => ModeSM.get());
 
 const generateLayerPolygon = (() => {
   const cache: { [key: string]: Polygon | MultiPolygon } = {};
@@ -505,12 +505,14 @@ const simpleDrawGeometry = (manager: typeof addLayerManager, mode: Mode) => {
 // Map and Layers
 // ------------------------------------------------------------------------------------------------------------------------------------
 
+const result = await fetchAPI<{ url: string }>("s3-cog-url", {
+  method: "GET",
+  query: { cog_id: COG_ID },
+});
+const { url: cogURL } = await result.json();
+
 const mapSource = new GeoTIFF({
-  sources: [
-    {
-      url: `https://s3.amazonaws.com/public.cdr.land/cogs/${COG_ID}.cog.tif`,
-    },
-  ],
+  sources: [{ url: cogURL }],
   convertToRGB: true,
   interpolate: false,
 });
@@ -645,6 +647,7 @@ const getInitialGlobal = (): GlobalObject => ({
   labelState: "off",
   labelPoints: [],
   selectedFeatures: new Set(),
+  lassoTimestamp: 0,
   lassoState: "off",
   lassoStartCoordinate: null,
   lassoPoints: [],
@@ -722,12 +725,12 @@ document.addEventListener("keydown", (event) => {
 
   if (Keybinds.hidePolygons.includes(code)) {
     event.preventDefault();
-    Element.hidePolygons.dispatchEvent(new Event("mousedown"));
+    E.hidePolygons.dispatchEvent(new Event("mousedown"));
   }
 
   if (Keybinds.hideMap.includes(code)) {
     event.preventDefault();
-    Element.hideMap.dispatchEvent(new Event("mousedown"));
+    E.hideMap.dispatchEvent(new Event("mousedown"));
   }
 
   // Edit history controls
@@ -736,7 +739,7 @@ document.addEventListener("keydown", (event) => {
     else EditHistory.undo();
   }
 
-  if (code === "KeyH") Element.helpDialog.showModal();
+  if (code === "KeyH") E.helpDialog.showModal();
 
   if (
     ModeSM.is("view") ||
@@ -756,10 +759,10 @@ document.addEventListener("keyup", (event) => {
   const { code } = event;
 
   if (Keybinds.hidePolygons.includes(code)) {
-    Element.hidePolygons.dispatchEvent(new Event("mouseup"));
+    E.hidePolygons.dispatchEvent(new Event("mouseup"));
   }
   if (Keybinds.hideMap.includes(code)) {
-    Element.hideMap.dispatchEvent(new Event("mouseup"));
+    E.hideMap.dispatchEvent(new Event("mouseup"));
   }
 });
 
@@ -814,7 +817,7 @@ map.on("error", (event) => {
 
 let initialRadiusMousePos: [number, number] | null = null;
 let initialRadiusSize: number = NaN;
-Element.map.addEventListener("mousedown", () => {
+E.map.addEventListener("mousedown", () => {
   // Mousedown logic
   if (ModifierKey.is(ModifierKey.ALT) && (ModeSM.is("erase") || ModeSM.is("add"))) {
     initialRadiusMousePos = Mouse.position;
@@ -831,7 +834,7 @@ Element.map.addEventListener("mousedown", () => {
     document.removeEventListener("mouseup", handleMouseUp);
   };
 
-  Element.map.addEventListener("mouseup", handleMouseUp);
+  E.map.addEventListener("mouseup", handleMouseUp);
   document.addEventListener("mouseup", handleMouseUp);
 });
 
@@ -861,7 +864,7 @@ const updateCursor = () => {
   // Show the regular cursor when not in add or erase mode
   if ((!ModeSM.is("add") && !ModeSM.is("erase")) || DrawModeSM.is("select")) {
     Cursor.reset();
-    Element.cursor.classList.add("hidden");
+    E.cursor.classList.add("hidden");
     return;
   }
 
@@ -880,10 +883,10 @@ const updateCursor = () => {
 
   // Update the cursor position and size
   Cursor.set(Cursor.NONE);
-  Element.cursor.classList.remove("hidden");
-  Element.cursor.style.left = `${x}px`;
-  Element.cursor.style.top = `${y}px`;
-  Element.cursor.style.width = `${visibleDiameter}px`;
+  E.cursor.classList.remove("hidden");
+  E.cursor.style.left = `${x}px`;
+  E.cursor.style.top = `${y}px`;
+  E.cursor.style.width = `${visibleDiameter}px`;
 };
 
 // @ts-expect-error: Custom move event
@@ -891,7 +894,7 @@ map.on("move", updateCursor);
 map.on("pointermove", updateCursor);
 document.addEventListener("mousemove", updateCursor);
 
-Element.hidePolygons.addEventListener("mousedown", () => {
+E.hidePolygons.addEventListener("mousedown", () => {
   // Mousedown logic
   userFacingLayerManager.getLayer().setVisible(false);
   viewLayerManager.getLayer().setVisible(false);
@@ -899,7 +902,7 @@ Element.hidePolygons.addEventListener("mousedown", () => {
   addLayerManager.getLayer().setVisible(false);
   lassoLayerManager.getLayer().setVisible(false);
   labelLayer.setVisible(false);
-  Element.hidePolygons.classList.add("swap-active");
+  E.hidePolygons.classList.add("swap-active");
 
   // Ensures that the mouseup event will trigger even when the mouse is released outside the button
   const handleMouseUp = () => {
@@ -909,34 +912,34 @@ Element.hidePolygons.addEventListener("mousedown", () => {
     addLayerManager.getLayer().setVisible(true);
     lassoLayerManager.getLayer().setVisible(true);
     labelLayer.setVisible(true);
-    Element.hidePolygons.classList.remove("swap-active");
+    E.hidePolygons.classList.remove("swap-active");
 
     document.removeEventListener("mouseup", handleMouseUp);
   };
 
-  Element.hidePolygons.addEventListener("mouseup", handleMouseUp);
+  E.hidePolygons.addEventListener("mouseup", handleMouseUp);
   document.addEventListener("mouseup", handleMouseUp);
 });
 
-Element.hideMap.addEventListener("mousedown", () => {
+E.hideMap.addEventListener("mousedown", () => {
   // Mousedown logic
   mapLayer.setVisible(false);
-  Element.hideMap.classList.add("swap-active");
+  E.hideMap.classList.add("swap-active");
 
   // Ensures that the event will trigger even when the mouse is released outside the button
   const handleMouseUp = () => {
     mapLayer.setVisible(true);
-    Element.hideMap.classList.remove("swap-active");
+    E.hideMap.classList.remove("swap-active");
 
     document.removeEventListener("mouseup", handleMouseUp);
   };
 
-  Element.hideMap.addEventListener("mouseup", handleMouseUp);
+  E.hideMap.addEventListener("mouseup", handleMouseUp);
   document.addEventListener("mouseup", handleMouseUp);
 });
 
-Element.undo.addEventListener("click", EditHistory.undo);
-Element.redo.addEventListener("click", EditHistory.redo);
+E.undo.addEventListener("click", EditHistory.undo);
+E.redo.addEventListener("click", EditHistory.redo);
 
 const resetData = () => {
   EditHistory.clear();
@@ -951,7 +954,7 @@ const resetUI = () => {
   updateUserFacingLayer();
 };
 
-Element.clear.addEventListener("click", () => {
+E.clear.addEventListener("click", () => {
   resetData();
   resetUI();
 });
@@ -1023,7 +1026,7 @@ const sendLabelsToServer = async () => {
   }
 };
 
-Element.sendLabels.addEventListener("click", sendLabelsToServer);
+E.sendLabels.addEventListener("click", sendLabelsToServer);
 
 const onClickLabel = (event: MapBrowserEvent<MouseEvent>) => {
   let type = LabelModeSM.get();
@@ -1320,6 +1323,7 @@ const sendLassoStart = async (coordinate: Coordinate) => {
     if (layer_id === LayerSM.get()) {
       Global.lassoState = "active";
       Global.lassoStartCoordinate = coordinate;
+      Global.lassoTimestamp = performance.now() + performance.timeOrigin;
 
       makeLassoGuides();
       sendLassoStep(Global.mouseCoordinate);
@@ -1353,19 +1357,22 @@ const sendLassoStep = async (coordinate: Coordinate) => {
     const response = await fetchAPI<{
       geometry: LineString;
       layer_id: string;
+      timestamp: number;
     }>("lasso-step", {
       method: "POST",
       body: {
         cog_id: COG_ID,
         coordinate,
         layer_id: LayerSM.get(),
+        // timestamp: Date.now(), // Millisecond precision
+        timestamp: performance.now() + performance.timeOrigin, // Arbitrary precision
       },
       timeout: 5000,
     });
 
     if (!response.ok) throw new Error("Error sending lasso step to server.");
 
-    const { geometry, layer_id } = await response.json();
+    const { geometry, layer_id, timestamp } = await response.json();
 
     if (!LassoDrawModeSM.is("magnetic")) {
       Cursor.set(Cursor.CROSSHAIR);
@@ -1377,7 +1384,15 @@ const sendLassoStep = async (coordinate: Coordinate) => {
       Cursor.set(Cursor.CROSSHAIR);
       stopLoading();
     } else if (LassoDrawModeSM.is("magnetic")) {
-      updateLassoEdge(coordinate, Convert.jsonToOpen(geometry) as OpenLayersLineString);
+      if (timestamp >= Global.lassoTimestamp) {
+        Global.lassoTimestamp = timestamp;
+        updateLassoEdge(coordinate, Convert.jsonToOpen(geometry) as OpenLayersLineString);
+      } else {
+        console.warn(
+          `Out-of-order lasso-step ${timestamp}. Expected >= ${Global.lassoTimestamp}.`,
+          `At least ${Global.lassoTimestamp - timestamp}ms old.`,
+        );
+      }
     }
   } catch (error) {
     if (error instanceof Object) {
@@ -1472,11 +1487,11 @@ const polygonDelete = () => {
   setDeleteElements();
 };
 
-Element.selectDelete.addEventListener("click", polygonDelete);
-Element.drawDelete.addEventListener("click", polygonDelete);
+E.selectDelete.addEventListener("click", polygonDelete);
+E.drawDelete.addEventListener("click", polygonDelete);
 
 const setDeleteElements = () => {
-  const deleteElement = ModeSM.is("view") ? Element.selectDelete : Element.drawDelete;
+  const deleteElement = ModeSM.is("view") ? E.selectDelete : E.drawDelete;
 
   if (Global.selectedFeatures.size === 0) {
     deleteElement.classList.add("hidden");
@@ -1575,7 +1590,7 @@ const LayerStore = {
 
 export type LayerStore = typeof LayerStore;
 
-Element.root.style.setProperty("--side-bar-width", "min(40vw, 32rem)");
+E.root.style.setProperty("--side-bar-width", "min(40vw, 32rem)");
 
 const preventFocusScroll = (event: React.FocusEvent<HTMLElement>) => {
   event.preventDefault();
@@ -1754,6 +1769,16 @@ const LayerCard = forwardRef(
                       }
 
                       const legendItem = (await response.json()) as LegendItem;
+                      const isLegendItemUnique = fetchAPI<{ unique: boolean }>(
+                        "check_polymer_legend_item",
+                        {
+                          method: "GET",
+                          query: {
+                            cog_id: COG_ID,
+                            legend_id: legendItem.id,
+                          },
+                        },
+                      );
 
                       if (allLegendIDs.some((id) => legendItem.id === id)) {
                         const legendExistsAlert = AlertStore.create({
@@ -1773,6 +1798,16 @@ const LayerCard = forwardRef(
                         time: 5000,
                       });
                       AlertStore.show(foundAlert);
+
+                      const isUniqueResponse = await isLegendItemUnique;
+                      if (isUniqueResponse.ok && !(await isUniqueResponse.json()).unique) {
+                        const notUniqueAlert = AlertStore.create({
+                          message: `Legend item '${legendItem.name}' has already been validated. Publishing a new layer will overwrite the old layer.`,
+                          type: "warning",
+                        });
+                        AlertStore.show(notUniqueAlert);
+                      }
+
                       LayerStore.setLayer(newLayer);
                     });
                   }}
@@ -1982,7 +2017,7 @@ const SidebarContents = () => {
         >
           <button
             className="btn btn-square pointer-events-auto shadow-md"
-            onClick={() => Element.options.showModal()}
+            onClick={() => E.options.showModal()}
             onFocus={preventFocusScroll}
           >
             <i className="fa-solid fa-wrench"></i>
@@ -2057,7 +2092,7 @@ const SidebarContents = () => {
           <div className="tooltip tooltip-top mr-auto" data-tip="More Options">
             <button
               className="btn btn-circle btn-ghost"
-              onClick={() => Element.options.showModal()}
+              onClick={() => E.options.showModal()}
               onFocus={preventFocusScroll}
             >
               <i className="fa-solid fa-wrench"></i>
@@ -2078,7 +2113,7 @@ LayerStore.setLayer(initialLayer);
 
 const LayerSM = new StateManager<string | null>({
   defaultState: null,
-  parentElement: Element.layerSidebar,
+  parentElement: E.layerSidebar,
   inputName: "layer-select",
   onChange: (layerID, _oldLayerID) => {
     // Select the layer in the layer sidebar
@@ -2092,10 +2127,10 @@ const LayerSM = new StateManager<string | null>({
   },
 });
 
-const layerSidebarRoot = createRoot(Element.layerSidebar);
+const layerSidebarRoot = createRoot(E.layerSidebar);
 layerSidebarRoot.render(<SidebarContents />);
 
-const allLayersOptionsRoot = createRoot(Element.options);
+const allLayersOptionsRoot = createRoot(E.options);
 allLayersOptionsRoot.render(
   <Options AlertStore={AlertStore} LayerStore={LayerStore} cog_id={COG_ID} />,
 );
@@ -2122,13 +2157,14 @@ if (!sessionStorage.getItem("hasLoaded")) {
   );
 }
 
-Element.pointsLink.href = `/points/${COG_ID}`;
-Element.projLink.href = `/projections/${COG_ID}`;
-Element.legendLink.href = `/swatchannotation/${COG_ID}`;
-Element.linesLink.href = `/lines/${COG_ID}`;
-Element.polyLink.href = `/segment/${COG_ID}`;
-Element.cogIDBadge.textContent = COG_ID;
-Element.cogIDBadge.addEventListener("click", () => {
+E.pointsLink.href = E.pointsLinkAlt.href = `/points/${COG_ID}`;
+E.projectionsLink.href = E.projectionsLinkAlt.href = `/projections/${COG_ID}`;
+E.areasLink.href = E.areasLinkAlt.href = `/areas/${COG_ID}`;
+E.legendsLink.href = E.legendsLinkAlt.href = `/swatchannotation/${COG_ID}`;
+E.linesLink.href = E.linesLinkAlt.href = `/lines/${COG_ID}`;
+E.polygonsLink.href = E.polygonsLinkAlt.href = `/segment/${COG_ID}`;
+E.cogIDBadge.querySelector("span")!.textContent = COG_ID;
+E.cogIDBadge.addEventListener("click", () => {
   AlertStore.show(copiedToClipboardAlert);
   copyTextToClipboard(COG_ID);
 });

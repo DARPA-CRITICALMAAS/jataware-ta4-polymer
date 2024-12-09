@@ -1,14 +1,41 @@
 <section
-  class="absolute top-[0.75rem] left-1/3 right-1/3 z-10 flex join drop-shadow-md"
+  class="absolute top-[0.75rem] left-1/3 right-1/3 z-[11] flex join drop-shadow-md"
   id="cog-id-browse"
   >
-  <label class="input input-bordered input-sm flex items-center join-item grow no-hover rounded-md">
-    <input type="text" class="grow" placeholder="Enter Map ID" />
+  <select class="select select-sm unstyled join-item">
+    <option selected value="map">Map ID</option>
+    <option value="product">Product ID</option>
+  </select>
+  <label class="input input-bordered input-sm flex items-center join-item grow no-hover">
+    <input name="cog_id" type="text" class="grow" placeholder="Enter Map ID" />
   </label>
-  <a href="" target="_blank" class="btn btn-sm rounded-md join-item">
+  <button class="btn btn-sm btn-primary btn-outline bg-base-200 border-none join-item pointer-events-none">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
       <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
     </svg>
     Go
-  </a>
+  </button>
+  <div
+    class="dropdown dropdown-hover rounded-sm pointer-events-none"
+    id="search-by-cog-id-menu"
+    >
+    <div
+      class="btn btn-primary bg-base-200 btn-outline border-none border-l-1 join-item p-1" style="min-height: 2rem; height: 2rem;">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+      </svg>
+    </div>
+    <ul tabindex="0" class="dropdown-content menu bg-base-200 w-52 shadow bg-opacity-50">
+      <li>
+        <button class="btn btn-sm btn-primary"
+          hx-get="{{template_prefix}}/search-one-map"
+          hx-swap="innerHTML"
+          hx-target="#map-results-target"
+          hx-include="[name='cog_id']"
+          >
+          Show in Results
+        </button>
+      </li>
+    </ul>
+  </div>
 </section>

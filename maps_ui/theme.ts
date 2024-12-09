@@ -43,8 +43,19 @@ export const theme = extendTheme({
           highlight: "#b9bbd0b8",
         },
 
+        // warning: { main: amber[500] },
+
         secondary: { main: indigo.A400 }, // blueGrey[600],
       },
     },
   },
+}, {
+  palette: {
+    pending: {
+      main: amber[500],
+      light: amber[500],
+      dark: amber[300],
+      contrastText: "#000"
+    }
+  }
 });

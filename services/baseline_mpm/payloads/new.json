@@ -1,0 +1,19 @@
+{
+  "cma_id": "ESRI:102008_c37bfbacf5e54c98eb1756e437797524ba72334a7287671456474e4585b62e27__res0_500_res1_500_rare_earth_elements",
+  "system": "bkj_rf_1030_000",
+  "system_version": "0.0.2",
+  "author": "bkj",
+  "date": "2024-10-30",
+  "organization": "jataware",
+  "model_type": "rf",
+  "train_config": {
+    "n_estimators": 2048,
+    "n_unlabeled": 40000
+  },
+  "evidence_layers": [
+    "ebe37c5ec9aa6c017f7e67300339a31b__516aa5cbf6072bce01bd4b354600e72e_818c3c30df445856bb024daadd4d535d",
+    "84c3623b91a89a23e93389d81fcb9d57__d751713988987e9331980363e24189ce_d03156ada0008ae1482a3ec2909bed8d",
+    "a052f919ee441027fc17910fd7e33833__516aa5cbf6072bce01bd4b354600e72e_29b6546a43a2d9839ba64658e4490da0",
+    "14fa13070d2fd4c4d996018583a77dbe__d751713988987e9331980363e24189ce_69c2148395c815893f5e21ad4a508964"
+  ]
+}

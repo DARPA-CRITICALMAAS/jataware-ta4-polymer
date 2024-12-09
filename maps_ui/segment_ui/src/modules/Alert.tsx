@@ -7,7 +7,7 @@ import { useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 
 import { useTimeout, getRandomInt } from "./utils";
-import * as Element from "./Elements";
+import * as E from "./Elements";
 
 /**
  * Represents an alert object consisting only of the required properties.
@@ -197,5 +197,5 @@ const AlertContainer = (): JSX.Element => {
   );
 };
 
-const alertContainerRoot = createRoot(Element.alertContainer);
+const alertContainerRoot = createRoot(E.alertContainer);
 alertContainerRoot.render(<AlertContainer />);

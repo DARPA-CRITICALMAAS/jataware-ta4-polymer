@@ -6,24 +6,31 @@ declare global {
    * Represents the global Polymer object with its properties.
    * @property cogID - The COG ID of the image.
    * @property cogURL - The URL of the COG image.
+   * @property system - The system of the COG image.
+   * @property version - The version of the COG image.
    * @property rawFeatures - The raw features returned from the request.
    * @property rawPolymerFeatures - The raw features of the latest 'polymer' system.
    * @property features - The formatted features.
    * @property polymerFeatures - The formatted features of the latest 'polymer' system.
    * @property mode - The page mode.
    * @property association - The current group and legend association (in that order).
+   * @property legendMapping - The legend ID to legend label mapping.
    * @property markedFeatures - The features marked by the user during validation.
    * @property didPanAfterCenter - Whether the user panned after centering the map on a new feature.
    */
   const polymer: {
     cogID: string;
     cogURL: string;
+    system?: string;
+    version?: string;
     rawFeatures?: FeatureGroup<RawFeatureResponse>;
     rawPolymerFeatures?: FeatureGroup<RawFeatureResponse>;
     features?: FeatureGroup;
     polymerFeatures?: FeatureGroup;
     mode?: PageMode;
+    ftype?: "point" | "line";
     association?: [string, string];
+    legendMapping?: Record<string, string>;
     markedFeatures?: MarkedFeature[];
     canMark?: boolean;
   };
@@ -55,6 +62,7 @@ declare global {
     legendID: string;
     bbox: [number, number, number, number];
     isValidated: boolean | null;
+    dashPattern?: "solid" | "dash" | "dotted" | "";
   };
 
   /**
@@ -66,6 +74,7 @@ declare global {
       { from: "featureID"; to: "feature_id" },
       { from: "legendID"; to: "legend_id" },
       { from: "isValidated"; to: "is_validated" },
+      { from: "dashPattern"; to: "dash_pattern" },
     ]
   >;
 
@@ -81,5 +90,10 @@ declare global {
   /**
    * Represents the page mode.
    */
-  type PageMode = "view" | "validate";
+  type PageMode = "view" | "validate" | "create";
+
+  /**
+   * Represents the type of feature.
+   */
+  type FType = "point" | "line";
 }

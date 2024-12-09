@@ -59,7 +59,7 @@ async def download(doc_id: str, request: Request):
     headers = {"Authorization": f"Bearer {token}"}
 
     async with httpx.AsyncClient(follow_redirects=False) as http:
-        resp = await http.get(f"https://api.cdr.land/v1/docs/document/{doc_id}", headers=headers)
+        resp = await http.get(f"{app_settings.cdr_api_host}/v1/docs/document/{doc_id}", headers=headers)
         await asyncio.sleep(0)
 
         location = resp.headers.get("location")
@@ -72,7 +72,7 @@ async def search_cdr(search: str, search_by: str, request: Request):
     headers = {"Authorization": f"Bearer {token}"}
 
     docs = []
-    url = "https://api.cdr.land/v1/docs/documents/q/title"
+    url = f"{app_settings.cdr_api_host}/v1/docs/documents/q/title"
     if search and len(search) > 2:
         pattern = search.strip()
         params = {
@@ -82,17 +82,17 @@ async def search_cdr(search: str, search_by: str, request: Request):
         match search_by:
             case "title":
                 params["pattern"] = f"*{pattern}*"
-                url = "https://api.cdr.land/v1/docs/documents/q/title"
+                url = f"{app_settings.cdr_api_host}/v1/docs/documents/q/title"
             case "doi":
                 params["pattern"] = f"*{pattern}*"
-                url = "https://api.cdr.land/v1/docs/documents/q/doi"
+                url = f"{app_settings.cdr_api_host}/v1/docs/documents/q/doi"
             case "prov":
                 params["pattern"] = f"{pattern}"
                 params["prefix_match"] = True
-                url = "https://api.cdr.land/v1/docs/documents/q/provenance"
+                url = f"{app_settings.cdr_api_host}/v1/docs/documents/q/provenance"
             case "url":
                 params["pattern"] = f"{pattern}"
-                url = "https://api.cdr.land/v1/docs/documents/q/provenance/url"
+                url = f"{app_settings.cdr_api_host}/v1/docs/documents/q/provenance/url"
 
         async with httpx.AsyncClient(follow_redirects=True) as http:
             resp = await http.post(url, headers=headers, params=params, timeout=None)
@@ -117,7 +117,7 @@ async def match_doi(doi):
     headers = {"Authorization": f"Bearer {token}"}
 
     params = {"pattern": f"*{doi}*"}
-    url = "https://api.cdr.land/v1/docs/documents/q/doi"
+    url = f"{app_settings.cdr_api_host}/v1/docs/documents/q/doi"
 
     async with httpx.AsyncClient(follow_redirects=True) as http:
         resp = await http.post(url, headers=headers, params=params, timeout=None)
@@ -187,7 +187,7 @@ async def partial_search(search: str, which: str, search_by: str, request: Reque
 async def _download_events(doc_id, redirect_page: int = 0):
     token = app_settings.cdr_api_key
     headers = {"Authorization": f"Bearer {token}"}
-    url = f"https://api.cdr.land/v1/docs/document/{doc_id}"
+    url = f"{app_settings.cdr_api_host}/v1/docs/document/{doc_id}"
     c = 0
     async with httpx.AsyncClient(follow_redirects=True) as http:
         logger.debug("downloading: %s", url)
@@ -290,7 +290,7 @@ async def index_upload_pubs(request: Request, indexid: str = ""):
 async def _pubs_download_events(cache_key):
     token = app_settings.cdr_api_key
     headers = {"Authorization": f"Bearer {token}"}
-    cdr_url = "https://api.cdr.land/v1/docs/document"
+    cdr_url = f"{app_settings.cdr_api_host}/v1/docs/document"
     upload_payload = pubs_uploads[cache_key]
     doc = upload_payload["doc"]
     data = {"document": doc.model_dump_json(exclude_none=True)}
@@ -470,7 +470,7 @@ def create_upload_file(
     token = app_settings.cdr_api_key
     headers = {"Authorization": f"Bearer {token}"}
 
-    res = httpx.post("https://api.cdr.land/v1/docs/document", headers=headers, data=data, files=files, timeout=None)
+    res = httpx.post(f"{app_settings.cdr_api_host}/v1/docs/document", headers=headers, data=data, files=files, timeout=None)
     res.raise_for_status()
     j = res.json()
     job_id = j.get("job_id")
@@ -488,7 +488,7 @@ def create_upload_file(
 def jobs_index(request: Request):
     token = app_settings.cdr_api_key
     headers = {"Authorization": f"Bearer {token}"}
-    url = "https://api.cdr.land/v1/jobs/q/size"
+    url = f"{app_settings.cdr_api_host}/v1/jobs/q/size"
     res = httpx.get(url, headers=headers, timeout=None)
     res.raise_for_status()
     qsize = res.json().get("size", -1)
@@ -523,7 +523,7 @@ def jobs_info(job_id: str, request: Request, response: Response):
     token = app_settings.cdr_api_key
     headers = {"Authorization": f"Bearer {token}"}
 
-    url = f"https://api.cdr.land/v1/jobs/result/{job_id}"
+    url = f"{app_settings.cdr_api_host}/v1/jobs/result/{job_id}"
     res = httpx.get(url, headers=headers, timeout=None)
     res.raise_for_status()
     j = res.json()
@@ -554,11 +554,11 @@ def jobs_info(job_id: str, request: Request, response: Response):
 
 @router.put("/cdr/process/send/{doc_id}")
 async def process_doc_cdr(doc_id: str, request: Request):
-    url = f"https://admin.cdr.land/admin/events/fire/doc/{doc_id}"
+    url = f"{app_settings.cdr_admin_host}/admin/events/fire/doc/{doc_id}"
     async with httpx.AsyncClient(timeout=None) as client:
         logger.debug("login")
         await client.post(
-            "https://auth.cdr.land/api/firstfactor",
+            f"{app_settings.cdr_auth_host}/api/firstfactor",
             json={"username": app_settings.cdr_admin_authelia_user, "password": app_settings.cdr_admin_authelia_pass},
         )
 

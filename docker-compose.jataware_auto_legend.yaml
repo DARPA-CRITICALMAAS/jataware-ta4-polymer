@@ -1,0 +1,34 @@
+
+services:
+
+  jataware_auto_legend:
+    profiles:
+      - jataware_auto_legend
+    image: jataware_auto_legend:dev
+    entrypoint:
+      - uvicorn
+      - jataware_auto_legend.http.api:api
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "7000"
+      - --log-config
+      - logging.yaml
+      - --workers
+      - "1"
+      - "--reload"
+    ports:
+      - 7000:7000
+    volumes:
+      - ./services/jataware_auto_legend:/home/apps/jataware_auto_legend
+      - ./aws/credentials:/home/apps/.aws/credentials
+    env_file:
+      - ./services/jataware_auto_legend/.env
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: "5"
+    networks:
+      - nylon
+

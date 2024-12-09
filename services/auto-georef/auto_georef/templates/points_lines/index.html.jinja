@@ -16,7 +16,7 @@ group-has-[#sidebar-toggle:checked]/page:pr-[--side-bar-width]" %}
 <div id="map" class="pointer-events-auto absolute inset-0 {{ width_with_sidebar }}">
 </div>
 
-{% call modal.modal("Welcome", "Select a Mode and System", id="session-start") %}
+{% call modal.modal("Welcome", "Select a Mode and Feature", id="session-start") %}
 <form class="modal-form" method="dialog">
 
   {% call modal.header() %}
@@ -24,33 +24,66 @@ group-has-[#sidebar-toggle:checked]/page:pr-[--side-bar-width]" %}
   <h3>Mode</h3>
   {% endcall %}
 
-  <div class="grid gap-2.5 grid-cols-2">
+  <div class="grid gap-2.5 grid-cols-auto-fit">
     <label class="btn btn-ghost btn-block has-[:checked]:btn-active" tabindex="0">
       <input type="radio" name="mode" value="view" autocomplete="off" class="hidden">
       <i class="fa-solid fa-eye"></i>
-      <span>Viewing</span>
+      <span>View</span>
     </label>
 
     <label class="btn btn-ghost btn-block has-[:checked]:btn-active" tabindex="0">
       <input type="radio" name="mode" value="validate" autocomplete="off" class="hidden">
       <i class="fa-solid fa-user-check"></i>
-      <span>Validating</span>
+      <span>Validate</span>
+    </label>
+
+    <label class="btn btn-ghost btn-block has-[:checked]:btn-active" tabindex="0">
+      <input type="radio" name="mode" value="create" autocomplete="off" class="hidden">
+      <i class="fa-solid fa-pencil"></i>
+      <span>Create</span>
     </label>
   </div>
 
-  {% call modal.header() %}
-  <i class="fa-solid fa-arrow-trend-up"></i>
-  <h3>Lines</h3>
-  {% endcall %}
+  <div id="feature-select" class="hidden">
 
-  {{ systems_menu(line_systems, ("radio", "system", "line")) }}
+    {% call modal.header() %}
+    <i class="fa-solid fa-shapes"></i>
+    <h3>Feature</h3>
+    {% endcall %}
 
-  {% call modal.header() %}
-  <i class="fa-solid fa-map-pin"></i>
-  <h3>Points</h3>
-  {% endcall %}
+    <div class="grid gap-2.5 grid-cols-auto-fit">
+      <label class="btn btn-ghost btn-block has-[:checked]:btn-active" tabindex="0">
+        <input type="radio" name="feature-type" value="point" autocomplete="off" class="hidden">
+        <i class="fa-solid fa-map-pin"></i>
+        <span>Point</span>
+      </label>
 
-  {{ systems_menu(point_systems, ("radio", "system", "point")) }}
+      <label class="btn btn-ghost btn-block has-[:checked]:btn-active" tabindex="0">
+        <input type="radio" name="feature-type" value="line" autocomplete="off" class="hidden">
+        <i class="fa-solid fa-arrow-trend-up"></i>
+        <span>Lines</span>
+      </label>
+    </div>
+
+  </div>
+
+  <div id="system-select" class="">
+
+    {% call modal.header() %}
+    <i class="fa-solid fa-map-pin"></i>
+    <h3>Points</h3>
+    {% endcall %}
+
+    {{ systems_menu(point_systems, ("radio", "system", "point")) }}
+
+    {% call modal.header() %}
+    <i class="fa-solid fa-arrow-trend-up"></i>
+    <h3>Lines</h3>
+    {% endcall %}
+
+    {{ systems_menu(line_systems, ("radio", "system", "line")) }}
+
+  </div>
 
   {{ modal.header() }}
 
@@ -63,43 +96,77 @@ group-has-[#sidebar-toggle:checked]/page:pr-[--side-bar-width]" %}
 </form>
 {% endcall %}
 
-{% call modal.modal("Validation", "Select a Group", id="validation-start") %}
+{% call modal.modal("Validation", "Select a Group", id="validate-start") %}
 <form class="modal-form" method="dialog">
   <div id="group-select"></div>
 </form>
 {% endcall %}
 
+{% call modal.modal("Creation", "Select a Legend Item", id="create-start") %}
+<form class="modal-form" method="dialog">
+  <div id="create-select"></div>
+</form>
+{% endcall %}
+
+
 
 {# Both - the action buttons #}
-<div class="absolute left-2 top-2 flex flex-col gap-2">
+<div class="absolute left-2 top-2 flex gap-2">
 
-  <div class="tooltip tooltip-right pointer-events-auto" data-tip="Hide Features (,)">
-    <button class="btn btn-square swap text-lg shadow-md" id="hide-features" tabindex="0">
-      <i class="fa-solid fa-shapes swap-off"></i>
-      <i class="fa-solid fa-eye-slash swap-on -ml-[0.055rem]"></i>
-    </button>
-  </div>
+  <div class="flex flex-col gap-2">
 
-  <div class="tooltip tooltip-right pointer-events-auto" data-tip="Hide Map (.)">
-    <button class="btn btn-square swap text-lg shadow-md" id="hide-map" tabindex="0">
-      <i class="fa-solid fa-map swap-off"></i>
-      <i class="fa-solid fa-eye-slash swap-on -ml-[0.055rem]"></i>
-    </button>
-  </div>
-
-  <div class="tooltip tooltip-right pointer-events-auto" data-tip="New Session">
-    <button class="btn btn-square text-lg shadow-md" id="new-session" tabindex="0">
-      <i class="fa-solid fa-rotate"></i>
-    </button>
-  </div>
-
-  {# Validating - switch group #}
-  <div id="switch-group" class="hidden">
-    <div class="tooltip tooltip-right pointer-events-auto" data-tip="Change Group">
-      <button class="btn btn-square text-lg shadow-md" id="new-group" tabindex="0">
-        <i class="fa-solid fa-right-left"></i>
+    <div class="tooltip tooltip-right pointer-events-auto" data-tip="Hide Features (,)">
+      <button class="btn btn-square swap text-lg shadow-md" id="hide-features" tabindex="0">
+        <i class="fa-solid fa-shapes swap-off"></i>
+        <i class="fa-solid fa-eye-slash swap-on -ml-[0.055rem]"></i>
       </button>
     </div>
+
+    <div class="tooltip tooltip-right pointer-events-auto" data-tip="Hide Map (.)">
+      <button class="btn btn-square swap text-lg shadow-md" id="hide-map" tabindex="0">
+        <i class="fa-solid fa-map swap-off"></i>
+        <i class="fa-solid fa-eye-slash swap-on -ml-[0.055rem]"></i>
+      </button>
+    </div>
+
+    <div class="tooltip tooltip-right pointer-events-auto" data-tip="New Session">
+      <button class="btn btn-square text-lg shadow-md" id="new-session" tabindex="0">
+        <i class="fa-solid fa-rotate"></i>
+      </button>
+    </div>
+
+    {# Validating - new validate group #}
+    <div id="new-validate" class="hidden">
+      <div class="tooltip tooltip-right pointer-events-auto" data-tip="Change Group">
+        <button class="btn btn-square text-lg shadow-md" tabindex="0">
+          <i class="fa-solid fa-right-left"></i>
+        </button>
+      </div>
+    </div>
+
+    {# Creating - switch legend items #}
+    <div id="new-create" class="hidden">
+      <div class="tooltip tooltip-right pointer-events-auto" data-tip="Change Legend Item">
+        <button class="btn btn-square text-lg shadow-md" tabindex="0">
+          <i class="fa-solid fa-right-left"></i>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  {# Lines - validating and creating #}
+  <div id="line-pattern" class="hidden">
+    <label class="card card-compact pointer-events-auto bg-base-200 shadow-md w-72">
+      <div class="card-body flex-row items-center !p-2 !pl-0 gap-0">
+        <span class="font-semibold px-6">Line Pattern</span>
+        <select class="select select-ghost bg-base-300 grow shadow-inner" name="dash-pattern" autocomplete="off">
+          <option value="solid" selected>Solid</option>
+          <option value="dash">Dashed</option>
+          <option value="dotted">Dotted</option>
+        </select>
+      </div>
+    </label>
   </div>
 
 </div>
@@ -139,10 +206,9 @@ group-has-[#sidebar-toggle:checked]/page:pr-[--side-bar-width]" %}
   </div>
 </div>
 
-
-
 {# Validating - the controls #}
 <div id="validate-controls" class="hidden">
+
   <div class="absolute right-2 top-2 flex flex-col gap-2">
     <div class="flex w-96 pointer-events-auto size-fit bg-base-100 shadow-md card p-2 px-3">
       <div class="w-full flex items-center gap-2">
@@ -151,22 +217,68 @@ group-has-[#sidebar-toggle:checked]/page:pr-[--side-bar-width]" %}
       </div>
     </div>
   </div>
+
   <div class="absolute inset-0 p-2 flex justify-center items-end">
-    <div class="flex w-[32.5rem] pointer-events-auto size-fit bg-base-100 shadow-md card p-2">
-      <div class="join grid grid-cols-3">
-        <button id="bad" class="btn btn-error join-item shadow-sm">
+    <div class="flex w-[33rem] pointer-events-auto size-fit bg-base-100 shadow-md card p-2">
+      <div class="join grid grid-cols-auto-fit">
+
+        <button id="validate-bad" class="btn btn-error join-item shadow-sm">
           <i class="fa-solid fa-times"></i>
           <span>Bad</span>
         </button>
-        <button id="skip" class="btn btn-default join-item shadow-sm z-20">
+
+        <button id="validate-misc" class="btn btn-default join-item shadow-sm z-20">
           <i class="fa-solid"></i>
           <span>Undefined</span>
         </button>
-        <button id="good" class="btn btn-success join-item shadow-sm">
+
+        <button id="validate-good" class="btn btn-success join-item shadow-sm">
           <i class="fa-solid fa-check"></i>
           <span>Good</span>
         </button>
+
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="create-controls" class="hidden">
+  <div class="absolute inset-0 p-2 flex justify-center items-end">
+    <div class="flex w-[22rem] pointer-events-auto size-fit bg-base-100 shadow-md card p-2">
+      <div class="join grid grid-cols-auto-fit">
+
+        <button id="create-misc" class="btn btn-default join-item shadow-sm z-20">
+          <i class="fa-solid"></i>
+          <span>Undefined</span>
+        </button>
+
+        <button id="create-good" class="btn btn-success join-item shadow-sm">
+          <i class="fa-solid fa-check"></i>
+          <span>Good</span>
+        </button>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Badges #}
+<div class="absolute inset-0 p-2 flex justify-center items-start gap-2">
+  <div class="tooltip tooltip-bottom pointer-events-auto cursor-pointer min-w-0 !flex" data-tip="Copy to Clipboard">
+    <div id="system-version-badge"
+      class="badge badge-sm badge-primary gap-2 pointer-events-auto active:opacity-50 shadow-md hidden">
+      <i class="fa-solid fa-user-gear"></i>
+      <span id="system-text">Unknown System</span>
+      <i class="fa-solid fa-gears"></i>
+      <span id="version-text">Unknown Version</span>
+    </div>
+  </div>
+
+  <div class="tooltip tooltip-bottom pointer-events-auto cursor-pointer min-w-0 !flex" data-tip="Copy to Clipboard">
+    <div id="legend-item-badge"
+      class="badge badge-sm badge-primary gap-2 pointer-events-auto active:opacity-50 shadow-md hidden">
+      <i class="fa-solid fa-check-to-slot"></i>
+      <span id="legend-item-text">Unknown Legend Item</span>
     </div>
   </div>
 </div>

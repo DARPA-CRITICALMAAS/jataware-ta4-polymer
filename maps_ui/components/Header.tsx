@@ -11,11 +11,10 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 
 import Alert from "@mui/material/Alert";
-import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
+import Badge, { BadgeProps } from '@mui/material/Badge';
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
-import GitHubIcon from "@mui/icons-material/GitHub";
+import { styled } from '@mui/material/styles';
 
 import polymerLogo from "../assets/polymer_logo.svg?react";
 import IconButton from "@mui/material/IconButton";
@@ -27,10 +26,14 @@ import SvgIcon from "@mui/material/SvgIcon";
 import Menu from "@mui/material/Menu";
 import MenuIcon from "@mui/icons-material/Menu";
 import MenuItem from "@mui/material/MenuItem";
-import AdbIcon from "@mui/icons-material/Adb";
 import Snackbar from "@mui/material/Snackbar";
 import CloseIcon from "@mui/icons-material/Close";
 import CopyIcon from "@mui/icons-material/ContentCopy";
+import SubmitShapefileButtonModal from "./SubmitShapefileModel"
+import { useLocation } from 'react-router-dom';
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
+import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 import CMASelection from "./AddToCMA";
 import { ErrorBoundary } from "react-error-boundary";
@@ -45,6 +48,49 @@ const _APP_JSON_HEADER = {
   "Access-Control-Allow-Origin": "*",
   "Content-Type": "application/json",
 };
+
+function isNumber(n) {
+  return typeof n === "number";
+}
+
+export function sleep(delay) {
+  return new Promise((resolve) => setTimeout(resolve, delay));
+}
+
+const NavBadge = styled(Badge)<BadgeProps>(({ theme }) => ({
+  '& .MuiBadge-badge': {
+    right: 2,
+    top: -1,
+    // border: `1px solid ${theme.palette.background.paper}`,
+    height: "1rem",
+    fontWeight: "bold",
+    opacity: 0.78,
+    filter: "hue-rotate(12deg)",
+    fontSize: "0.6rem",
+    color: theme.palette.common.black,
+  },
+}));
+
+const SLOW_JOB_WAIT_TIME = 15000;
+async function pollCallSuccess(url) {
+  let wait = 5000; //ms
+  let totalSecondsWaited = 0;
+
+  while (true) {
+    await sleep(wait);
+    totalSecondsWaited += wait / 1000;
+    const res = await axios.get(url);
+    const { data } = res;
+    // const data = await res.json();
+
+    if (!["running", "pending"].includes(data.status)) {
+      return data.status;
+    }
+    if (totalSecondsWaited >= 90 && wait < SLOW_JOB_WAIT_TIME) {
+      wait = SLOW_JOB_WAIT_TIME;
+    }
+  }
+}
 
 const fallbackCopyTextToClipboard = (text: string) => {
   const textArea = document.createElement("textarea");
@@ -107,33 +153,71 @@ const NavButton = (props) => {
   );
 };
 
+// TODO use this for both the mobile-version menu and desktop version
 const pages = [
   {
     label: "Map GCPs",
     urlPath: "points",
   },
-  { label: "Projections", urlPath: "projections" },
+  { label: "Projections",
+    urlPath: "projections",
+    statusKey: "projections"
+  },
+  {
+    label: "Areas",
+    urlPath: "areas"
+  },
   {
     label: "Legend Swatches",
     urlPath: "swatchannotation",
+    statusKey: "legend_items",
   },
   {
     label: "Polygons",
     urlPath: "segment",
+    statusKey: "polygons" ,
     external: true,
   },
   {
     label: "Points/Lines",
     urlPath: "lines",
+    statusKey: "lines",
     external: true,
   },
 ];
+
+const V2_BASE_URL = import.meta.env.VITE_V2_UI_BASE_URL;
+
+const validGreen = "success";
+const pendingYellow = "pending"; // rgb(108, 171, 245) blue previously
+const emptyRed = "error";
+
+enum StatState {
+    VALIDATED = "validated",
+    PENDING = "pending",
+    EMPTY = "empty",
+};
+
+const stateToColorMapper = {
+  [StatState.VALIDATED]: validGreen,
+  [StatState.PENDING]: pendingYellow,
+  [StatState.EMPTY]: emptyRed,
+};
+
+// Previous tooltips
+// const statusToTooltip = {
+//   [validGreen]: "Validated items available.",
+//   [pendingYellow]: "Pending items available for review.",
+//   [emptyRed]: "No items available.",
+// }
 
 export default function Header({ navigate, forceLoading, cog_id }) {
   const { mode, setMode } = useColorScheme();
   const isFetching = useIsFetching();
   const isMutating = useIsMutating();
+  const location = useLocation();
 
+  const isProjectionsPage = location.pathname.includes('/projections/');
   function onNavClick(page) {
     const url = `/${page}/${cog_id}`;
     navigate(url);
@@ -142,6 +226,48 @@ export default function Header({ navigate, forceLoading, cog_id }) {
   function toV2Url(page) {
     return `/${page}/${cog_id}`;
   }
+
+  const availableExtractionsQuery = useQuery({
+    enabled: Boolean(cog_id),
+    queryKey: ["mapCog", cog_id, "extractionsAvailable"],
+    queryFn: async () => {
+      const response = await axios({
+        method: "GET",
+        url: "/api/map/" + cog_id + "/cog-stats-status",
+        headers: _APP_JSON_HEADER,
+      });
+      const { data } = response;
+
+      const singleFeatures = ["projections", "polygons", "legend_items"];
+      const colors = singleFeatures.reduce((acc, curr) => {
+        acc[curr] = {
+          total: data[curr].total,
+          validated: data[curr].validated,
+          color: stateToColorMapper[data[curr].status],
+        }
+        return acc;
+      }, {});
+
+      const stateOrder = [StatState.EMPTY, StatState.PENDING, StatState.VALIDATED];
+
+      let linePointKeyToUse = "lines";
+      // if points has a higher state than lines, replace "lines" with "points" state
+      if (stateOrder.indexOf(data["lines"]) < stateOrder.indexOf(data["points"])) {
+        linePointKeyToUse = "points";
+      }
+
+      // use lines as the url is /lines as well
+      colors["lines"] = {
+        color: stateToColorMapper[data[linePointKeyToUse].status],
+        total: data[linePointKeyToUse].total,
+        validated: data[linePointKeyToUse].validated,
+      }
+
+      // colors is a mui `color` variant prop (eg info, success, error, warning, etc)
+      return colors; // this will still be availableExtractionsQuery?.data
+    },
+    refetchOnWindowFocus: false,
+  });
 
   const cogProjectionsQuery = useQuery({
     enabled: Boolean(cog_id),
@@ -173,6 +299,37 @@ export default function Header({ navigate, forceLoading, cog_id }) {
     },
   });
 
+  const mapDownloadsAvailable = useQuery({
+    queryKey: ["mapCog", cog_id, "downloads"],
+  });
+
+  const georeferenceFeatures = useMutation({
+    mutationFn: async () => {
+      const geoFeatCall = await axios({
+        method: "POST",
+        url: `/api/map/${cog_id}/georeference-features`,
+        timeout: 5 * MINUTE,
+        headers: _APP_JSON_HEADER,
+      });
+
+      if (geoFeatCall.status === 200) {
+        const { job_id } = geoFeatCall.data;
+
+        const jobUrl = "/api/features/creation-job-status";
+        const jobUrlID = `${jobUrl}?job_id=${job_id}`;
+        await pollCallSuccess(jobUrlID)
+
+        const resultJobURL = jobUrlID.replace("status", "result");
+        const jobResult = await axios.get(resultJobURL);
+        if (jobResult.data.state === "success") {
+          return jobResult.data.state;
+        }
+        throw new Error(`Georeference Job Failed with status: ${jobResult.data.state}.`);
+      }
+      throw new Error(`An unexpected error ocurred. Status code: ${geoFeatCall.status}.`);
+    },
+  });
+
   const SnackbarActions = (
     <IconButton
       size="small"
@@ -187,14 +344,8 @@ export default function Header({ navigate, forceLoading, cog_id }) {
   const theme = useTheme();
   const isLargeScreen = useMediaQuery(theme.breakpoints.up("xl"));
   const isMediumScreen = useMediaQuery(theme.breakpoints.down("md"));
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-
-  function queueMapProcess() {}
 
   const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(
-    null,
-  );
-  const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(
     null,
   );
 
@@ -206,10 +357,38 @@ export default function Header({ navigate, forceLoading, cog_id }) {
     setAnchorElNav(null);
   };
 
+  const { data: statusData } = availableExtractionsQuery;
+
+  function getDataForStatus(statusKey) {
+    return statusData ? statusData[statusKey] : {};
+  }
+
+
+  function getBadgeContents(statusKey) {
+    const { total, validated } = getDataForStatus(statusKey);
+    if (isNumber(total) && isNumber(validated)) {
+      if (total == 0) {
+        return "0";
+      }
+      return `${validated} / ${total}`;
+    }
+      return "";
+  }
+
+  function getStatusTooltip(statusKey) {
+    const { total, validated } = getDataForStatus(statusKey);
+    if (isNumber(total) && isNumber(validated)) {
+      if (total === 0) {
+        return "No extractions available."
+      }
+      return `${validated} validated / ${total} total`;
+    }
+  }
+
   return (
     <header className="polymer-header-root">
       <div className="left-header">
-        <a href="/" className="polymer-title">
+        <a href={(V2_BASE_URL || "") + "/"} className="polymer-title">
           <div className="polymer-logo">
             {Boolean(isFetching) || Boolean(isMutating) || forceLoading ? (
               <Spinner size={33} />
@@ -250,15 +429,30 @@ export default function Header({ navigate, forceLoading, cog_id }) {
               onClose={handleCloseNavMenu}
             >
               {pages.map((page) => (
+
                 <MenuItem
                   key={page.label}
                   onClick={
                     page.external ? undefined : () => onNavClick(page.urlPath)
                   }
                   href={page.external && toV2Url(page.urlPath)}
-                  component={external ? "a" : undefined}
+                  component={page.external ? "a" : undefined}
                 >
-                  <Text textAlign="center">{page.label}</Text>
+                  {page.statusKey ? (
+                    <Tooltip
+                      title={getStatusTooltip(page.statusKey)}
+                      arrow
+                    >
+                      <NavBadge 
+                        badgeContent={getBadgeContents(page.statusKey)}
+                        color={getDataForStatus(page.statusKey).color}
+                      >
+                        <Text textAlign="center">{page.label}</Text>
+                      </NavBadge>
+                    </Tooltip>
+                  ) : (
+                      <Text textAlign="center">{page.label}</Text>
+                  )}
                 </MenuItem>
               ))}
             </Menu>
@@ -276,37 +470,101 @@ export default function Header({ navigate, forceLoading, cog_id }) {
                 Process Map
               </LoadingButton>
             </Tooltip>
+            {isProjectionsPage && (
+
+              <SubmitShapefileButtonModal cog_id={cog_id}></SubmitShapefileButtonModal>
+            )}
           </nav>
         ) : (
           <nav>
             <ul>
               <li>
-                <NavButton onClick={() => onNavClick("points")}>
-                  {!isLargeScreen ? <span>GCPs</span> : <span>Map GCPs</span>}
-                </NavButton>
+                <NavButton 
+                  onClick={() => onNavClick("points")} 
+                >
+                    {!isLargeScreen ? <span>GCPs</span> : <span>Map GCPs</span>}
+                  </NavButton>
               </li>
               {Boolean(cogProjectionsQuery?.data?.data?.length) && (
-                <li>
-                  <NavButton onClick={() => onNavClick("projections")}>
-                    Projections
-                  </NavButton>
-                </li>
+                  <li>
+                    <NavButton
+                      onClick={() => onNavClick("projections")}
+                    >
+                      <Tooltip
+                        title={getStatusTooltip("projections")}
+                        arrow
+                      >
+                        <NavBadge
+                          badgeContent={getBadgeContents("projections")}
+                          color={getDataForStatus("projections").color}
+                        >
+                          Projections
+                        </NavBadge>
+                      </Tooltip>
+                    </NavButton>
+                  </li>
               )}
               <li>
-                <NavButton onClick={() => onNavClick("swatchannotation")}>
-                  {!isLargeScreen ? (
-                    <span>Swatches</span>
-                  ) : (
-                    <span>Legend Swatches</span>
-                  )}
+                <NavButton onClick={() => onNavClick("areas")}>
+                  <span>Areas</span>
                 </NavButton>
               </li>
               <li>
-                <NavButton href={toV2Url("segment")}>Polygons</NavButton>
+                  <NavButton
+                    onClick={() => onNavClick("swatchannotation")}
+                  >
+                    <Tooltip
+                      title={getStatusTooltip("legend_items")}
+                      arrow
+                    >
+                      <NavBadge
+                        badgeContent={getBadgeContents("legend_items")}
+                        color={getDataForStatus("legend_items").color}
+                      >
+                        {!isLargeScreen ? (
+                          <span>Swatches</span>
+                        ) : (
+                          <span>Legend Swatches</span>
+                        )}
+                      </NavBadge>
+                    </Tooltip>
+                  </NavButton>
               </li>
 
               <li>
-                <NavButton href={toV2Url("lines")}>Points/Lines</NavButton>
+                <NavButton 
+                    href={toV2Url("segment")}
+                  >
+                    <Tooltip
+                      title={getStatusTooltip("polygons")}
+                      arrow
+                    >
+                    <NavBadge
+                      badgeContent={getBadgeContents("polygons")}
+                      color={getDataForStatus("polygons").color}
+                    >
+                      Polygons
+                    </NavBadge>
+                    </Tooltip>
+                </NavButton>
+              </li>
+
+              <li>
+                  <NavButton
+                    href={toV2Url("lines")}
+                  >
+                    <Tooltip
+                      title={getStatusTooltip("lines")}
+                      arrow
+                    >
+                      <NavBadge
+                        badgeContent={getBadgeContents("lines")}
+                        color={getDataForStatus("lines").color}
+                      >
+                        Points/Lines
+                      </NavBadge>
+                    </Tooltip>
+                  </NavButton>
               </li>
 
               <li>
@@ -328,11 +586,46 @@ export default function Header({ navigate, forceLoading, cog_id }) {
                   </LoadingButton>
                 </Tooltip>
               </li>
-
-              {cog_id && (
+              {isProjectionsPage && (
                 <li>
-                  <COGDownloads cog_id={cog_id}/>
+                  <SubmitShapefileButtonModal cog_id={cog_id}></SubmitShapefileButtonModal>
                 </li>
+              )}
+              {cog_id && (
+                <>
+                <li>
+                  <COGDownloads cog_id={cog_id} />
+                </li>
+                {isProjectionsPage && mapDownloadsAvailable.isSuccess && (
+                  <li>
+                    <Tooltip
+                      title={georeferenceFeatures.isSuccess ?
+                              "Successfully georeferenced all features. Click to run again." :
+                             georeferenceFeatures.isPending ? "Georeferencing new features (running)..." :
+                             georeferenceFeatures.isError ? "Failed to georeference new features. Try again later." :
+                              "Georeference manually-edited features and recreate packages."}
+                      placement="bottom"
+                      arrow
+                    >
+                      <span>
+                        <IconButton
+                          color={georeferenceFeatures.isSuccess ? "success" : georeferenceFeatures.isError ? "error" : "default"}
+                          onClick={georeferenceFeatures.mutate}
+                          disabled={georeferenceFeatures.isPending}
+                        >
+                          {georeferenceFeatures.isSuccess ? (
+                            <TaskAltIcon />
+                          ) : georeferenceFeatures.isError ? (
+                              <ErrorOutlineIcon />
+                          ) : (
+                            <RefreshRoundedIcon className={georeferenceFeatures.isPending ? 'rotating' : ''} />
+                          )}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </li>
+                )}
+                </>
               )}
             </ul>
           </nav>
@@ -404,6 +697,7 @@ export default function Header({ navigate, forceLoading, cog_id }) {
             : "Failed to queue map for processing."}
         </Alert>
       </Snackbar>
-    </header>
+
+    </header >
   );
 }

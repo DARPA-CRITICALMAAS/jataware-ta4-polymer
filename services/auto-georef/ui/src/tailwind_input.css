@@ -1,4 +1,3 @@
-/* @import "charts.css/dist/charts.min.css"; */
 @import "tailwindcss/base";
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
@@ -8,18 +7,25 @@
 
 :root {
   font-family: Inter, system-ui, sans-serif;
-  font-feature-settings: 'liga' 1, 'calt' 1; /* fix for Chrome */
+  font-feature-settings:
+    "liga" 1,
+    "calt" 1; /* fix for Chrome */
 }
 
 @supports (font-variation-settings: normal) {
-  :root { font-family: InterVariable, system-ui, sans-serif; }
+  :root {
+    font-family: InterVariable, system-ui, sans-serif;
+  }
 }
 
 .badge {
-  @apply p-3 uppercase font-bold;
+  @apply uppercase font-bold;
 }
 
-.badge-info, .badge-success, .badge-warning, .badge-error {
+.badge-info,
+.badge-success,
+.badge-warning,
+.badge-error {
   @apply text-primary-content;
 }
 
@@ -31,7 +37,7 @@
   @apply text-primary-content;
 }
 
-html[data-theme='dark'] {
+html[data-theme="dark"] {
   .badge-info,
   .badge-success,
   .badge-warning,
@@ -65,13 +71,19 @@ html[data-theme='dark'] {
   @apply inset-0;
 }
 
-.input:hover, .select:hover, .textarea:hover {
+.input:hover,
+.select:hover:not(.unstyled),
+.textarea:hover {
   @apply border-primary;
 }
 
-.input:focus, .input:focus-within,
-.select:focus, .select:focus-within, .input[type=file],
-.textarea:focus, .textarea:focus-within {
+.input:focus,
+.input:focus-within,
+.select:focus:not(unstyled),
+.select:focus-within:not(unstyled),
+.input[type="file"],
+.textarea:focus,
+.textarea:focus-within {
   @apply outline-primary;
   outline-width: 1px;
   outline-offset: 0px;
@@ -91,7 +103,6 @@ html[data-theme='dark'] {
   display: block;
 }
 
-
 .range-black {
   --range-shdw: auto;
 }
@@ -107,7 +118,8 @@ html[data-theme='dark'] {
 /*   --range-shdw: auto; */
 /* } */
 
-a:link, a:visited {
+a:link:not(.skip-link),
+a:visited:not(.skip-link) {
   @apply no-underline hover:underline text-accent;
 }
 
@@ -188,27 +200,60 @@ a:link, a:visited {
   transform-origin: 50% 50%;
 }
 
-
-#state-autocomplete-results .selected, #rock-units-autocomplete-results .selected,
-#cma-autocomplete-results .selected
-{
+#state-autocomplete-results .selected,
+#rock-units-autocomplete-results .selected,
+#cma-autocomplete-results .selected {
   @apply bg-base-300;
   filter: contrast(1.05);
 }
 
 .map-stats-grid {
-  grid-template-columns: repeat(auto-fill, minmax(100px,1fr));
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
 }
 
 .map-search-results-grid {
-  grid-template-columns: repeat(auto-fill, minmax(450px,1fr));
+  grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
 }
 
 .input.input-md {
   @apply h-10;
+  @apply min-h-10;
 }
 
-select.select.select-md {
+select.select.select-md:not(.unstyled) {
   @apply h-10;
   @apply min-h-10;
+}
+
+.filtered {
+  @apply hidden;
+}
+
+#cmas-left-panel {
+  #spinner {
+    display: none;
+  }
+
+  .htmx-request #spinner {
+    display: unset;
+  }
+
+  .htmx-request#spinner {
+    display: unset;
+  }
+
+  .htmx-request#spinner ~ #cma-details {
+    display: none;
+  }
+}
+
+.jata-tooltip-lg::before {
+  @apply text-base;
+}
+
+.drag-hint {
+  width: 1.4rem;
+  height: 1.9rem;
+  background-image: radial-gradient(circle, #4249624a 2px, transparent 1px);
+  background-size: 8px 8px;
 }

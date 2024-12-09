@@ -43,27 +43,18 @@ import {
   loadWMTSLayer,
   getShapeCenterPoint,
   returnInCDR,
-  returnInCDRStyle
+  returnInCDRStyle,
 } from "./helpers";
 import { fromUrl, fromArrayBuffer, fromBlob } from "geotiff";
-
 import SubmitProjectionModal from "./SubmitProjectionModal";
 import ControlPanel from "./ProjectionControlPanel";
+import { useConfig } from '../ConfigContext';
 
 import "../css/projection_viewer.scss";
 
 // Params
-const CDR_COG_URL = import.meta.env.VITE_CDR_COG_URL;
-const CDR_PUBLIC_BUCKET = import.meta.env.VITE_CDR_PUBLIC_BUCKET;
 
-const POLYMER_COG_URL = import.meta.env.VITE_POLYMER_COG_URL;
-const POLYMER_PUBLIC_BUCKET = import.meta.env.VITE_POLYMER_PUBLIC_BUCKET;
-
-const CDR_S3_COG_PRO_PREFEX = import.meta.env.VITE_CDR_S3_COG_PRO_PREFEX;
-const POLYMER_S3_COG_PRO_PREFEX = import.meta.env
-  .VITE_POlYMER_S3_COG_PRO_PREFEX;
-
-const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
+// const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
 const _APP_JSON_HEADER = {
   "Access-Control-Allow-Origin": "*",
@@ -71,6 +62,8 @@ const _APP_JSON_HEADER = {
 };
 
 function ProjectionsPage({ cog_id, mapData }) {
+  const config = useConfig();
+
   const navigate = useNavigate();
   const cog_name = mapData["cog_info"]["cog_name"];
   const all_proj_info = mapData["proj_info"].toReversed();
@@ -111,8 +104,9 @@ function ProjectionsPage({ cog_id, mapData }) {
     setOpenReview(false);
   };
 
+
   const base_source = new XYZ({
-    url: `https://api.maptiler.com/tiles/satellite/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
+    url: `https://api.maptiler.com/tiles/satellite/{z}/{x}/{y}.jpg?key=${config.MAPTILER_KEY}`,
     crossOrigin: "",
   });
 
@@ -127,7 +121,7 @@ function ProjectionsPage({ cog_id, mapData }) {
   const map_source = new GeoTIFF({
     sources: [
       {
-        url: determineMapSourceURL(curr_proj_info, cog_id),
+        url: determineMapSourceURL(curr_proj_info, cog_id, config),
         nodata: -1,
       },
     ],
@@ -193,7 +187,7 @@ function ProjectionsPage({ cog_id, mapData }) {
 
     waitForProjections(codes)
       .then(() => {
-        return setCenterExtent();
+        return setCenterExtent(config);
       })
       .then((center) => {
         return buildWMTSBaseLayers(center);
@@ -262,8 +256,9 @@ function ProjectionsPage({ cog_id, mapData }) {
 
   async function setCenterExtent() {
     let extent = await getGeoTIFFExtent(
-      determineMapSourceURL(all_proj_info[0], cog_id),
+      determineMapSourceURL(all_proj_info[0], cog_id, config),
     );
+    console.log(extent)
     let center = [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2];
     currCenterRef.current = center;
     return center;
@@ -318,7 +313,7 @@ function ProjectionsPage({ cog_id, mapData }) {
     const new_map_source = new GeoTIFF({
       sources: [
         {
-          url: determineMapSourceURL(all_proj_info[proj_index.current], cog_id),
+          url: determineMapSourceURL(all_proj_info[proj_index.current], cog_id, config),
           nodata: -1,
         },
       ],
@@ -372,12 +367,12 @@ function ProjectionsPage({ cog_id, mapData }) {
         handleClose();
         if (status == "validated") {
           alert("Validated");
-          oneMap("georeferenced", navigate, createPath("georeferenced", ".."));
-        } else {
+
           setTimeout(() => {
             window.location.reload();
           }, 2000);
         }
+
       })
       .catch((e) => {
         alert(e);
@@ -485,20 +480,22 @@ function ProjectionsPage({ cog_id, mapData }) {
     );
   }
 
+
   function checkValidatedProj(status) {
     if (status == "validated") {
-      return "TRUE"
+      return "TRUE";
     }
 
-    return "FALSE"
-
+    return "FALSE";
   }
   function returnValidatedStyle(status) {
     if (status == "validated") {
-      return { marginRight: "5px", background: "var(--mui-palette-success-light)" }
-
+      return {
+        marginRight: "5px",
+        background: "var(--mui-palette-success-light)",
+      };
     }
-    return { marginRight: "5px" }
+    return { marginRight: "5px" };
   }
 
   return (
@@ -557,6 +554,7 @@ function ProjectionsPage({ cog_id, mapData }) {
                 >
                   Random Map
                 </Button>
+
               </section>
 
               <Typography>
@@ -576,10 +574,13 @@ function ProjectionsPage({ cog_id, mapData }) {
                 <span style={{ display: "flex" }}>
                   In CDR:&nbsp;
                   <Chip
-                    style={returnInCDRStyle(all_proj_info[proj_index.current]["in_cdr"])}
+                    style={returnInCDRStyle(
+                      all_proj_info[proj_index.current]["in_cdr"],
+                    )}
                     size="small"
-                    label={returnInCDR(all_proj_info[proj_index.current]["in_cdr"])
-                    }
+                    label={returnInCDR(
+                      all_proj_info[proj_index.current]["in_cdr"],
+                    )}
                   />
                 </span>
               </Typography>
@@ -588,9 +589,13 @@ function ProjectionsPage({ cog_id, mapData }) {
                   <span>
                     Validated:&nbsp;
                     <Chip
-                      style={returnValidatedStyle(all_proj_info[proj_index.current]["status"])}
+                      style={returnValidatedStyle(
+                        all_proj_info[proj_index.current]["status"],
+                      )}
                       size="small"
-                      label={checkValidatedProj(all_proj_info[proj_index.current]["status"])}
+                      label={checkValidatedProj(
+                        all_proj_info[proj_index.current]["status"],
+                      )}
                     />
                   </span>
                 </span>
@@ -711,6 +716,7 @@ function ProjectionsPage({ cog_id, mapData }) {
         handleClose={handleClose}
         save={saveProjection}
       />
+
     </>
   );
 }

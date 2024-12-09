@@ -11,6 +11,7 @@ from cdr_schemas.cdr_responses.features import LineExtractionResponse, PointExtr
 from cdr_schemas.cdr_responses.legend_items import LegendItemResponse
 from cdr_schemas.feature_results import FeatureResults
 from cdr_schemas.features.line_features import (
+    DashType,
     Line,
     LineFeature,
     LineFeatureCollection,
@@ -47,6 +48,7 @@ class FeatureResponse(BaseModel):
     legend_id: str
     bbox: list[float | int]
     is_validated: bool | None
+    dash_pattern: DashType | None
 
 
 class FeatureGroup(BaseModel):
@@ -59,11 +61,14 @@ class PublishRequest(BaseModel):
     geometry: Line | Point
     feature_id: str
     legend_id: str
+    dash_pattern: DashType | None = None
+
 
 class UpdateStatusRequest(BaseModel):
     feature_id: str
     ftype: str
     is_validated: bool | None
+
 
 class CDRClient:
     def __init__(self, cog_id: str, *, system: str | None = None, version: str | None = None):
@@ -154,11 +159,7 @@ class CDRClient:
         self._publish_feature("point", result)
 
     def update_status(self, feature_id: str, ftype: str, is_validated: bool | None):
-        data = {
-            "feature_ids": [feature_id], 
-            "feature_type": ftype,
-            "validated": is_validated
-        }
+        data = {"feature_ids": [feature_id], "feature_type": ftype, "validated": is_validated}
         self.post(f"update/bulk_feature_status", data)
 
 
@@ -216,6 +217,9 @@ def get_features(cog_id: str, ftype: FType, system: str, version: str, max_num: 
         elif isinstance(feature, PointExtractionResponse):
             return feature.point_id
 
+    def get_dash_pattern(feature: LineExtractionResponse | PointExtractionResponse):
+        return feature.dash_pattern if isinstance(feature, LineExtractionResponse) else None
+
     # Get features
     features = None
     if ftype == "line":
@@ -232,6 +236,7 @@ def get_features(cog_id: str, ftype: FType, system: str, version: str, max_num: 
             bbox=flip_bbox(f.px_bbox, height),
             is_validated=f.validated,
             feature_id=get_feature_id(f),
+            dash_pattern=get_dash_pattern(f),
         )
         for f in features
     ]
@@ -295,6 +300,7 @@ def get_legend_items(cog_id: str, ftype: str, system: str, version: str):
     legend_items = [LegendItemResponse(**li) for li in response]
     return legend_items
 
+
 @router.post("/update-status", status_code=HTTP_204_NO_CONTENT)
 def update_status(request: UpdateStatusRequest):
     """
@@ -302,9 +308,10 @@ def update_status(request: UpdateStatusRequest):
     """
 
     logger.info(f"Updating status of feature: {request.feature_id} to {request.is_validated}")
-    
+
     client = CDRClient("")
     client.update_status(request.feature_id, request.ftype, request.is_validated)
+
 
 @router.post("/publish", status_code=HTTP_204_NO_CONTENT)
 def publish(request: PublishRequest):
@@ -348,11 +355,15 @@ def publish(request: PublishRequest):
         line_id = hashlib.sha256(str(line).encode()).hexdigest()
         feature = LineFeature(
             id=f"{request.cog_id}_{POLYMER}_{latest_version}_{line_id}",
+            geometry=line,
             properties=LineProperties(
                 model=POLYMER,
                 model_version=latest_version,
                 validated=True,
                 reference_id=request.feature_id,
+                # TODO: Remove this hardcoding once the `cdr_schemas` is updated to include
+                # the same `dash_pattern` type in `LineProperties` and `LineExtractionResponse`
+                dash_pattern=request.dash_pattern,
             ),
         )
         features_legend = LineLegendAndFeaturesResult(
@@ -360,12 +371,14 @@ def publish(request: PublishRequest):
             name=legend_items[request.legend_id].label,
             description=legend_items[request.legend_id].description,
             validated=True,
-            point_features=LineFeatureCollection(features=[feature]),
+            line_features=LineFeatureCollection(features=[feature]),
         )
         client.publish_line(features_legend)
 
+
 def dict_features(features: dict[str, list[FeatureResponse]]):
     return {lid: [f.model_dump() for f in fs] for lid, fs in features.items()}
+
 
 @router.get("/view-features")
 def get_view_features(request: Request, cog_id: str, ftype: FType, system: str, version: str, max_num: int = 0):
@@ -374,6 +387,8 @@ def get_view_features(request: Request, cog_id: str, ftype: FType, system: str, 
     context = {
         "features": dict_features(grouped_features),
         "groups": feature_groups,
+        "system": system,
+        "version": version,
     }
 
     return create_template("groups", request, context)
@@ -381,21 +396,43 @@ def get_view_features(request: Request, cog_id: str, ftype: FType, system: str, 
 
 @router.get("/validate-features")
 def get_validate_features(request: Request, cog_id: str, ftype: FType, system: str, version: str, max_num: int = 0):
-
     latest_version = get_latest_version(cog_id, POLYMER)
     legend_groups = get_legend_items(cog_id, ftype, POLYMER, latest_version)
+    legend_id_to_label = {li.legend_id: li.label for li in legend_groups}
 
     grouped_features, feature_groups = get_features(cog_id, ftype, system, version, max_num)
     polymer_grouped_features, _ = get_features(cog_id, ftype, POLYMER, latest_version, max_num)
-    
+
     context = {
         "features": dict_features(grouped_features),
         "polymer_features": dict_features(polymer_grouped_features),
         "groups": feature_groups,
         "legend_groups": legend_groups,
+        "legend_id_to_label": legend_id_to_label,
+        "system": system,
+        "version": version,
     }
 
     return create_template("group-select", request, context)
+
+
+@router.get("/create-features")
+def get_create_features(request: Request, cog_id: str, ftype: FType, max_num: int = 0):
+    latest_version = get_latest_version(cog_id, POLYMER)
+    legend_groups = get_legend_items(cog_id, ftype, POLYMER, latest_version)
+    legend_id_to_label = {li.legend_id: li.label for li in legend_groups}
+
+    polymer_grouped_features, _ = get_features(cog_id, ftype, POLYMER, latest_version, max_num)
+
+    context = {
+        "polymer_features": dict_features(polymer_grouped_features),
+        "legend_groups": legend_groups,
+        "legend_id_to_label": legend_id_to_label,
+        "system": POLYMER,
+        "version": latest_version,
+    }
+
+    return create_template("create-select", request, context)
 
 
 @router.get("/{cog_id}")

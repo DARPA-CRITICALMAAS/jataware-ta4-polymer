@@ -1,0 +1,52 @@
+<style>
+.modal.modal-open {
+    pointer-events: none;
+}
+.modal.modal-open .modal-box {
+    pointer-events: auto;
+}
+</style>
+<dialog id="create-raster-dialog" class="modal">
+    <div class="modal-box p-0 max-w-xl">
+        <div class="p-4 text-base-100 bg-info cursor-move flex items-center" id="raster-title">
+            <div class="drag-hint mr-2">
+            </div>
+            <h3 style="user-select: none;" class="text-lg font-bold  p-0">Raster Evidence Layers in CDR</h3>
+        </div>
+        <div class="p-4 overflow-y-auto max-h-[80vh]">
+            <p class="py-2 caption">
+                Name each raster layer. Submit to start evidence layer creation.
+            </p>
+            <form id="raster-step-1">
+            </form>
+            <div id="raster-step-2" class="hidden">
+                <p class="py-3 flex gap-2 items-center">
+                    <span class="loading loading-spinner loading-md"></span>
+                    <span id="raster-status">package jobs are</span>
+                </p>
+
+                <ul id="raster-failed-job-ids"></ul>
+
+                <div class="job-status-breakdown mb-2 px-1"></div>
+
+                <div role="alert" class="alert dark:bg-base-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                        class="stroke-info h-6 w-6 shrink-0">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>You may open a new tab to continue using polymer.</span>
+                </div>
+            </div>
+
+            <div id="raster-step-3" class="hidden mt-2">
+                <p class="mb-1">These rasterized layers have been pushed to CDR as evidence layers. You may download them for local use:</p>
+                <ul id="layer-download-links" class="prose"></ul>
+            </div>
+
+            <div class="modal-action hidden">
+                <button class="btn">Close</button>
+            </div>
+        </div>
+    </div>
+</dialog>

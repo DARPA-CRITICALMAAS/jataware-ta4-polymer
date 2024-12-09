@@ -22,7 +22,7 @@
         </svg>
       </div>
       {%if not downloads['disabled'] %}
-      <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-sm border-primary border-solid border z-[1] w-52 p-2 shadow-md">
+      <ul tabindex="0" class="my-0 dropdown-content menu bg-base-100 rounded-sm border-primary border-solid border z-[1] w-52 p-2 shadow-md">
         <li>
           <a
             class="rounded-none"
@@ -80,34 +80,41 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
       </svg>
     </label>
-    <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded z-[1] w-52 p-2 shadow max-h-96 border border-solid border-base-300">
-      {%for cma in cmas%}
-      <li class="cursor-pointer">
-        <a
-          class="rounded-none {%if cma.selected %}active{% endif %} hover:brightness-125 cma-toggler-link"
-          data-cog_id="{{cog_id}}"
-          hx-target="this"
-          hx-swap="outerHTML"
-          hx-on="click"
-          hx-post="{{template_prefix}}/cma-{%if cma.selected %}unlink{%else%}link{%endif%}/{{cma.cma_id}}?cog_id={{cog_id}}&mineral={{cma.mineral}}"
-          >
-          <input
-            type="checkbox"
-            {%if cma.selected %}
-            checked="checked"
-            {%endif%}
-            class="checkbox pointer-events-none"
-            />{{cma.mineral}}
-        </a>
-      </li>
-      {%endfor%}
-    </ul>
+    <div class="dropdown-content max-h-60 overflow-x-hidden overflow-y-auto z-[1]" tabindex="0">
+      <ul class="my-0 not-prose menu menu-sm bg-base-100 rounded w-52 p-2 shadow border border-solid border-base-300">
+        {%for cma in cmas%}
+          <li
+            class="cursor-pointer"
+            title="{{cma.cma_id}}"
+              >
+            <a
+              class="rounded-none {%if cma.selected %}active {% endif %}hover:brightness-125 skip-link no-underline"
+              data-cog_id="{{cog_id}}"
+              hx-target="this"
+              hx-swap="outerHTML"
+              hx-on="click"
+              hx-post="{{template_prefix}}/cma-{%if cma.selected %}unlink{%else%}link{%endif%}/{{cma.cma_id}}?cog_id={{cog_id}}&mineral={{cma.mineral}}"
+              >
+              <input
+                type="checkbox"
+                {%if cma.selected %}
+                  checked="checked"
+                {%endif%}
+                class="checkbox pointer-events-none"
+                />{{cma.mineral}}
+            </a>
+          </li>
+        {%endfor%}
+      </ul>
+      <div>
   </div>
 
 </div>
 
 {% block javascript %}
 <script>
-  updateCMAInput("{{cog_id}}");
+  if (updateCMAInput) {
+    updateCMAInput("{{cog_id}}");
+  }
 </script>
 {% endblock %}

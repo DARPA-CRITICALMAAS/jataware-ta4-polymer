@@ -1,0 +1,40 @@
+<style>
+.modal.modal-open {
+    pointer-events: none;
+}
+.modal.modal-open .modal-box {
+    pointer-events: auto;
+}
+</style>
+<dialog id="download-package-dialog" class="modal">
+    <div class="modal-box p-0">
+        <div class="p-4 text-base-100 bg-info cursor-move flex items-center" id="download-title">
+            <div class="drag-hint mr-2"></div>
+            <h3 style="user-select: none;" class="text-lg font-bold  p-0">Creating Packages</h3>
+        </div>
+        <div class="p-4">
+            <p class="py-2" id="download-package-caption">Packages are being prepared. Please stay on this page until downloads are completed.
+            </p>
+            <p class="py-4 flex gap-2 items-center">
+                <span class="loading loading-spinner loading-md"></span>
+                <span id="job-count-status">package jobs are</span>
+            </p>
+
+            <ul id="failed-job-ids"></ul>
+
+            <div class="job-status-breakdown mb-2 px-1"></div>
+
+            <div role="alert" class="alert dark:bg-base-300">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                    class="stroke-info h-6 w-6 shrink-0">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>You may open a new tab to continue using polymer.</span>
+            </div>
+            <div class="modal-action hidden">
+                <button class="btn">Close</button>
+            </div>
+        </div>
+    </div>
+</dialog>

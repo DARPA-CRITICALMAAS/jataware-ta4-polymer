@@ -21,7 +21,8 @@
     "jsts": "^2.11.3",
     "ol": "^8.1.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "theme-change": "^2.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.5.0",

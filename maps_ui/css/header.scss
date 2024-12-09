@@ -4,17 +4,24 @@
   display: flex;
   align-items: center;
 
+  .rotating {
+    animation: rotation 2s infinite linear;
+  }
+
   .left-header {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
 
     nav {
+      align-items: center;
       ul {
         margin: 0;
         display: flex;
         list-style: none;
+        align-items: center;
         li {
-          margin-right: 0.75rem;
+          margin-right: 0.5rem;
         }
       }
     }
@@ -73,3 +80,5 @@
     }
   }
 }
+
+@keyframes rotation { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

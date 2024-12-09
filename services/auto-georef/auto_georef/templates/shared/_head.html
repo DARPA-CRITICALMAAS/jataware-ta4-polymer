@@ -1,11 +1,17 @@
-  <head>
-    <title>{{ page_title or "Polymer" }}</title>
-    
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+  <title>{{ page_title or "Polymer" }}</title>
 
-    <link rel="icon" type="image/x-icon" href="/static/img/polymer.png" />
-    <link href="/static/css/app.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <script src="/static/js/htmx.js" type="module"></script>
-  </head>
+  <!-- Avoid Flash of inAccurate coloR Theme (FART) -->
+  <script>
+    document.documentElement.dataset.theme =
+      localStorage.getItem("theme") ?? "";
+  </script>
+
+  <link rel="icon" type="image/x-icon" href="/static/img/polymer.png" />
+  <link href="/static/css/app.css" rel="stylesheet" />
+
+  <script src="/static/js/htmx.js" type="module"></script>
+</head>

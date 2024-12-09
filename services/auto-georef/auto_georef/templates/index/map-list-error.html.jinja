@@ -10,3 +10,10 @@
     {% endif %}
   </p>
 </div>
+
+{% block javascript %}
+<script>
+  document.getElementById("maps-results-count-total").classList.add("hidden");
+  setTimeout(window.connectMapResultsToMap, 10);
+</script>
+{% endblock %}

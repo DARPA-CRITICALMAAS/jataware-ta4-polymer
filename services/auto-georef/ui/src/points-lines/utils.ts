@@ -17,10 +17,12 @@ import { Failure, Success } from "@/utils/result";
 
 import MouseWheelZoom from "@/utils/openlayers/mouse-wheel-zoom";
 import DoubleClickZoom from "@/utils/openlayers/double-click-zoom";
+import Spline from "@/utils/openlayers/spline";
 import { randint } from "@/utils/random";
 import { type Color, colorContrast, colorString, HSL } from "@/utils/color";
 import ModifierKey from "@/utils/modifier-key";
 import { defaultResolution } from "@/utils/resolution";
+import { copyTextToClipboard as copy } from "@/utils/clipboard";
 
 import FeatureMarker from "@/points-lines/feature-marker";
 import * as E from "@/points-lines/elements";
@@ -43,6 +45,21 @@ export function removeAllFeatures(map: OpenLayersMap) {
 }
 
 /**
+ * Remove a feature from the map.
+ * @param map - The map to remove the feature from.
+ * @param feature - The feature to remove.
+ */
+export function removeFeature(map: OpenLayersMap, feature: OpenLayersFeature) {
+  const layers = map.getLayers().getArray();
+
+  for (const layer of layers) {
+    if (layer instanceof VectorLayer) {
+      layer.getSource().removeFeature(feature);
+    }
+  }
+}
+
+/**
  * Formats the raw features groups to the correct format.
  * @param rawFeatures - The raw features to format.
  * @returns The formatted features.
@@ -57,6 +74,7 @@ export function formatRawFeatures(
         { from: "feature_id", to: "featureID" },
         { from: "legend_id", to: "legendID" },
         { from: "is_validated", to: "isValidated" },
+        { from: "dash_pattern", to: "dashPattern" },
       ]),
     );
   }
@@ -68,31 +86,75 @@ export function formatRawFeatures(
  * Sets the page mode to the specified mode.
  * @param mode - The mode to set.
  */
-export function setMode(mode: PageMode | undefined) {
+export function setMode(map: OpenLayersMap, mode: PageMode | undefined) {
+  // Set the mode in the global state
   polymer.mode = mode;
 
-  const groupSidebar = E.query("#group-sidebar").classList;
-  const validateControls = E.validateControls.classList;
-  const sidebarToggle = E.query<HTMLInputElement>("#sidebar-toggle");
-  const switchGroup = E.switchGroup.classList;
+  // Reset the global state
+  polymer.ftype = undefined;
+  polymer.association = undefined;
+  polymer.markedFeatures = [];
+  polymer.system = undefined;
+  polymer.version = undefined;
 
+  // Reset zoom anchor
+  setZoomAnchor(map, undefined);
+
+  // Elements to adjust
+  const groupSidebar = E.query("#group-sidebar").classList;
+  const sidebarToggle = E.query<HTMLInputElement>("#sidebar-toggle");
+  const validateControls = E.validateControls.classList;
+  const createControls = E.createControls.classList;
+  const newValidateButton = E.newValidateButton.classList;
+  const newCreateButton = E.newCreateButton.classList;
+
+  // Reset the badges
+  setSystemVersionBadge();
+  setLegendItemBadge();
+
+  // Adjustments for viewing or not
   if (mode === "view") {
     groupSidebar.remove("hidden");
-    validateControls.add("hidden");
-    switchGroup.add("hidden");
-  } else if (mode === "validate") {
+  } else {
     groupSidebar.add("hidden");
-    switchGroup.remove("hidden");
     sidebarToggle.checked = false;
   }
+
+  // Adjustments for validation or not
+  if (mode === "validate") {
+    newValidateButton.remove("hidden");
+  } else {
+    validateControls.add("hidden");
+    newValidateButton.add("hidden");
+  }
+
+  // Adjustments for creating or not
+  if (mode === "create") {
+    newCreateButton.remove("hidden");
+  } else {
+    E.linePattern.classList.add("hidden");
+    createControls.add("hidden");
+    newCreateButton.add("hidden");
+  }
+
+  // Deactivate the double click zoom interaction on create mode
+  map.getInteractions().forEach((interaction) => {
+    if (interaction instanceof DoubleClickZoom) {
+      interaction.setActive(mode !== "create");
+    } else if (interaction instanceof Spline) {
+      interaction.setActive(false);
+    }
+  });
 }
 
 /**
- * Shows a modal dialog.
+ * Shows a modal dialog, while resetting the form.
  * @param modal - The modal dialog to show.
  */
 export function showModal(modal: HTMLDialogElement) {
   modal.showModal();
+
+  E.queryAll<HTMLFormElement>(modal, "form").forEach((form) => form.reset());
 
   if (document.activeElement instanceof HTMLElement) {
     document.activeElement.blur();
@@ -134,13 +196,17 @@ export async function addFeatures(
  * @param legendID - The legend ID of the lines.
  * @param lines - The lines to add to the map.
  */
-async function addLines(
+export async function addLines(
   map: OpenLayersMap,
   legendID: string,
   lines: Feature<LineString>[],
 ) {
   const hue = await randint(0, 360, legendID);
   const { width, border, alpha } = K.LINE_STYLE;
+
+  const hsl = HSL(hue, 100, 50);
+  const color = colorString(hsl, alpha);
+  const outerColor = getOuterColor(hsl);
 
   const features = lines.map((line) => {
     const feature = new OpenLayersFeature({
@@ -158,33 +224,44 @@ async function addLines(
           width,
           border,
           alpha,
+          lineDash: K.LINE_DASH[line.dashPattern ?? "solid"],
         },
       });
+    } else {
+      const lineDash = K.LINE_DASH[line.dashPattern ?? "solid"];
+
+      const styleOuter = new Style({
+        stroke: new Stroke({ color: outerColor, width, lineDash }),
+      });
+
+      const styleInner = new Style({
+        stroke: new Stroke({ color, width: width - border, lineDash }),
+      });
+
+      feature.setStyle([styleOuter, styleInner]);
     }
 
     return feature;
   });
 
-  const hsl = HSL(hue, 100, 50);
-  const color = colorString(hsl, alpha);
-  const outerColor = getOuterColor(hsl);
+  // Check if the layer already exists
+  const lineLayer = map
+    .getLayers()
+    .getArray()
+    .find((layer) => layer.get("legendID") === legendID);
 
-  const styleOuter = new Style({
-    stroke: new Stroke({ color: outerColor, width }),
-  });
-
-  const styleInner = new Style({
-    stroke: new Stroke({ color, width: width - border }),
-  });
-
-  const lineLayer = new VectorLayer({
-    source: new VectorSource({ features }),
-    style: [styleOuter, styleInner],
-    properties: { legendID },
-    updateWhileInteracting: true, // May have performance issues
-  });
-
-  map.addLayer(lineLayer);
+  // Add the features to the layer or create a new layer
+  if (lineLayer instanceof VectorLayer) {
+    lineLayer.getSource().addFeatures(features);
+  } else {
+    map.addLayer(
+      new VectorLayer({
+        source: new VectorSource({ features }),
+        properties: { legendID },
+        updateWhileInteracting: true, // May have performance issues
+      }),
+    );
+  }
 }
 
 /**
@@ -192,7 +269,7 @@ async function addLines(
  * @param legendID - The legend ID of the points.
  * @param points - The points to add to the map.
  */
-async function addPoints(
+export async function addPoints(
   map: OpenLayersMap,
   legendID: string,
   points: Feature<Point>[],
@@ -218,6 +295,17 @@ async function addPoints(
           alpha,
         },
       });
+    } else if (polymer.mode === "create") {
+      setMarkedFeature(map, {
+        feature,
+        options: {
+          isValidated: point.isValidated,
+          isBold: point.isValidated === null,
+          width,
+          border,
+          alpha,
+        },
+      });
     }
 
     return feature;
@@ -235,14 +323,25 @@ async function addPoints(
     }),
   });
 
-  const pointLayer = new VectorLayer({
-    source: new VectorSource({ features }),
-    style,
-    properties: { legendID },
-    updateWhileInteracting: true, // May have performance issues
-  });
+  // Check if the layer already exists
+  const pointLayer = map
+    .getLayers()
+    .getArray()
+    .find((layer) => layer.get("legendID") === legendID);
 
-  map.addLayer(pointLayer);
+  // Add the features to the layer or create a new layer
+  if (pointLayer instanceof VectorLayer) {
+    pointLayer.getSource().addFeatures(features);
+  } else {
+    map.addLayer(
+      new VectorLayer({
+        source: new VectorSource({ features }),
+        style,
+        properties: { legendID },
+        updateWhileInteracting: true, // May have performance issues
+      }),
+    );
+  }
 }
 
 /**
@@ -250,7 +349,11 @@ async function addPoints(
  * @param legendID - The legend ID of the bounding boxes.
  * @param features - The features to add to the map.
  */
-function addBBoxes(map: OpenLayersMap, legendID: string, features: Feature[]) {
+export function addBBoxes(
+  map: OpenLayersMap,
+  legendID: string,
+  features: Feature[],
+) {
   const newFeatures = features.map((f) => {
     const [x1, y1, x2, y2] = f.bbox;
     const feature = new OpenLayersFeature({
@@ -267,13 +370,24 @@ function addBBoxes(map: OpenLayersMap, legendID: string, features: Feature[]) {
     return feature;
   });
 
-  const bboxLayer = new VectorLayer({
-    source: new VectorSource({ features: newFeatures }),
-    properties: { legendID },
-    updateWhileInteracting: true, // May have performance issues
-  });
+  // Check if the layer already exists
+  const bboxLayer = map
+    .getLayers()
+    .getArray()
+    .find((layer) => layer.get("legendID") === legendID);
 
-  map.addLayer(bboxLayer);
+  // Add the features to the layer or create a new layer
+  if (bboxLayer instanceof VectorLayer) {
+    bboxLayer.getSource().addFeatures(newFeatures);
+  } else {
+    map.addLayer(
+      new VectorLayer({
+        source: new VectorSource({ features: newFeatures }),
+        properties: { legendID },
+        updateWhileInteracting: true, // May have performance issues
+      }),
+    );
+  }
 }
 
 /**
@@ -312,6 +426,25 @@ export function getFeatureFromLegendIDAndFeatureID(
   const feature = vectorSource?.getFeatureById(featureID);
 
   if (feature == null) {
+    // Hardcoded check for line creation
+    if (polymer.mode === "create" && polymer.ftype === "line") {
+      const spline = map
+        .getInteractions()
+        .getArray()
+        .find((i) => i instanceof Spline);
+
+      const splineFeature = spline?.getSpline();
+      if (splineFeature?.getId() === featureID) {
+        return splineFeature;
+      }
+
+      for (const controlPoint of spline?.controlPoints ?? []) {
+        if (controlPoint.getId() === featureID) {
+          return controlPoint;
+        }
+      }
+    }
+
     throw new Error(`Feature not found for feature ID: ${featureID}`);
   }
 
@@ -353,6 +486,7 @@ export function setMarkedFeature(
       width: number;
       border: number;
       alpha: number;
+      lineDash?: number[];
     };
   },
 ) {
@@ -360,7 +494,7 @@ export function setMarkedFeature(
     feature: potentialFeature,
     legendID,
     featureID,
-    options: { isValidated, isBold: isFocused, width, border, alpha },
+    options: { isValidated, isBold: isFocused, width, border, alpha, lineDash },
   } = args;
 
   const feature =
@@ -401,17 +535,27 @@ export function setMarkedFeature(
         stroke: new Stroke({
           color,
           width: (width - border) * (isFocused ? 1.5 : 1),
+          lineDash,
         }),
       });
 
       const outerStyle = new Style({
         stroke: new Stroke({
           color: outerColor,
-          width: width * (isFocused ? 2 : 1),
+          width: width * (isFocused ? 1.5 : 1),
+          lineDash,
         }),
       });
 
-      return [outerStyle, innerStyle];
+      const outerStyleBold = new Style({
+        stroke: new Stroke({
+          color: outerColor === "black" ? "white" : "black",
+          width: width * (isFocused ? 2 : 1),
+          lineDash,
+        }),
+      });
+
+      return [outerStyleBold, outerStyle, innerStyle];
     } else {
       throw new Error("Unsupported geometry type");
     }
@@ -433,8 +577,9 @@ export function setFeatureBold(
   const featureID = feature.featureID;
   const legendID = feature.legendID;
 
-  const otherOptions =
-    feature.geometry.type === "LineString" ? K.LINE_STYLE : K.POINT_STYLE;
+  const other = { Point: K.POINT_STYLE, LineString: K.LINE_STYLE }[
+    feature.geometry.type
+  ];
 
   setMarkedFeature(map, {
     featureID,
@@ -442,7 +587,8 @@ export function setFeatureBold(
     options: {
       isValidated: feature.isValidated,
       isBold,
-      ...otherOptions,
+      lineDash: feature.dashPattern ? K.LINE_DASH[feature.dashPattern] : [],
+      ...other,
     },
   });
 }
@@ -501,6 +647,9 @@ export function tryShowNextFeature(
 
   showFeature(map, markedFeature.feature, shouldZoom);
   setCanMark(map, true);
+  if (polymer.ftype === "line") {
+    E.linePatternSelect.value = markedFeature.feature.dashPattern ?? "solid";
+  }
 
   return Success(false);
 }
@@ -541,7 +690,7 @@ function validateData(
  * @param isError - Whether to show the error.
  * @param message - The optional error message to show.
  */
-export function setSessionFormSubmitError(isError: boolean, message?: string) {
+export function setSessionFormError(isError: boolean, message?: string) {
   const query = "label:has(> input[type='submit'])";
   const submit = E.query(E.sessionForm, query);
   const submitInput = E.query<HTMLInputElement>(submit, "input");
@@ -554,7 +703,7 @@ export function setSessionFormSubmitError(isError: boolean, message?: string) {
 
     if (submitText.dataset.originalText === undefined) {
       submitText.dataset.originalText = submitText.innerText;
-      submitText.innerText = message ?? "Internal Server Error";
+      submitText.innerText = message ?? "Error";
     }
   } else {
     submitInput.disabled = false;
@@ -566,15 +715,16 @@ export function setSessionFormSubmitError(isError: boolean, message?: string) {
       delete submitText.dataset.originalText;
     }
   }
+
+  E.sessionForm.addEventListener("change", () => setSessionFormError(false));
 }
 
 /**
  * Validates the session form, adding error rings to invalid elements.
  * @returns Whether the session form is valid.
  */
-export function sessionFormValidation(): boolean {
+export function didValidateSessionForm(): boolean {
   const data = new FormData(E.sessionForm);
-  setSessionFormSubmitError(false);
 
   const isValid = (name: string) => data.get(name) !== null;
   const elements = (name: string) => {
@@ -582,21 +732,31 @@ export function sessionFormValidation(): boolean {
     return E.queryAll(query);
   };
 
-  const names = ["mode", "system"];
+  const mode = data.get("mode") as PageMode | undefined;
+  const names = ["mode", mode === "create" ? "feature-type" : "system"];
 
   const areValids = names.map((name) => {
     return validateData(elements(name), isValid(name));
   });
 
-  return areValids.every(Boolean);
+  const isFormValid = areValids.every(Boolean);
+
+  // Add or remove the event listener based on the form validity
+  if (isFormValid) {
+    E.sessionForm.removeEventListener("change", didValidateSessionForm);
+  } else {
+    E.sessionForm.addEventListener("change", didValidateSessionForm);
+  }
+
+  return isFormValid;
 }
 
 /**
  * Validates the validation form, adding error rings to invalid elements.
  * @returns Whether the validation form is valid.
  */
-export function validationFormValidation(): boolean {
-  const data = new FormData(E.validationForm);
+export function didValidateValidateForm(): boolean {
+  const data = new FormData(E.validateForm);
 
   const isValid = (element: Element, value: string) =>
     Array.from(E.queryAll<HTMLOptionElement>(element, "option"))
@@ -613,7 +773,45 @@ export function validationFormValidation(): boolean {
     return validateData(select, isValid(select, value));
   });
 
-  return areValids.every(Boolean);
+  const isFormValid = areValids.every(Boolean);
+
+  // Add or remove the event listener based on the form validity
+  if (isFormValid) {
+    E.sessionForm.removeEventListener("change", didValidateSessionForm);
+  } else {
+    E.sessionForm.addEventListener("change", didValidateSessionForm);
+  }
+
+  return isFormValid;
+}
+
+/**
+ * Validates the create form, adding error rings to invalid elements.
+ * @returns Whether the create form is valid.
+ */
+export function didValidateCreateForm(): boolean {
+  const data = new FormData(E.createForm);
+
+  const isValid = (element: Element, value: string) =>
+    Array.from(E.queryAll<HTMLOptionElement>(element, "option"))
+      .filter((option) => !option.disabled)
+      .map((option) => option.value)
+      .includes(value);
+  const element = (name: string) => E.query(`select[name='${name}']`);
+
+  const value = data.get("legend") as string;
+  const select = element("legend");
+
+  const isFormValid = validateData(select, isValid(select, value));
+
+  // Add or remove the event listener based on the form validity
+  if (isFormValid) {
+    E.sessionForm.removeEventListener("change", didValidateSessionForm);
+  } else {
+    E.sessionForm.addEventListener("change", didValidateSessionForm);
+  }
+
+  return isFormValid;
 }
 
 /**
@@ -632,7 +830,7 @@ export function setZoomAnchor(
   }
 }
 
-export type SkipButtonState =
+export type ValidateMiscButtonState =
   | "start"
   | "skip"
   | "unset"
@@ -641,18 +839,21 @@ export type SkipButtonState =
   | "complete";
 
 /**
- * Sets the skip button to the specified state.
+ * Sets the validation miscellaneous button to the specified state.
  * @param alternate - Whether the skip button should be in the alternate state.
  */
-export function setSkipState(state: SkipButtonState, force: boolean = false) {
-  if (getSkipState() === "complete" && !force) return;
+export function setValidateMiscButtonState(
+  state: ValidateMiscButtonState,
+  force: boolean = false,
+) {
+  if (getValidateMiscButtonState() === "complete" && !force) return;
 
-  E.skipButton.dataset.state = state;
+  E.validateMiscButton.dataset.state = state;
 
-  const skipTextElement = E.query(E.skipButton, "span");
-  const skipIconElement = E.query(E.skipButton, "i");
+  const textElement = E.query(E.validateMiscButton, "span");
+  const iconElement = E.query(E.validateMiscButton, "i");
 
-  const stateData: Record<SkipButtonState, [string, string]> = {
+  const stateData: Record<ValidateMiscButtonState, [string, string]> = {
     start: ["Start", "fa-play"],
     skip: ["Skip", "fa-forward"],
     unset: ["Unset Validation", "fa-backward-step"],
@@ -664,34 +865,86 @@ export function setSkipState(state: SkipButtonState, force: boolean = false) {
   const allIcons = Object.values(stateData).map(([, icon]) => icon);
 
   const [text, icon] = stateData[state];
-  skipIconElement.classList.remove(...allIcons);
-  skipIconElement.classList.add(icon);
-  skipTextElement.innerText = text;
+  iconElement.classList.remove(...allIcons);
+  iconElement.classList.add(icon);
+  textElement.innerText = text;
 
   if (state === "recenter" || state === "start" || state === "complete") {
-    E.goodButton.disabled = true;
-    E.badButton.disabled = true;
+    E.validateGoodButton.disabled = true;
+    E.validateBadButton.disabled = true;
   } else if (state === "reset") {
-    E.badButton.disabled = true;
-    E.goodButton.disabled = false;
+    E.validateBadButton.disabled = true;
+    E.validateGoodButton.disabled = false;
   } else {
-    E.goodButton.disabled = false;
-    E.badButton.disabled = false;
+    E.validateGoodButton.disabled = false;
+    E.validateBadButton.disabled = false;
   }
 
   if (state === "complete") {
-    E.skipButton.classList.add("pointer-events-none");
+    E.validateMiscButton.classList.add("pointer-events-none");
   } else {
-    E.skipButton.classList.remove("pointer-events-none");
+    E.validateMiscButton.classList.remove("pointer-events-none");
   }
 }
 
 /**
- * Gets the state of the skip button.
- * @returns The state of the skip button.
+ * Gets the state of the validate miscellaneous button.
+ * @returns The state of the validate miscellaneous button.
  */
-export function getSkipState() {
-  return E.skipButton.dataset.state as SkipButtonState;
+export function getValidateMiscButtonState() {
+  return E.validateMiscButton.dataset.state as ValidateMiscButtonState;
+}
+
+export type CreateMiscButtonState = "start" | "remove" | "recenter";
+
+/**
+ * Sets the create miscellaneous button to the specified state.
+ * @param state - The state to set the create miscellaneous button to.
+ */
+export function setCreateMiscButtonState(state: CreateMiscButtonState) {
+  E.createMiscButton.dataset.state = state;
+
+  const textElement = E.query(E.createMiscButton, "span");
+  const iconElement = E.query(E.createMiscButton, "i");
+
+  const stateData: Record<CreateMiscButtonState, [string, string]> = {
+    start: ["Double-click", "fa-pencil"],
+    remove: ["Remove", "fa-trash"],
+    recenter: ["Recenter", "fa-arrows-to-dot"],
+  };
+
+  const allIcons = Object.values(stateData).map(([, icon]) => icon);
+
+  const [text, icon] = stateData[state];
+  iconElement.classList.remove(...allIcons);
+  iconElement.classList.add(icon);
+  textElement.innerText = text;
+
+  if (state === "start" || state === "recenter") {
+    E.createGoodButton.disabled = true;
+  } else {
+    E.createGoodButton.disabled = false;
+  }
+
+  if (state === "start") {
+    E.createMiscButton.classList.add("pointer-events-none");
+  } else {
+    E.createMiscButton.classList.remove("pointer-events-none");
+  }
+
+  if (state === "remove") {
+    E.createMiscButton.classList.add("btn-error");
+  } else {
+    E.createMiscButton.classList.remove("btn-error");
+  }
+}
+
+/**
+ * Gets the state of the create miscellaneous button.
+ * @returns The state of the create miscellaneous button.
+ */
+export function getCreateMiscButtonState() {
+  return E.createMiscButton.dataset.state as CreateMiscButtonState;
 }
 
 /**
@@ -736,6 +989,17 @@ export function isMarkedPoint(
 }
 
 /**
+ * Checks if the marked feature is a line.
+ * @param markedFeature - The marked feature to check.
+ * @returns Whether the marked feature is a line.
+ */
+export function isMarkedLine(
+  markedFeature: MarkedFeature,
+): markedFeature is MarkedFeature<LineString> {
+  return markedFeature?.feature.geometry.type === "LineString";
+}
+
+/**
  * Sets the can mark state of the map.
  * @param map - The map to set the can mark state on.
  * @param canMark - Whether the map can be marked.
@@ -744,15 +1008,25 @@ export function setCanMark(map: OpenLayersMap, canMark: boolean) {
   const result = FeatureMarker.getCurrent();
   if (!result.success) return;
 
-  const markedFeature = result.value;
-  if (!isMarkedPoint(markedFeature)) return;
-
   // Mark the global state
   polymer.canMark = canMark;
 
   // Lock zoom to or unlock zoom from the marked feature
-  const coordinate = markedFeature.feature.geometry.coordinates;
-  setZoomAnchor(map, canMark ? coordinate : undefined);
+  const markedFeature = result.value;
+  if (isMarkedPoint(markedFeature)) {
+    const coordinate = markedFeature.feature.geometry.coordinates;
+    setZoomAnchor(map, canMark ? coordinate : undefined);
+  } else if (isMarkedLine(markedFeature)) {
+    const bbox = markedFeature.feature.bbox;
+
+    if (bbox === undefined) {
+      throw new Error("Bounding box is undefined");
+    }
+
+    const [x1, y1, x2, y2] = bbox;
+    const coordinate = [(x1 + x2) / 2, (y1 + y2) / 2];
+    setZoomAnchor(map, canMark ? coordinate : undefined);
+  }
 
   const isOriginalPosition = (() => {
     const result = FeatureMarker.getCurrent();
@@ -766,15 +1040,20 @@ export function setCanMark(map: OpenLayersMap, canMark: boolean) {
     );
   })();
 
-  const state =
-    ModifierKey.is("Meta") || ModifierKey.is("Control")
-      ? "unset"
-      : canMark
-        ? isOriginalPosition
-          ? "skip"
-          : "reset"
-        : "recenter";
-  setSkipState(state);
+  if (polymer.mode === "validate") {
+    const state =
+      ModifierKey.is("Meta") || ModifierKey.is("Control")
+        ? "unset"
+        : canMark
+          ? isOriginalPosition
+            ? "skip"
+            : "reset"
+          : "recenter";
+    setValidateMiscButtonState(state);
+  } else if (polymer.mode === "create") {
+    const state = canMark ? "remove" : "recenter";
+    setCreateMiscButtonState(state);
+  }
 }
 
 /**
@@ -791,10 +1070,114 @@ export async function resetMapView(map: OpenLayersMap, mapSource: GeoTIFF) {
 
   const resolution = defaultResolution(extent);
   const [x1, y1, x2, y2] = extent;
+
+  if (
+    x1 === undefined ||
+    y1 === undefined ||
+    x2 === undefined ||
+    y2 === undefined
+  ) {
+    throw new Error("One or more extent values are undefined");
+  }
+
   const center = [(x1 + x2) / 2, (y1 + y2) / 2];
 
   map.getView().setCenter(center);
   map.getView().setResolution(resolution);
 
   console.info("Resetting map view");
+}
+
+/**
+ * Sets the system and version badge.
+ * @param system - The system to set the badge to.
+ * @param version - The version to set the badge to.
+ */
+export function setSystemVersionBadge(system?: string, version?: string) {
+  // Hack to remove all event listeners
+  const oldBadge = E.query("#system-version-badge");
+  oldBadge.replaceWith(oldBadge.cloneNode(true));
+
+  const badge = E.query("#system-version-badge");
+  const systemBadgeText = E.query(badge, "#system-text");
+  const versionBadgeText = E.query(badge, "#version-text");
+
+  const handler = () => copy(`${system}__${version}`);
+
+  if (system && version) {
+    badge.classList.remove("hidden");
+    badge.addEventListener("click", handler);
+
+    systemBadgeText.innerText = system;
+    versionBadgeText.innerText = version;
+  } else {
+    badge.classList.add("hidden");
+  }
+}
+
+/**
+ * Sets the legend item badge.
+ * @param legendItem - The legend item to set the badge to.
+ */
+export function setLegendItemBadge(legendItem?: string) {
+  // Hack to remove all event listeners
+  const oldBadge = E.query("#legend-item-badge");
+  oldBadge.replaceWith(oldBadge.cloneNode(true));
+
+  const badge = E.query("#legend-item-badge");
+  const legendItemBadgeText = E.query(badge, "#legend-item-text");
+
+  const polymerLegendItem =
+    polymer.legendMapping?.[polymer.association?.[1] ?? -1];
+  const legendItemText = legendItem ?? polymerLegendItem;
+  const handler = () => copy(`${legendItemText}`);
+
+  if (legendItemText) {
+    badge.classList.remove("hidden");
+    badge.addEventListener("click", handler);
+
+    legendItemBadgeText.innerText = legendItemText;
+  } else {
+    badge.classList.add("hidden");
+  }
+}
+
+/**
+ * Prevents the default action of the event.
+ * @param event - The event to prevent the default action of.
+ */
+export function UnPreventDefault(event: Event, listener: EventListener) {
+  const { type, currentTarget, bubbles, cancelable, composed } = event;
+  if (currentTarget === null) {
+    console.warn("currentTarget is null");
+    return;
+  }
+
+  // Effectively undoes the `event.preventDefault()` call, thus doing the default.
+  currentTarget.removeEventListener("submit", listener);
+  currentTarget.dispatchEvent(
+    new Event(type, { bubbles, cancelable, composed }),
+  );
+  currentTarget.addEventListener("submit", listener);
+}
+
+/**
+ * Sets the session form based on the selected mode in the form.
+ */
+export function updateSessionForm(forceReset?: boolean) {
+  const data = new FormData(E.sessionForm);
+  const mode = data.get("mode") as PageMode | null;
+
+  const featureSelect = E.query("#feature-select");
+  const systemSelect = E.query("#system-select");
+
+  const isDefault = mode !== "create";
+
+  if (isDefault || forceReset) {
+    featureSelect.classList.add("hidden");
+    systemSelect.classList.remove("hidden");
+  } else {
+    featureSelect.classList.remove("hidden");
+    systemSelect.classList.add("hidden");
+  }
 }

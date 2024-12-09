@@ -1,22 +1,22 @@
 # Build the segment app
-FROM node:lts-slim as segment
+FROM node:22.11.0-slim as segment
 RUN mkdir /app1
 WORKDIR /app1
 
 COPY ./segment_ui /app1/
 
-RUN npm install
+RUN npm ci
 
 
 RUN npm run build
 
-FROM node:lts-slim as build
+FROM node:22.11.0-slim as build
 RUN mkdir /app
 WORKDIR /app
 
 COPY ["package.json", "package-lock.json*", "./"]
 
-RUN npm install
+RUN npm ci
 
 COPY . .
 

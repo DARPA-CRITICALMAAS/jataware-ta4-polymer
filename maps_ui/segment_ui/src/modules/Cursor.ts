@@ -3,7 +3,7 @@
  * @module Cursor
  */
 
-import * as Element from "./Elements";
+import * as E from "./Elements";
 
 export default class Cursor {
   /**
@@ -31,7 +31,7 @@ export default class Cursor {
    * @param {string} cursor - The cursor value to set.
    */
   static set(cursor: string): void {
-    Element.map.style.cursor = cursor;
+    E.map.style.cursor = cursor;
   }
 
   /**

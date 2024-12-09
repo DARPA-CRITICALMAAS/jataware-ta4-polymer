@@ -5,8 +5,7 @@ import operator
 from logging import Logger
 from typing import Any, Callable, Iterable, Literal, TypeAlias
 
-import cv2
-import numpy as np
+import httpx
 from cdr_schemas.cdr_responses.legend_items import LegendItemResponse
 from cdr_schemas.features.polygon_features import (
     Polygon,
@@ -15,17 +14,13 @@ from cdr_schemas.features.polygon_features import (
     PolygonLegendAndFeaturesResult,
     PolygonProperties,
 )
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, PositiveInt, field_validator
-from rasterio.features import rasterize
-from rasterio.features import shapes as rio_shapes
 from starlette.status import HTTP_204_NO_CONTENT
 
-from auto_georef.common.segment_utils import CDRClient, LassoTool, SegmentFloodFill, ToolCache, quick_cog, rgb_to_hsl
-from auto_georef.common.tiff_cache import get_cached_tiff
+from auto_georef.common.segment_utils import CDRClient, quick_cog
 from auto_georef.common.utils import timeit
-from auto_georef.http.routes.cache import cache
 from auto_georef.settings import app_settings
 
 logger: Logger = logging.getLogger(__name__)
@@ -72,71 +67,119 @@ class LabelPoint(BaseModel):
 
 @router.get("/segment_in_cache")
 def check_segment_in_cache(cog_id):
-    return ToolCache(cog_id).segment is not None
+    try:
+        resp = httpx.get(app_settings.segment_api_endpoint_url + f"/segment/segment_in_cache?cog_id={cog_id}")
+
+        resp.raise_for_status()
+        logger.info(resp)
+        return resp.json()
+    except httpx.HTTPStatusError as exc:
+        if exc.response.headers.get("Content-Type") == "application/json":
+            try:
+                detail = exc.response.json().get("detail", "Unknown error")
+            except ValueError:
+                detail = "Unknown error (invalid JSON)"
+        else:
+            detail = exc.response.text
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/lasso_in_cache")
 def check_lasso_in_cache(cog_id):
-    return ToolCache(cog_id).lasso is not None
+    try:
+        resp = httpx.get(app_settings.segment_api_endpoint_url + f"/segment/lasso_in_cache?cog_id={cog_id}")
+
+        resp.raise_for_status()
+        return resp.json()
+    except httpx.HTTPStatusError as exc:
+        if exc.response.headers.get("Content-Type") == "application/json":
+            try:
+                detail = exc.response.json().get("detail", "Unknown error")
+            except ValueError:
+                detail = "Unknown error (invalid JSON)"
+        else:
+            detail = exc.response.text
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.post("/embeddings_to_s3")
-def create_send_embeds(background_tasks: BackgroundTasks, cog_id: str, overwrite: bool = False):
+def create_send_embeds(cog_id: str):
     """
     Create embeddings and send to S3
     """
-
-    def save_embeds(segment: SegmentFloodFill):
-        segment.upload_embeds(overwrite)
-        ToolCache(cog_id).segment = segment
-
     try:
-        with get_cached_tiff(cache, cog_id):
-            logger.info(f"Loaded tiff in cache")
-        segment = SegmentFloodFill(cog_id)
+        resp = httpx.post(
+            app_settings.segment_api_endpoint_url + "/segment/embeddings_to_s3", params={"cog_id": cog_id}
+        )
+        info = resp.json()
+        logger.info(info)
+        if "time" in info:
+            return info
+        resp.raise_for_status()
 
-        # Save embeddings in the background
-        background_tasks.add_task(save_embeds, segment)
-
-        # Estimate time to completion
-        millis_per_embed = app_settings.time_per_embedding
-        time = len(segment.tiles) * millis_per_embed / 1000 / 60
-        return {"time": time}
-    except SegmentFloodFill.ModelWeightsNotFoundError:
-        message = "Failed to load model weights"
-        logger.exception(message)
-        raise HTTPException(500, message)
+        return
+    except httpx.HTTPStatusError as exc:
+        if exc.response.headers.get("Content-Type") == "application/json":
+            try:
+                detail = exc.response.json().get("detail", "Unknown error")
+            except ValueError:
+                detail = "Unknown error (invalid JSON)"
+        else:
+            detail = exc.response.text
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.post("/load_segment", status_code=HTTP_204_NO_CONTENT)
-def load_segment(cog_id: str):
+async def load_segment(cog_id: str):
     """
     Load the segment for the specified `cog_id`
     """
     try:
-        with get_cached_tiff(cache, cog_id):
-            logger.info(f"Loaded tiff in cache")
-        segment = SegmentFloodFill(cog_id)
-        segment.load_embeds()
-        ToolCache(cog_id).segment = segment
-    except SegmentFloodFill.EmbeddingsNotFoundError:
-        message = f"Failed to load embeddings for {cog_id}"
-        logger.exception(message)
-        raise HTTPException(400, message)
-    except SegmentFloodFill.ModelWeightsNotFoundError:
-        message = "Failed to load model weights"
-        logger.exception(message)
-        raise HTTPException(500, message)
+        async with httpx.AsyncClient(timeout=None) as client:
+            resp = await client.post(app_settings.segment_api_endpoint_url + f"/segment/load_segment?cog_id={cog_id}")
+            resp.raise_for_status()
+            return
+    except httpx.HTTPStatusError as exc:
+        if exc.response.headers.get("Content-Type") == "application/json":
+            try:
+                detail = exc.response.json().get("detail", "Unknown error")
+            except ValueError:
+                detail = "Unknown error (invalid JSON)"
+        else:
+            detail = exc.response.text
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.post("/load_lasso", status_code=HTTP_204_NO_CONTENT)
-def load_lasso(cog_id: str):
+async def load_lasso(cog_id: str):
     """
     Load the lasso tool for the specified `cog_id`
     """
-    with get_cached_tiff(cache, cog_id):
-        logger.info(f"Loaded tiff in cache")
-    ToolCache(cog_id).lasso = LassoTool(cog_id)
+    try:
+        async with httpx.AsyncClient(timeout=None) as client:
+            resp = await client.post(app_settings.segment_api_endpoint_url + f"/segment/load_lasso?cog_id={cog_id}")
+            logger.info(resp.status_code)
+            resp.raise_for_status()
+            return
+    except httpx.HTTPStatusError as exc:
+        if exc.response.headers.get("Content-Type") == "application/json":
+            try:
+                detail = exc.response.json().get("detail", "Unknown error")
+            except ValueError:
+                detail = "Unknown error (invalid JSON)"
+        else:
+            detail = exc.response.text
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/systems")
@@ -144,6 +187,9 @@ def get_systems(cog_id: str, type: str = "polygon"):
     """
     Get the systems and versions for the specified `cog_id` and `type`
     """
+
+    # __import__("time").sleep(3) # Simulate slow response
+
     client = CDRClient(cog_id)
     response = client.get_system_versions(type)
     response = sorted(response, key=operator.itemgetter(0))
@@ -208,9 +254,49 @@ def get_legend_items(cog_id: str):
     return legend_items
 
 
+@router.get("/legend_items_from_system")
+def get_legend_items_from_system(cog_id: str, legend_id: str):
+    image = quick_cog(cog_id)
+    height = image.shape[0]
+
+    def flip_bbox(bbox, height):
+        x1, y1, x2, y2 = bbox
+        return [x1, height - y2, x2, height - y1]
+
+    client = CDRClient("")
+    item = client.legend_item_intersect(legend_id)
+    item = LayerLegendItemResponse(
+        id=item["legend_id"], bbox=flip_bbox(item["px_bbox"], height), name=item["abbreviation"].strip()
+    )
+    return item
+
+
 class SelectLegendItemPointRequest(BaseModel):
     cog_id: str
     point: PixelCoordinate
+
+
+@router.get("/check_polymer_legend_item")
+def check_polymer_legend_item(cog_id: str, legend_id: str):
+    """
+    Check if a legend item is in the polymer legend
+    """
+    client = CDRClient(cog_id)
+    latest_version = get_latest_version(cog_id, POLYMER)
+    extractions = client.get_polygons(POLYMER, latest_version, 1 << 32)
+
+    def create_legend_item(legend_item: Any | None):
+        try:
+            return LegendItemResponse(**legend_item)
+        except Exception:
+            return None
+
+    validated_legend_ids = [create_legend_item(e.legend_item).legend_id for e in extractions]
+
+    # logger.info(f"Found {len(validated_legend_ids)} validated legend items for {cog_id}")
+    # logger.info(f"Checking if {legend_id} is in {validated_legend_ids}")
+
+    return {"unique": legend_id not in validated_legend_ids}
 
 
 @router.post("/select_legend_item_point")
@@ -218,57 +304,22 @@ def select_legend_item_point(req: SelectLegendItemPointRequest):
     """
     Select a legend item based on a point.
     """
+    image = quick_cog(req.cog_id)
+    height = image.shape[0]
 
-    legend_items = get_legend_items(req.cog_id)
-    px, py = req.point
+    client = CDRClient(req.cog_id)
+    x, y = req.point
+    y = height - y
 
-    for li in legend_items:
-        x1, y1, x2, y2 = li.bbox
-        if x1 <= px <= x2 and y1 <= py <= y2:
-            return li
+    def flip_bbox(bbox, height):
+        x1, y1, x2, y2 = bbox
+        return [x1, height - y2, x2, height - y1]
 
-    raise HTTPException(400, "No legend item found for the specified point")
-
-
-class SelectLegendItemBBoxRequest(BaseModel):
-    cog_id: str
-    bbox: list[float | int]
-
-    @field_validator("bbox")
-    def validate_bbox(cls, value):
-        if len(value) != 4:
-            raise ValueError("Bounding box must have 4 elements")
-        return value
-
-
-@router.post("/select_legend_item_bbox")
-def select_legend_item_bbox(req: SelectLegendItemBBoxRequest):
-    """
-    Select a legend item based on a point.
-    """
-
-    legend_items = get_legend_items(req.cog_id)
-    x1, y1, x2, y2 = req.bbox
-
-    max_iou = 0.0
-    max_legend_item = None
-
-    for li in legend_items:
-        li_x1, li_y1, li_x2, li_y2 = li.bbox
-        intersection_area = max(0, min(x2, li_x2) - max(x1, li_x1)) * max(0, min(y2, li_y2) - max(y1, li_y1))
-        bbox_area = (x2 - x1) * (y2 - y1)
-        li_bbox_area = (li_x2 - li_x1) * (li_y2 - li_y1)
-        union_area = bbox_area + li_bbox_area - intersection_area
-        iou = intersection_area / union_area
-
-        if iou > max_iou:
-            max_iou = iou
-            max_legend_item = li
-
-    if max_legend_item is not None:
-        return max_legend_item
-
-    raise HTTPException(400, "No legend item found for the specified bounding box")
+    item = client.legend_item_intersect_point(x, y)
+    item = LayerLegendItemResponse(
+        id=item["legend_id"], bbox=flip_bbox(item["px_bbox"], height), name=item["abbreviation"].strip()
+    )
+    return item
 
 
 class PolygonResponse(BaseModel):
@@ -337,17 +388,13 @@ def import_polygons(cog_id: str, system: str, version: str, max_polygons: int = 
             is_validated = False
 
         # Check if there is a valid legend item for the polygon
+
         legend_item = None
         try:
             if li is None:
                 raise ValueError("No legend item")
-            if len(li.px_bbox) != 4:
-                raise ValueError("Invalid bounding box")
 
-            x1, y1, x2, y2 = li.px_bbox
-            bbox = [x1, height - y2, x2, height - y1]
-            req = SelectLegendItemBBoxRequest(cog_id=cog_id, bbox=bbox)
-            legend_item = select_legend_item_bbox(req)
+            legend_item = get_legend_items_from_system(cog_id, li.legend_id)
             name = legend_item.name
         except (ValueError, HTTPException):
             pass
@@ -446,59 +493,30 @@ class SegmentResponse(BaseModel):
 
 
 @router.post("/labels")
-def segment(req: SegmentRequest) -> SegmentResponse:
+async def segment(req: SegmentRequest) -> SegmentResponse:
     """
     Segments the contiguous region based on the provided points and labels
     """
-
-    segment = ToolCache(req.cog_id).segment
-    if segment is None:
-        raise HTTPException(400, "Segment not loaded in cache")
-
-    points, labels = [], []
-    for p in req.points:
-        col_left, row_bottom = p.coordinate
-        points.append([segment.nrow - row_bottom, col_left])
-        labels.append({"positive": 1, "negative": 0}[p.type])
-
-    # Filter out points outside image extent bounds
-    filtered_points = []
-    filtered_labs = []
-    for point, lab in zip(points, labels):
-        row, col = point
-        if 0 <= row < segment.nrow and 0 <= col < segment.ncol:
-            filtered_points.append(point)
-            filtered_labs.append(lab)
-
-    points = filtered_points
-    labels = filtered_labs
-
-    if len(labels) != len(points):
-        raise HTTPException(500, "Points could not be filtered")
-
-    if sum(labels) == 0:
-        raise HTTPException(400, "Must include at least one valid positive label")
-
-    _, mask_out = segment.flood_fill(points, labels)
-
-    k = np.ones((2, 2), np.uint8)
-    mask_out = cv2.morphologyEx(mask_out, cv2.MORPH_OPEN, k, iterations=3)
-
-    contours, _ = cv2.findContours(mask_out.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    for cnt in contours:
-        if cv2.contourArea(cnt) < 50:  # Adjust the area threshold as needed
-            cv2.drawContours(mask_out, [cnt], -1, 0, -1)
-    shapes = rio_shapes(mask_out.astype(np.int16), mask=None, connectivity=4)
-
-    coordinates = []
-    for shape, value in shapes:
-        if value == 1:
-            coords = []
-            for cc in shape["coordinates"]:
-                coords.append([[c[0], segment.nrow - c[1]] for c in cc])
-            coordinates.append(coords)
-
-    return SegmentResponse(geometry={"type": "MultiPolygon", "coordinates": coordinates}, layer_id=req.layer_id)
+    try:
+        async with httpx.AsyncClient(timeout=None) as client:
+            resp = await client.post(
+                app_settings.segment_api_endpoint_url + "/segment/labels",
+                json=req.model_dump(mode="json"),
+            )
+            resp.raise_for_status()
+            geometry = resp.json().get("geometry", None)
+            return SegmentResponse(geometry=geometry, layer_id=req.layer_id)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.headers.get("Content-Type") == "application/json":
+            try:
+                detail = exc.response.json().get("detail", "Unknown error")
+            except ValueError:
+                detail = "Unknown error (invalid JSON)"
+        else:
+            detail = exc.response.text
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 class LassoStartRequest(BaseModel):
@@ -513,58 +531,76 @@ class LassoStartResponse(BaseModel):
 
 
 @router.post("/lasso-start")
-def lasso_start(req: LassoStartRequest) -> LassoStartResponse:
+async def lasso_start(req: LassoStartRequest) -> LassoStartResponse:
     """
     Start the lasso tool with the specified coordinate and buffer size
     """
+    try:
+        async with httpx.AsyncClient(timeout=None) as client:
+            resp = await client.post(
+                app_settings.segment_api_endpoint_url + "/segment/lasso-start",
+                json=req.model_dump(mode="json"),
+            )
+            resp.raise_for_status()
+            return LassoStartResponse(layer_id=req.layer_id)
 
-    lasso_tool = ToolCache(req.cog_id).lasso
-    if lasso_tool is None:
-        raise HTTPException(400, "Lasso tool not loaded in cache")
-
-    lasso_tool.start_coordinate = lasso_tool.convert_coordinate(req.coordinate)
-    lasso_tool.crop_size = req.crop_size
-
-    lasso_tool.apply_image()
-    lasso_tool.build_map()
-
-    return LassoStartResponse(layer_id=req.layer_id)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.headers.get("Content-Type") == "application/json":
+            try:
+                detail = exc.response.json().get("detail", "Unknown error")
+            except ValueError:
+                detail = "Unknown error (invalid JSON)"
+        else:
+            detail = exc.response.text
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 class LassoStepRequest(BaseModel):
     cog_id: str
     coordinate: PixelCoordinate
     layer_id: str
+    timestamp: float
 
 
 class LassoStepResponse(BaseModel):
     geometry: LineString
     layer_id: str
+    timestamp: float
 
 
 @router.post("/lasso-step")
-def lasso_step(req: LassoStepRequest) -> LassoStepResponse:
+async def lasso_step(req: LassoStepRequest) -> LassoStepResponse:
     """
     Perform a step in the lasso tool with the specified coordinate, getting a new contour
     """
+    try:
+        async with httpx.AsyncClient(timeout=None) as client:
+            # Timing for out-of-order requests debugging
+            # if __import__("random").random() < 0.1:
+            #     logger.info("Sleeping")
+            #     await __import__("asyncio").sleep(0.5)
 
-    lasso_tool = ToolCache(req.cog_id).lasso
-    if lasso_tool is None:
-        raise HTTPException(400, "Lasso tool not loaded in cache")
+            resp = await client.post(
+                app_settings.segment_api_endpoint_url + "/segment/lasso-step",
+                json=req.model_dump(mode="json"),
+            )
+            resp.raise_for_status()
+            geometry = resp.json().get("geometry", None)
 
-    coordinate = req.coordinate
-    coordinate = lasso_tool.convert_crop_coordinate(coordinate, interpolate=True)
-    contour = lasso_tool.get_contour(coordinate)
-
-    if contour is None:
-        raise HTTPException(400, f"No contour found for {req.coordinate} (cropped: {coordinate})")
-
-    # Convert contour to coordinates in the original image space
-    contour = lasso_tool.convert_contour(contour)
-    coordinates = contour.tolist()
-    geometry = {"type": "LineString", "coordinates": coordinates}
-
-    return LassoStepResponse(geometry=geometry, layer_id=req.layer_id)
+            return LassoStepResponse(geometry=geometry, layer_id=req.layer_id, timestamp=req.timestamp)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.headers.get("Content-Type") == "application/json":
+            try:
+                detail = exc.response.json().get("detail", "Unknown error")
+            except ValueError:
+                detail = "Unknown error (invalid JSON)"
+        else:
+            detail = exc.response.text
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 class MeanColorRequest(BaseModel):
@@ -579,31 +615,43 @@ class MeanColorResponse(BaseModel):
 
 
 @router.post("/mean-color")
-def mean_color(req: MeanColorRequest) -> MeanColorResponse:
+async def mean_color(req: MeanColorRequest) -> MeanColorResponse:
     """
     Get the mean color of the specified geometry
     """
-
-    image = quick_cog(req.cog_id)
-
     try:
-        result = rasterize([req.geometry.model_dump()], out_shape=image.shape[:2])
-    except ValueError:
-        raise HTTPException(400, "Invalid geometry")
+        async with httpx.AsyncClient(timeout=None) as client:
+            resp = await client.post(
+                app_settings.segment_api_endpoint_url + "/segment/mean-color",
+                json=req.model_dump(mode="json"),
+            )
+            resp.raise_for_status()
+            color = resp.json().get("color", None)
 
-    result = np.flipud(result)
-    mask = image * np.expand_dims(result, -1)
+            return MeanColorResponse(color=color, layer_id=req.layer_id)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.headers.get("Content-Type") == "application/json":
+            try:
+                detail = exc.response.json().get("detail", "Unknown error")
+            except ValueError:
+                detail = "Unknown error (invalid JSON)"
+        else:
+            detail = exc.response.text
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
-    # Resize the masked image to a smaller size for faster processing
-    scale = 0.25
-    mask = cv2.resize(mask, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
-    result = cv2.resize(result, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
-    # skip = 10
-    # mask = mask[::skip, ::skip, :]
-    # result = result[::skip, ::skip]
 
-    color = np.sum(mask, axis=(0, 1)) / np.sum(result)
-    color = color.astype(int).tolist()
-    color = rgb_to_hsl(color)
+class S3CogUrlResponse(BaseModel):
+    url: str
 
-    return MeanColorResponse(color=color, layer_id=req.layer_id)
+
+@router.get("/s3-cog-url")
+async def s3_cog_url(cog_id: str) -> S3CogUrlResponse:
+    """
+    Get the S3 URL of a given COG ID
+    """
+
+    url = f"{app_settings.cdr_s3_endpoint_url}/{app_settings.cdr_public_bucket}/{app_settings.cdr_s3_cog_prefix}/{cog_id}.cog.tif"
+
+    return S3CogUrlResponse(url=url)

@@ -13,18 +13,18 @@ import { Button } from "@mui/material";
 
 import { returnImageBufferUrl, expand_resolutions } from "./helpers";
 
-const CDR_COG_URL = import.meta.env.VITE_CDR_COG_URL;
-const CDR_PUBLIC_BUCKET = import.meta.env.VITE_CDR_PUBLIC_BUCKET;
-const CDR_S3_COG_PREFEX = import.meta.env.VITE_CDR_S3_COG_PREFEX;
-const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
+
 const BUFFER = 250;
 import Progress from "@mui/material/CircularProgress";
+import { useConfig } from '../ConfigContext';
 
 import { MapSpinner } from "../Spinner";
 
 import "../css/small_map.scss";
 
 function SmallMap({ cog_id, gcp, updateGCP, height }) {
+  const config = useConfig();
+
   const mapTargetElement = useRef<HTMLDivElement>(null);
 
   const [showMap, setShowMap] = useState(false);
@@ -39,7 +39,7 @@ function SmallMap({ cog_id, gcp, updateGCP, height }) {
   const map_source = new GeoTIFF({
     sources: [
       {
-        url: `${CDR_COG_URL}/${CDR_PUBLIC_BUCKET}/${CDR_S3_COG_PREFEX}/${cog_id}.cog.tif`,
+        url: `${config.CDR_COG_URL}/${config.CDR_PUBLIC_BUCKET}/${config.CDR_S3_COG_PREFEX}/${cog_id}.cog.tif`,
         nodata: -1,
       },
     ],

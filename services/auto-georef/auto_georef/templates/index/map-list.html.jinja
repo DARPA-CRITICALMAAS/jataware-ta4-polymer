@@ -1,80 +1,6 @@
 <div class="absolute inset-0 overflow-x-hidden flex flex-col gap-2">
   <div id="results-grid" class="{%if use_maps_grid %}grid{%endif%} gap-2 map-search-results-grid flex-1 overflow-y-auto overflow-x-hidden">
-    {% for map in maps %}
-      <div
-        class="cog-result-card flex flex-col justify-evenly card bg-base-100 bg-opacity-80
-               rounded-md border-2 border-gray-300 dark:border-neutral border-solid py-1 px-2"
-        data-extent="{{map.best_bounds}}"
-        data-cog_id="{{map.cog_id}}"
-        data-validated="{{map.validated_count}}"
-        >
-        <h5
-          title="{{map.cog_name}}"
-          class="mb-1 card-title line-clamp-2 font-light text-base leading-snug"
-          >
-          {{map.cog_name}}
-        </h5>
-        <div class="flex gap-2 items-center">
-          <div class="overflow-hidden outline rounded outline-solid outline-neutral-200 max-w-32 max-h-32 min-w-20 min-h-20">
-            <a
-              href="{{map.gcp_url}}"
-              class="contents"
-              target="_blank"
-              >
-              <img class="zoomed-proj object-cover max-w-[110%]"
-                   src="{{map.thumbnail}}" />
-            </a>
-          </div>
-
-          <div id="map-result-data" class="flex-1 rounded text-neutral-content">
-
-            <div
-              hx-get="{{template_prefix}}/map-stats/{{map.cog_id}}"
-              hx-swap="outerHTML"
-              hx-trigger="load"
-              hx-target="this"
-            >
-              <div class="flex inset-0 w-full">
-                <span class="loading loading-ring loading-sm"></span>
-                &nbsp;
-                <span class="text-neutral whitespace-nowrap">Loading features</span>
-              </div>
-            </div>
-            <div class="flex prose text-xs items-center justify-evenly">
-              <div class="flex gap-1">
-                <div class="">Scale</div>
-                <div class="text-base-content font-bold">
-                  1:<span class="">{{map.fmt_scale}}</span>
-                </div>
-              </div>
-              <div class="flex gap-1">
-                <div class="">Year</div>
-                <div class=""><span class="text-base-content font-bold">{{map.publish_year}}</span></div>
-              </div>
-              <div class="flex gap-1">
-                <div>Source</div>
-                <a class="font-bold" target="_blank" href="{{map.provider_catalog_url}}">
-                  {{'ngmdb' if 'NGMDB' in map.provider_name else map.provider_name}}
-                </a>
-              </div>
-            </div>
-
-          </div><!-- /map-result-data -->
-        </div>
-
-        <div hx-get="{{template_prefix}}/map-actions/{{map.cog_id}}"
-             hx-swap="outerHTML"
-             hx-trigger="load"
-             hx-target="this"
-             >
-             <div class="flex inset-0 w-full">
-               <span class="loading loading-ring loading-sm"></span>
-               &nbsp;
-               <span class="text-neutral whitespace-nowrap">Preparing</span>
-             </div>
-        </div>
-      </div>
-    {%endfor%}
+    {% include 'index/fragments/map-list-only.html.jinja' with context %}
   </div>
 
   <div class="text-center">
@@ -102,18 +28,5 @@
   <script>
     document.getElementById("map-results-on-page").innerText="Showing {{maps_in_page}}";
     document.getElementById("maps-results-count-total").classList.remove("hidden");
-
-    {
-    let called = false;
-
-    document.getElementById('results-grid').addEventListener('htmx:afterOnLoad', e => {
-      if (!called) {
-        connectMapResultsToMap();
-        called = true;
-      }
-    });
-
-    }
-
   </script>
 {% endblock %}

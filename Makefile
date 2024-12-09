@@ -1,4 +1,4 @@
-VERSION := 0.1.211
+VERSION := 0.1.344
 
 # make helpers
 null  :=
@@ -64,6 +64,19 @@ docker-build-maps-ui:
 .PHONY: docker-build-georef
 docker-build-georef:
 	(cd services/auto-georef && docker build -t nylon_georef:dev .)
+
+.PHONY: docker-build-segment_api
+docker-build-segment_api:
+	(cd services/segment_api && docker build -t segment_api:dev .)
+
+.PHONY: docker-build-jataware-auto-legend
+docker-build-jataware-auto-legend:
+	(cd services/jataware_auto_legend && docker build -t jataware_auto_legend:dev .)
+
+.PHONY: docker-build-baseline-mpm
+docker-build-baseline-mpm:
+	(cd services/baseline_mpm && docker build -t baseline_mpm:dev .)
+
 
 .PHONY: docker-build-jataware-georef
 docker-build-jataware-georef:
@@ -148,8 +161,42 @@ docker_buildx-jataware_georef:| gitlab-docker-login  ## build and push jataware-
 		-f Dockerfile \
 		.)
 
+.PHONY: docker_buildx-segmentation_api
+docker_buildx-segmentation_api:| gitlab-docker-login  ## build and push segmentation-georef
+	@echo "building segmentation-api"
+	(cd services/segment_api && \
+		docker buildx build \
+			--platform linux/amd64 \
+		-t registry.gitlab.com/jataware/nylon/segmentation-api:${VERSION} \
+		--output type=image,push=true \
+		-f Dockerfile \
+		.)
+
+.PHONY: docker_buildx-jataware-auto-legend
+docker_buildx-jataware-auto-legend:| gitlab-docker-login  ## build and push segmentation-georef
+	@echo "building jataware-auto-legend"
+	(cd services/jataware_auto_legend && \
+		docker buildx build \
+			--platform linux/amd64 \
+		-t registry.gitlab.com/jataware/nylon/jataware-auto-legend:${VERSION} \
+		--output type=image,push=true \
+		-f Dockerfile \
+		.)
+
+
+.PHONY: docker_buildx-baseline_mpm
+docker_buildx-baseline_mpm:| gitlab-docker-login  ## build and push segmentation-georef
+	@echo "building baseline_mpm"
+	(cd services/baseline_mpm && \
+		docker buildx build \
+			--platform linux/amd64 \
+		-t registry.gitlab.com/jataware/nylon/baseline_mpm:${VERSION} \
+		--output type=image,push=true \
+		-f Dockerfile \
+		.)
+
 .PHONY: docker_buildx-all
-docker_buildx-all:| docker_buildx-maps-ui docker_buildx-silk docker_buildx-georef docker_buildx-jataware_georef
+docker_buildx-all:| docker_buildx-maps-ui docker_buildx-silk docker_buildx-georef docker_buildx-jataware_georef docker_buildx-segmentation_api docker_buildx-baseline_mpm docker_buildx-jataware-auto-legend
 
 .PHONY:
 ALL_DOCKER_COMPOSE_FILES:= $(wildcard docker-compose*.yaml)
@@ -167,12 +214,15 @@ DOCKER_COMPOSE_FILES:=docker-compose.network.yaml \
 	docker-compose.postgis.yaml \
 	docker-compose.silk.yaml \
 	docker-compose.autogeoref.yaml \
+	docker-compose.segment_api.yaml \
+	docker-compose.baseline_mpm.yaml \
 	docker-compose.jataware_georef.yaml \
+	docker-compose.jataware_auto_legend.yaml \
 	docker-compose.redis.yaml \
 	$(DOCKER_COMPOSE_LOCALS) \
 	docker-compose.dev.yaml
 
-ALL_PROFILES=default minio elastic postgis silk georef jataware_georef redis
+ALL_PROFILES=default minio elastic postgis silk georef jataware_georef redis segment_api baseline_mpm jataware_auto_legend
 
 define all_profiles
 $(subst $(space),$(comma),$(ALL_PROFILES))
@@ -191,6 +241,24 @@ up:
 .PHONY: up.georef
 up.georef:
 	COMPOSE_PROFILES="georef" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
+
+
+.PHONY: up.segment_api
+up.segment_api:
+	COMPOSE_PROFILES="segment_api" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
+
+.PHONY: up.jataware_auto_legend
+up.jataware_auto_legend:
+	COMPOSE_PROFILES="jataware_auto_legend" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
+.PHONY: down.jataware_auto_legend
+down.jataware_auto_legend:
+	COMPOSE_PROFILES="jataware_auto_legend" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) down
+
+
+
+.PHONY: up.baseline_mpm
+up.baseline_mpm:
+	COMPOSE_PROFILES="baseline_mpm" docker compose $(addprefix -f , $(DOCKER_COMPOSE_FILES)) up -d
 
 .PHONY: up.redis
 up.redis:

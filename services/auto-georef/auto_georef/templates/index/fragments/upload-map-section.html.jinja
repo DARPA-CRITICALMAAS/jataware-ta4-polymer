@@ -2,33 +2,25 @@
 <section class="absolute z-10 bottom-3 left-3 drop-shadow-md">
   <div class="bg-base-200 m-auto p-3 pb-4 rounded-lg shadow-md">
     <div class="mt-[-0.75rem]">
-      <form
-        id="upload-map-form"
-        hx-encoding="multipart/form-data"
-        data-url="{{upload_map_url|safe}}"
-        data-job_url="{{job_url|safe}}"
-        >
+      <form id="upload-map-form" hx-encoding="multipart/form-data" data-url="{{upload_map_url|safe}}"
+        data-job_url="{{job_url|safe}}">
         <label class="form-control w-full max-w-xs cursor-pointer">
           <div class="label prose flex align-center justify-start">
-            <svg
-              xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
-              class="size-6 text-blue-500 -rotate-45 mr-0.5 mt-[-0.25rem]"
-              >
-              <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+              class="size-6 text-blue-500 -rotate-45 mr-0.5 mt-[-0.25rem]">
+              <path
+                d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
             </svg>
 
             <h3 class="inline-block m-0 p-0">Upload Map to CDR</h3>
           </div>
-          <input
-            type='file'
-            id="cdr-map-file-input"
-            name='map_file'
+          <input type='file' id="cdr-map-file-input" name='map_file' accept=".tif,.tiff,.png,.pdf,.zip"
             onchange="document.getElementById('map-upload-details').classList.remove('hidden'); document.getElementById('upload-title-input').focus();"
             class="file-input file-input-bordered file-input-sm file-input-primary" />
         </label>
 
         <div id="map-upload-details" class="hidden">
-          <br class="br h-2"/>
+          <br class="br h-2" />
 
           <label class="input input-bordered flex items-center gap-2 input-sm">
             Title
@@ -37,7 +29,7 @@
 
           <input type="hidden" name="map_data" id="map-data-input" />
 
-          <br class="br h-2"/>
+          <br class="br h-2" />
 
           <div class="flex justify-end w-full m-auto">
             <button id="upload-cancel-button" class="btn btn-error btn-outline btn-sm">
@@ -55,22 +47,44 @@
       <div class="hidden" id="upload-loading">
 
         <div class="label prose mb-0 flex align-center justify-start">
-          <svg
-            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
-            class="size-6 text-blue-500 -rotate-45 mr-0.5 mt-[-0.25rem]"
-            >
-            <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+            class="size-6 text-blue-500 -rotate-45 mr-0.5 mt-[-0.25rem]">
+            <path
+              d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
           </svg>
 
           <h3 class="inline-block m-0 p-0">Uploading Map to CDR</h3>
         </div>
+        <button 
+          id="reload-job-queue-button"
+          class="hidden"
+          hx-get="{{template_prefix}}/jobs-queue"
+          hx-swap="outerHTML"
+          hx-trigger="click"
+          hx-target="this"></button>
         <div class="flex prose">
           <span class="loading loading-spinner loading-xs"></span>
           &nbsp;
           <h5 id="map-processing-message">Please stay on this page until processed.</h5>
+          <div class="tooltip text-info" data-tip="You may open a new browser tab to continue using polymer. This tab will be redirected to the map page once processing is completed.">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-7">
+              <path fill-rule="evenodd"
+                d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm8.706-1.442c1.146-.573 2.437.463 2.126 1.706l-.709 2.836.042-.02a.75.75 0 0 1 .67 1.34l-.04.022c-1.147.573-2.438-.463-2.127-1.706l.71-2.836-.042.02a.75.75 0 1 1-.671-1.34l.041-.022ZM12 9a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"
+                clip-rule="evenodd" />
+            </svg>
+          </div>
+
+          <div class="tooltip" data-tip="Click to copy job ID, in order to check details through the CDR API.">
+              <svg id="copy-job-id" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="cursor-pointer size-6 text-primary hidden">
+                <path
+                  d="M7.5 3.375c0-1.036.84-1.875 1.875-1.875h.375a3.75 3.75 0 0 1 3.75 3.75v1.875C13.5 8.161 14.34 9 15.375 9h1.875A3.75 3.75 0 0 1 21 12.75v3.375C21 17.16 20.16 18 19.125 18h-9.75A1.875 1.875 0 0 1 7.5 16.125V3.375Z" />
+                <path
+                  d="M15 5.25a5.23 5.23 0 0 0-1.279-3.434 9.768 9.768 0 0 1 6.963 6.963A5.23 5.23 0 0 0 17.25 7.5h-1.875A.375.375 0 0 1 15 7.125V5.25ZM4.875 6H6v10.125A3.375 3.375 0 0 0 9.375 19.5H16.5v1.125c0 1.035-.84 1.875-1.875 1.875h-9.75A1.875 1.875 0 0 1 3 20.625V7.875C3 6.839 3.84 6 4.875 6Z" />
+              </svg>
+          </div>
+
         </div>
       </div>
-
       <div id="upload-failed" class="hidden mt-1 text-red-500 dark:text-red-400"></div>
     </div>
   </div>

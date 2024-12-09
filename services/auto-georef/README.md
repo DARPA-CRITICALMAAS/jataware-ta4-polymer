@@ -15,15 +15,14 @@ npm install
 
 ## One-time Environment Configuration
 
-Copy `./ui/.env-sample` to `./ui/.env` and update values to your dev or prod use case.
-Only a maptiler key is needed for now:
-
 - Get a free MapTiler key at https://www.maptiler.com/
 
 Copy `./.env-sample` to `./.env`'.
-New var, which should be added when running locally in development (without a caddy server in front):
+**New vars for v2 UI**, which should be added when running locally in development (without a caddy server in front):
 ```
-AUTOGEOREF_template_prefix=""
+AUTOGEOREF_template_prefix=""                       #  "/ui" on prod
+AUTOGEOREF_maps_ui_base_url="http://localhost:8080" #  "" on prod
+AUTOGEOREF_maptiler_key = ""                        # the maptiler key described above, needed both on prod and dev
 ```
 
 ## Start App for Development

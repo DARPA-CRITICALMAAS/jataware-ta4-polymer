@@ -7,18 +7,18 @@ import GeoJSON from "ol/format/GeoJSON";
 import { transform } from "ol/proj";
 import TileLayer from "ol/layer/WebGLTile";
 import axios from "axios";
-
+import { useConfig } from '../ConfigContext';
 import proj4 from "proj4";
 
-const CDR_COG_URL = import.meta.env.VITE_CDR_COG_URL;
-const CDR_PUBLIC_BUCKET = import.meta.env.VITE_CDR_PUBLIC_BUCKET;
+// const CDR_COG_URL = import.meta.env.VITE_CDR_COG_URL;
+// const CDR_PUBLIC_BUCKET = import.meta.env.VITE_CDR_PUBLIC_BUCKET;
 
-const POLYMER_COG_URL = import.meta.env.VITE_POLYMER_COG_URL;
-const POLYMER_PUBLIC_BUCKET = import.meta.env.VITE_POLYMER_PUBLIC_BUCKET;
+// const POLYMER_COG_URL = import.meta.env.VITE_POLYMER_COG_URL;
+// const POLYMER_PUBLIC_BUCKET = import.meta.env.VITE_POLYMER_PUBLIC_BUCKET;
 
-const CDR_S3_COG_PRO_PREFEX = import.meta.env.VITE_CDR_S3_COG_PRO_PREFEX;
-const POLYMER_S3_COG_PRO_PREFEX = import.meta.env
-  .VITE_POLYMER_S3_COG_PRO_PREFEX;
+// const CDR_S3_COG_PRO_PREFEX = import.meta.env.VITE_CDR_S3_COG_PRO_PREFEX;
+// const POLYMER_S3_COG_PRO_PREFEX = import.meta.env
+//   .VITE_POLYMER_S3_COG_PRO_PREFEX;
 // --
 // Map helpers
 
@@ -143,9 +143,12 @@ export const dec2dms = function (decimal) {
 
   const hours = Math.floor(absDecimal);
   const minutesFloat = (absDecimal - hours) * 60;
-  const minutes = Math.floor(minutesFloat);
-  const seconds = Math.round((minutesFloat - minutes) * 60);
-
+  let minutes = Math.floor(minutesFloat);
+  let seconds = Math.round((minutesFloat - minutes) * 60);
+  if (seconds == 60) {
+    minutes = minutes + 1
+    seconds = 0
+  }
   return (
     (isNegative ? "-" : "") + hours + "° " + minutes + "' " + seconds + '"'
   );
@@ -154,9 +157,19 @@ export const dec2dms = function (decimal) {
 export const dms2dec = function (dms) {
   // [TODO] error handling
 
-  const regex = /(-?)(\d+)°\s?(\d+)'?\s?(\d+)?"/;
-  const result = dms.match(regex);
+  // const regex = /(-?)(\d+)°\s?(\d+)'?\s?(\d+)?"/;
+  // const result = dms.match(regex);
+  const regex = /^(-)?(\d{1,3})°\s?(\d{1,2})'?\s?(?:(\d{1,2}(\.\d+)?)")?$/;
 
+  // Match the input against the regex
+  const result = dms.trim().match(regex);
+
+  if (!result) {
+    throw new Error(
+      "Invalid DMS format. Expected format: {degrees}° {minutes}' {seconds}\""
+    );
+  }
+  console.log(result)
   if (!result) {
     throw new Error("Invalid DMS format");
   }
@@ -296,11 +309,12 @@ export function returnImageBufferUrl(cog_id, gcp, height) {
   );
 }
 
-export function determineMapSourceURL(projection_info, cog_id) {
+export function determineMapSourceURL(projection_info, cog_id, config) {
+
   if (projection_info?.in_cdr) {
-    return `${CDR_COG_URL}/${CDR_PUBLIC_BUCKET}/${CDR_S3_COG_PRO_PREFEX}/${cog_id}/${projection_info["system"]}/${projection_info["system_version"]}/${projection_info["projection_id"]}`;
+    return `${config.CDR_COG_URL}/${config.CDR_PUBLIC_BUCKET}/${config.CDR_S3_COG_PRO_PREFEX}/${cog_id}/${projection_info["system"]}/${projection_info["system_version"]}/${projection_info["projection_id"]}`;
   } else {
-    return `${POLYMER_COG_URL}/${POLYMER_PUBLIC_BUCKET}/${POLYMER_S3_COG_PRO_PREFEX}/${cog_id}/${projection_info["projection_id"]}`;
+    return `${config.POLYMER_COG_URL}/${config.POLYMER_PUBLIC_BUCKET}/${config.POLYMER_S3_COG_PRO_PREFEX}/${cog_id}/${projection_info["projection_id"]}`;
   }
 }
 
@@ -376,17 +390,20 @@ export const validateExtent = function (extent) {
 
 export const returnInCDR = function (in_cdr) {
   if (in_cdr) {
-    return "TRUE"
+    return "TRUE";
   }
-  return "FALSE"
-}
+  return "FALSE";
+};
 
 export const returnInCDRStyle = function (in_cdr) {
   if (in_cdr) {
-    return { marginRight: "5px", background: "var(--mui-palette-success-light)" }
+    return {
+      marginRight: "5px",
+      background: "var(--mui-palette-success-light)",
+    };
   }
-  return { marginRight: "5px" }
-}
+  return { marginRight: "5px" };
+};
 
 export function getShapeCenterPoint(coordinatesArray) {
   const pointsCount = coordinatesArray.length;

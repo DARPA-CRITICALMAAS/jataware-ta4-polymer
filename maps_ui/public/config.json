@@ -1,0 +1,10 @@
+{
+    "POLYMER_PUBLIC_BUCKET": "common.polymer.rocks",
+    "CDR_PUBLIC_BUCKET": "public.cdr.land",
+    "POLYMER_COG_URL": "https://s3.amazonaws.com",
+    "CDR_COG_URL": "https://s3.amazonaws.com",
+    "CDR_S3_COG_PREFEX": "cogs",
+    "CDR_S3_COG_PRO_PREFEX": "test/cogs",
+    "POLYMER_S3_COG_PRO_PREFEX": "cogs/projections",
+    "MAPTILER_KEY": "sXCi6nyzm0QBx2HOxv4n"
+}

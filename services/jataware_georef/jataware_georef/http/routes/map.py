@@ -124,7 +124,7 @@ async def georeference_map(req: MapEventPayload,  response_model=GeoreferenceRes
 
         start_transform = perf_counter()
 
-        img = Image.open(raw_path)
+        img = Image.open(raw_path).convert('RGB')
         width, height = img.size
         gcps = extract_gcps_(AGR, img)
 

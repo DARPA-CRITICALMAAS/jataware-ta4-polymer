@@ -27,7 +27,8 @@ export default function SubmitProjectionModal({ open, handleClose, save }) {
         }}
       >
         <Typography id="modal-description" variant="body1" mb={2}>
-          Are you sure you want to <b>validate and submit</b> this projection to CDR?
+          Are you sure you want to <b>validate and submit</b> this projection to
+          CDR?
         </Typography>
         <Button color="success" onClick={save}>
           Yes

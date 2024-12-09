@@ -5,7 +5,7 @@ from auto_georef.common.utils import s3_client
 from ..settings import app_settings
 
 s3 = s3_client(app_settings.polymer_s3_endpoint_url)
-s3.create_bucket(Bucket="common.polymer.rocks")
+s3.create_bucket(Bucket=app_settings.polymer_public_bucket)
 
 policy = {
     "Version": "2012-10-17",
@@ -14,7 +14,7 @@ policy = {
             "Effect": "Allow",
             "Principal": {"AWS": ["*"]},
             "Action": ["s3:GetBucketLocation", "s3:ListBucket", "s3:ListBucketMultipartUploads"],
-            "Resource": ["arn:aws:s3:::common.polymer.rocks"],
+            "Resource": [f"arn:aws:s3:::{app_settings.polymer_public_bucket}"],
         },
         {
             "Effect": "Allow",
@@ -26,8 +26,8 @@ policy = {
                 "s3:DeleteObject",
                 "s3:GetObject",
             ],
-            "Resource": ["arn:aws:s3:::common.polymer.rocks/*"],
+            "Resource": [f"arn:aws:s3:::{app_settings.polymer_public_bucket}/*"],
         },
     ],
 }
-response = s3.put_bucket_policy(Bucket='common.polymer.rocks"', Policy=json.dumps(policy))
+response = s3.put_bucket_policy(Bucket=app_settings.polymer_public_bucket, Policy=json.dumps(policy))

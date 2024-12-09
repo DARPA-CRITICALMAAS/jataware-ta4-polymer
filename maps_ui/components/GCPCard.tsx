@@ -27,6 +27,7 @@ import "../css/GCP_card.scss";
 enum DegreeType {
   DD = "DD", // decimal degrees
   DMS = "DMS", // degreees, minutes, seconds
+  UTM = "UTM"
 }
 
 export default function GCPCard({
@@ -108,7 +109,7 @@ export default function GCPCard({
       <div className="extraction-card">
         <CardContent>
           <div className="gcp-card-grid">
-            {degreesType === DegreeType.DD ? (
+            {degreesType === DegreeType.DD && (
               <div className="decimal-degrees">
                 <TextField
                   style={{ marginBottom: "1rem" }}
@@ -128,7 +129,8 @@ export default function GCPCard({
                   onChange={(e) => _onChange("latitude", e.target.value)}
                 />
               </div>
-            ) : (
+            )}
+            {degreesType === DegreeType.DMS && (
               <div>
                 <LocationInput
                   disabled={readonly}
@@ -141,6 +143,27 @@ export default function GCPCard({
                   input_label="y_dms"
                   gcp={gcp}
                   updateDMS={updateDMS}
+                />
+              </div>
+            )}
+            {degreesType === DegreeType.UTM && (
+              <div className="decimal-degrees">
+                <TextField
+                  style={{ marginBottom: "1rem" }}
+                  size="small"
+                  disabled={readonly}
+                  label="E"
+                  type="number"
+                  value={gcp.longitude}
+                  onChange={(e) => _onChange("longitude", e.target.value)}
+                />
+                <TextField
+                  size="small"
+                  disabled={readonly}
+                  label="N"
+                  value={gcp.latitude}
+                  type="number"
+                  onChange={(e) => _onChange("latitude", e.target.value)}
                 />
               </div>
             )}

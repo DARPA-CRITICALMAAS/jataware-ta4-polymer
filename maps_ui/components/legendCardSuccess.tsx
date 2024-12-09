@@ -13,17 +13,35 @@ import Typography from "@mui/material/Typography";
 // import "../css/legend_annotation.scss";
 import "../css/legend_card_success.scss";
 
-import { returnImageUrl, getColorForProvenance, validateExtent, returnInCDR, returnInCDRStyle } from "./helpers";
+import {
+  returnImageUrl,
+  getColorForProvenance,
+  validateExtent,
+  returnInCDR,
+  returnInCDRStyle,
+} from "./helpers";
 
 function LegendCardSuccess({
   cog_id,
   item,
   setValidated,
   removeSucceededItem,
-  zoomTo
+  zoomTo,
 }) {
-  const [minimized, setMinimized] = useState(true);
+  const [minimized, setMinimized] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+
+    if (validateExtent(item.extent_from_bottom)) {
+      zoomTo(item);  // Call the zoomTo function on hover
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
   function handleMinimizeItem_() {
     setMinimized(!minimized);
   }
@@ -34,10 +52,11 @@ function LegendCardSuccess({
     setValidated(item, value);
   }
 
-
-
   return (
-    <Card style={{ width: "100%", borderRadius: "10px", padding: "1rem" }}>
+    <Card
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      style={{ width: "100%", borderRadius: "10px", padding: "1rem" }}>
       <div>
         <div
           style={{
@@ -180,10 +199,7 @@ function LegendCardSuccess({
             </>
           )}
           <>
-            <Button
-              onClick={() => handleMinimizeItem_()}
-              color="primary"
-            >
+            <Button onClick={() => handleMinimizeItem_()} color="primary">
               {minimized ? "Expand" : "Minimize"}
             </Button>
             <Button
@@ -193,11 +209,11 @@ function LegendCardSuccess({
             >
               Edit
             </Button>
-            {validateExtent(item.extent_from_bottom) && (
+            {/* {validateExtent(item.extent_from_bottom) && (
               <Button startIcon={<ZoomInIcon />} onClick={() => zoomTo(item)}>
                 Zoom
               </Button>
-            )}
+            )} */}
           </>
           <FormControlLabel
             control={

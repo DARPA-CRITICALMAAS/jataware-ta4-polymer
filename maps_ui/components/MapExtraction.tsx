@@ -15,6 +15,9 @@ import axios from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
 
+import Select, { SelectChangeEvent } from "@mui/material/Select";
+import MenuItem from "@mui/material/MenuItem";
+
 import Button from "@mui/material/Button";
 import Autocomplete from "@mui/material/Autocomplete";
 import Paper from "@mui/material/Paper";
@@ -34,6 +37,7 @@ import LoadingButton from "@mui/lab/LoadingButton";
 import Box from "@mui/material/Box";
 import Slider from "@mui/material/Slider";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import FormatAlignJustifyIcon from "@mui/icons-material/FormatAlignJustify";
 
 import { MapSpinner } from "../Spinner";
 import "../css/map_extraction.scss";
@@ -54,15 +58,18 @@ import {
   createPath,
 } from "./helpers";
 import GCPList from "./GCPList";
+import { Tooltip } from "@mui/material";
+import PolymerTooltip from "./Tooltip";
+import { useConfig } from '../ConfigContext';
 
 // Params
-const CDR_COG_URL = import.meta.env.VITE_CDR_COG_URL;
-const CDR_PUBLIC_BUCKET = import.meta.env.VITE_CDR_PUBLIC_BUCKET;
-const CDR_S3_COG_PREFEX = import.meta.env.VITE_CDR_S3_COG_PREFEX;
+// const CDR_COG_URL = import.meta.env.VITE_CDR_COG_URL;
+// const CDR_PUBLIC_BUCKET = import.meta.env.VITE_CDR_PUBLIC_BUCKET;
+// const CDR_S3_COG_PREFEX = import.meta.env.VITE_CDR_S3_COG_PREFEX;
 const SYSTEM_VERSION = import.meta.env.VITE_POLYMER_SYSTEM_VERSION;
 const SYSTEM = import.meta.env.VITE_POLYMER_SYSTEM;
 
-const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
+// const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 const BUFFER = 150;
 
 const _APP_JSON_HEADER = {
@@ -99,6 +106,8 @@ const SECOND = 1000;
 const MINUTE = SECOND * 60;
 
 function GeoreferenceComponent({ mapDataInit }) {
+  const config = useConfig();
+
   const [mapData, setMapData] = useState(mapDataInit);
   const cog_id = mapData["cog_info"]["cog_id"];
   const cog_name = mapData["cog_info"]["cog_name"];
@@ -108,6 +117,7 @@ function GeoreferenceComponent({ mapDataInit }) {
   const [gcps, setGCPs] = useState([]);
   const [map_crs, setMapCRS] = useState(null);
   const [georeferenced, setGeoreferenced] = useState(false);
+  const [provenanceVisible, setProvenanceVisible] = useState(true);
   const [isProjected, setProjected] = useState(
     mapData["cog_info"]["georeferenced_count"],
   );
@@ -117,6 +127,7 @@ function GeoreferenceComponent({ mapDataInit }) {
   const [EPSGs, setEPSGs] = useState([]);
   const [extractedText, setExtractedText] = useState("");
   const [reasoning, setReasoning] = useState("");
+  const [GCPGrouping, setGCPGrouping] = useState("system");
   const [loadingMap, setLoadingMap] = useState(true);
   const navigate = useNavigate();
   const drawRef = useRef();
@@ -243,7 +254,7 @@ function GeoreferenceComponent({ mapDataInit }) {
   const map_source = new GeoTIFF({
     sources: [
       {
-        url: `${CDR_COG_URL}/${CDR_PUBLIC_BUCKET}/${CDR_S3_COG_PREFEX}/${cog_id}.cog.tif`,
+        url: `${config.CDR_COG_URL}/${config.CDR_PUBLIC_BUCKET}/${config.CDR_S3_COG_PREFEX}/${cog_id}.cog.tif`,
         nodata: -1,
       },
     ],
@@ -259,7 +270,7 @@ function GeoreferenceComponent({ mapDataInit }) {
   // BASE layer
 
   const base_source = new XYZ({
-    url: `https://api.maptiler.com/tiles/satellite/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
+    url: `https://api.maptiler.com/tiles/satellite/{z}/{x}/{y}.jpg?key=${config.MAPTILER_KEY}`,
     crossOrigin: "",
   });
 
@@ -367,7 +378,7 @@ function GeoreferenceComponent({ mapDataInit }) {
           latitude: null,
           x_dms: null,
           y_dms: null,
-          crs: "",
+          crs: "EPSG:4267",
           provenance: SYSTEM + "_" + SYSTEM_VERSION,
           system: SYSTEM,
           system_verison: SYSTEM_VERSION,
@@ -590,8 +601,9 @@ function GeoreferenceComponent({ mapDataInit }) {
     navigate(0);
   }
 
-  const handleProvenanceChange = (event) => {
+  const handleProvenanceChange = (event, type) => {
     const option = event.target.name;
+    const value = event.target.checked;
     let newOptions = [...provenanceOption];
 
     if (event.target.checked) {
@@ -601,9 +613,22 @@ function GeoreferenceComponent({ mapDataInit }) {
       // Remove the unchecked option
       newOptions = newOptions.filter((item) => item !== option);
     }
-    const filteredGCPS = mapData["all_gcps"].filter((gcp) =>
-      newOptions.includes(gcp.system + "_" + gcp.system_version),
-    );
+    let filteredGCPSIds = [];
+
+    if (type === "system") {
+      filteredGCPSIds = mapData["all_gcps"]
+        .filter((gcp) => newOptions.includes(gcp.system + "_" + gcp.system_version))
+        .map((gcp) => gcp.gcp_id);
+    } else if (type === "projection") {
+      filteredGCPSIds = mapData["proj_info"]
+        .filter((proj) => newOptions.includes(proj.projection_id))
+        .flatMap((proj) => proj.gcps.map((gcp) => gcp.gcp_id));
+    }
+
+
+    const filteredGCPS = mapData["all_gcps"]
+      .filter((gcp) => filteredGCPSIds.includes(gcp.gcp_id))
+
     setGCPs(filteredGCPS);
     setProvenanceOption(newOptions);
   };
@@ -650,35 +675,131 @@ function GeoreferenceComponent({ mapDataInit }) {
             {Boolean(mapData["provenances"]?.length) && (
               <div className="control-panel" id="control-panel">
                 <Box sx={{ minWidth: 200 }}>
-                  <Typography variant="body1">Select GCPs</Typography>
-                  <FormGroup>
-                    {mapData["provenances"].map((option, index) => (
-                      <FormControlLabel
-                        key={index}
-                        control={
-                          <Checkbox
-                            size="small"
-                            checked={provenanceOption.includes(option)}
-                            onChange={handleProvenanceChange}
-                            name={option}
-                          />
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <Typography style={{ marginRight: "4px" }} variant="body1">Select GCPs:</Typography>
+                    <Select
+                      sx={{
+                        borderColor: "white",
+                        padding: "5px", // Add padding to the Select component
+                        '.MuiSelect-select': {
+                          padding: '5px', // Add padding to the dropdown text inside the select
                         }
-                        label={
-                          <Typography
-                            style={{
-                              color: getColorForProvenance(option),
-                              maxWidth: "22rem",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {option}
-                          </Typography>
-                        }
-                      />
-                    ))}
-                  </FormGroup>
+                      }}
+                      style={{ padding: "5px" }}
+                      value={GCPGrouping}
+                      onChange={(e) => {
+                        setGCPs([])
+                        setProvenanceOption([])
+                        setGCPGrouping(e.target.value)
+                      }}
+                      displayEmpty
+                    >
+
+                      <MenuItem key="system" value="system">
+                        System
+                      </MenuItem>
+                      <MenuItem key="projection" value="projection">
+                        Projection
+                      </MenuItem>
+                    </Select>
+                    <PolymerTooltip
+                      title={provenanceVisible ? "Hide" : "Show"}
+                    >
+                      <IconButton
+                        color="secondary"
+                        onClick={() => {
+                          setProvenanceVisible(!provenanceVisible);
+                        }}
+                      >
+                        <FormatAlignJustifyIcon />
+                      </IconButton>
+                    </PolymerTooltip>
+                  </div>
+                  {provenanceVisible &&
+                    <FormGroup>
+                      {GCPGrouping == "system" ?
+                        <>
+                          {mapData["provenances"].map((option, index) => (
+                            <FormControlLabel
+                              key={index}
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={provenanceOption.includes(option)}
+                                  onChange={(e) => {
+                                    handleProvenanceChange(e, "system")
+                                  }}
+                                  name={option}
+                                />
+                              }
+                              label={
+                                <Typography
+                                  style={{
+                                    color: "var(--mui-palette-text-primary)",
+                                    maxWidth: "22rem",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {option}
+                                </Typography>
+                              }
+                            />
+                          ))}
+                        </>
+                        :
+                        <>
+                          {mapData["proj_info"].map((option, index) => (
+                            <FormControlLabel
+                              key={index}
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={provenanceOption.includes(option.projection_id)}
+                                  onChange={(e) => {
+                                    handleProvenanceChange(e, "projection")
+                                  }}
+                                  name={option.projection_id}
+                                />
+                              }
+                              label={
+                                <Tooltip title={
+                                  "Created: " + option.created.split("T")[0] + " " + option.created.split("T")[1].split(".")[0]
+                                }>
+                                  <Typography
+                                    style={{
+                                      color: getColorForProvenance(option),
+                                      maxWidth: "22rem",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {option.system +
+                                      " M"
+                                      +
+                                      option.created.split('T')[1].split(":")[1]
+                                      +
+                                      ":"
+                                      +
+                                      option.created.split('T')[1].split(":")[2].split(".")[0]
+                                      +
+                                      " "
+                                      +
+                                      option.crs
+                                    }
+                                  </Typography>
+                                </Tooltip>
+                              }
+                            />
+                          ))}
+                        </>
+                      }
+
+                    </FormGroup>
+                  }
+
                   {georeferenced && (
                     <>
                       <Typography id="continuous-slider" gutterBottom>
@@ -818,7 +939,7 @@ function GeoreferenceComponent({ mapDataInit }) {
                       {EPSGs.map((gcp, i) => {
                         return (
                           <li key={i}>
-                            {gcp}: {returnEPSGName(gcp)} {}
+                            {gcp}: {returnEPSGName(gcp)} { }
                           </li>
                         );
                       })}
@@ -870,10 +991,10 @@ function GeoreferenceComponent({ mapDataInit }) {
             : ocr.isError
               ? `OCR failed. ${ocr?.error?.message}`
               : ocrAnalysis.isError &&
-                `OCR Analysis failed. ${ocrAnalysis?.error?.message}`}
+              `OCR Analysis failed. ${ocrAnalysis?.error?.message}`}
         </Alert>
       </Snackbar>
-    </div>
+    </div >
   );
 }
 

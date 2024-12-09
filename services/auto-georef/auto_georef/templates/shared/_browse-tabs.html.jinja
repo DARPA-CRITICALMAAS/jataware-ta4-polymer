@@ -1,0 +1,46 @@
+<nav 
+    id="manage-browse" 
+    class="absolute left-[-3.5rem] top-0 join join-vertical shadow-md"
+>
+    <div class="tooltip tooltip-right jata-tooltip-lg" data-tip="Maps">
+        <a role="button" href="/" class="btn text-lg btn-square skip-link join-item h-12 w-12
+            {%if '/' == request.url.path%} btn-primary pointer-events-none{%endif%}
+        ">
+            <!-- maps icon-->
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5">
+                <path fill-rule="evenodd"
+                    d="M8.161 2.58a1.875 1.875 0 0 1 1.678 0l4.993 2.498c.106.052.23.052.336 0l3.869-1.935A1.875 1.875 0 0 1 21.75 4.82v12.485c0 .71-.401 1.36-1.037 1.677l-4.875 2.437a1.875 1.875 0 0 1-1.676 0l-4.994-2.497a.375.375 0 0 0-.336 0l-3.868 1.935A1.875 1.875 0 0 1 2.25 19.18V6.695c0-.71.401-1.36 1.036-1.677l4.875-2.437ZM9 6a.75.75 0 0 1 .75.75V15a.75.75 0 0 1-1.5 0V6.75A.75.75 0 0 1 9 6Zm6.75 3a.75.75 0 0 0-1.5 0v8.25a.75.75 0 0 0 1.5 0V9Z"
+                    clip-rule="evenodd" />
+            </svg>
+        </a>
+    </div>
+
+    <div class="divider join-item m-0 z-10 h-fit bg-base-100"></div>
+
+    <div class="tooltip tooltip-right jata-tooltip-lg" data-tip="CMAs">
+        <a role="button" href="/cmas" class="btn text-lg btn-square skip-link join-item h-12 w-12 text-lg
+            {%if 'cmas' in request.url.path%} btn-primary pointer-events-none{%endif%}
+        ">
+            <!-- rect group icon-->
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5">
+                <path fill-rule="evenodd"
+                    d="M1.5 7.125c0-1.036.84-1.875 1.875-1.875h6c1.036 0 1.875.84 1.875 1.875v3.75c0 1.036-.84 1.875-1.875 1.875h-6A1.875 1.875 0 0 1 1.5 10.875v-3.75Zm12 1.5c0-1.036.84-1.875 1.875-1.875h5.25c1.035 0 1.875.84 1.875 1.875v8.25c0 1.035-.84 1.875-1.875 1.875h-5.25a1.875 1.875 0 0 1-1.875-1.875v-8.25ZM3 16.125c0-1.036.84-1.875 1.875-1.875h5.25c1.036 0 1.875.84 1.875 1.875v2.25c0 1.035-.84 1.875-1.875 1.875h-5.25A1.875 1.875 0 0 1 3 18.375v-2.25Z"
+                    clip-rule="evenodd" />
+            </svg>
+        </a>
+    </div>
+
+    <div class="divider join-item m-0 z-10 h-fit bg-base-100"></div>
+
+    <div class="tooltip tooltip-right jata-tooltip-lg" data-tip="Features">
+        <a role="button" href="/features/" class="btn text-lg btn-square skip-link join-item h-12 w-12 text-lg
+                {%if 'features' in request.url.path%} btn-primary pointer-events-none{%endif%}
+            ">
+            <!-- queue list icon-->
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5">
+                <path
+                    d="M5.625 3.75a2.625 2.625 0 1 0 0 5.25h12.75a2.625 2.625 0 0 0 0-5.25H5.625ZM3.75 11.25a.75.75 0 0 0 0 1.5h16.5a.75.75 0 0 0 0-1.5H3.75ZM3 15.75a.75.75 0 0 1 .75-.75h16.5a.75.75 0 0 1 0 1.5H3.75a.75.75 0 0 1-.75-.75ZM3.75 18.75a.75.75 0 0 0 0 1.5h16.5a.75.75 0 0 0 0-1.5H3.75Z" />
+            </svg>
+        </a>
+    </div>
+</nav>

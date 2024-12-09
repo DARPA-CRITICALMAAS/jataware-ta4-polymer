@@ -171,6 +171,7 @@ VITE_CDR_PUBLIC_BUCKET="public.cdr.land"
 VITE_CDR_S3_COG_PRO_PREFEX="test/cogs"
 VITE_CDR_S3_COG_PREFEX="cogs"
 VITE_POLYMER_SYSTEM="polymer"
+VITE_V2_UI_BASE_URL="http://localhost:3000"            # only on dev
 VITE_POLYMER_SYSTEM_VERSION="0.0.1"
 ```
 

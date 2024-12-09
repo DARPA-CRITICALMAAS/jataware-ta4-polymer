@@ -20,9 +20,19 @@ auth = {
 
 @router.get("/")
 def list_cmas():
-    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/cmas?size=40"
+    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/cmas?size=60"
     response = httpx.get(fetch_url, headers=auth, timeout=None).raise_for_status()
     return response.json()
+
+
+@router.get("/cog/{cog_id}")
+def get_cmas_linked_to_cog(cog_id):
+    cog_meta_url = f"{app_settings.cdr_endpoint_url}/v1/maps/cog/meta/{cog_id}"
+
+    cog_response = httpx.get(cog_meta_url, headers=auth, timeout=None).raise_for_status()
+    cog_meta = cog_response.json()
+
+    return cog_meta["cmas"]
 
 
 @router.get("/{cma_id}")

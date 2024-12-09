@@ -1,8 +1,8 @@
 {%if data["total_cogs"] %}
   <aside class="gap-2 bg-base-100 rounded pr-2 items-center shadow-md hidden xl:flex">
-    <h4 class="badge text-bold text-base-100 rounded rounded-e-none badge-accent h-8 ml-[-1px]">Maps in CDR</h4>
-    <div class="badge badge-base-100 text-secondary saturate-150 dark:saturate-100">Total: {{data["total_cogs"]}}</div>
-    <div class="badge badge-base-100 hidden md:flex text-info">Projected:&nbsp;
+    <h4 class="badge text-bold text-base-100 rounded rounded-e-none badge-accent h-8 ml-[-1px] border-none">Maps in CDR</h4>
+    <div class="badge badge-base-100 text-secondary dark:saturate-100 border-none">Total: {{data["total_cogs"]}}</div>
+    <div class="badge badge-base-100 hidden md:flex text-info border-none">Projected:&nbsp;
       {% if data["has_validated_cogs"] %}
         <span title="Validated Projection Count">
           {{data["validated_projected_cogs"]}}

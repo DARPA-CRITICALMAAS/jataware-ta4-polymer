@@ -4,16 +4,23 @@
 :8080 {
   # Redirect /api to /api/
   redir /api /api/
+  redir /cmas /cmas/
+  redir /features /features/
 
   handle /ui/upload/* {
     uri strip_prefix /ui/upload
     request_header Authorization "Bearer {$CDR_TOKEN}"
-    request_header Host api.cdr.land
-    reverse_proxy api.cdr.land:443 {
+    request_header Host {$CDR_HOST}
+    reverse_proxy {$CDR_HOST}:443 {
       transport http {
         tls
       }
     }
+  }
+
+  handle /auto_legend_api/* {
+    uri strip_prefix /auto_legend_api
+    reverse_proxy jataware-auto-legend.{$INTERNAL_DOMAIN}:7000
   }
 
   handle /ui/* {
@@ -29,8 +36,15 @@
   # Handle API requests with reverse proxy
   handle /api/* {
     uri strip_prefix /api
-    reverse_proxy {env.API}:3000
+    reverse_proxy {env.API}:3000 {
+      transport http {
+        read_timeout 200s  
+        write_timeout 200s
+      }
+    }
+
   }
+  
 
   handle /segment/* {
     uri strip_prefix /segment
@@ -44,6 +58,14 @@
   }
 
   handle /lines/* {
+    reverse_proxy {env.API}:3000
+  }
+
+  handle /cmas/* {
+    reverse_proxy {env.API}:3000
+  }
+
+  handle /features/* {
     reverse_proxy {env.API}:3000
   }
 

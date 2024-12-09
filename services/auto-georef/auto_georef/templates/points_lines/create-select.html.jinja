@@ -1,0 +1,36 @@
+{% import "shared/modal.html.jinja" as modal %}
+
+{% call modal.header() %}
+<i class="fa-solid fa-list"></i>
+<h3>Legend Item</h3>
+{% endcall %}
+
+<div class="flex place-content-center">
+  <label class="form-control w-full max-w-xs">
+    <div class="label">
+      <span class="label-text">Select a legend item to create features for</span>
+    </div>
+    <select class="select select-bordered" name="legend">
+      <option disabled selected>Pick one</option>
+      {% for li in legend_groups %}
+      <option value="{{ li.legend_id }}">{{ li.label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</div>
+
+{{ modal.header() }}
+
+<label class="btn btn-primary btn-block" tabindex="0">
+  <i class="loading loading-spinner hidden"></i>
+  <span>Begin</span>
+  <input type="submit" class="hidden">
+</label>
+
+<script>
+  console.log("create-select.html.jinja");
+  window.polymer.legendMapping = {{ legend_id_to_label | tojson }};
+  window.polymer.system = "{{ system }}";
+  window.polymer.version = "{{ version }}";
+  window.polymer.rawPolymerFeatures = {{ polymer_features | tojson }};
+</script>

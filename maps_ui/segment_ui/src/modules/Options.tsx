@@ -4,7 +4,7 @@ import type { MultiPolygon } from "geojson";
 import type { Layer, LegendItem } from "./Types";
 import type { LayerStore } from "../app";
 import type { AlertStore } from "./Alert";
-import * as Element from "./Elements";
+import * as E from "./Elements";
 
 declare global {
   interface JSON {
@@ -58,7 +58,7 @@ const Options = ({
     setHasImported(new Map(hasImported.set(sysver, true)));
   };
 
-  const [systems, setSystems] = useState<Map<string, string[]>>(new Map());
+  const [systems, setSystems] = useState<Map<string, string[]> | null>(null);
   useEffect(() => {
     (async () => {
       try {
@@ -157,7 +157,7 @@ const Options = ({
   };
 
   const uploadToCDR = async () => {
-    Element.options.close();
+    E.options.close();
 
     LayerStore.updateCurrentLayer();
 
@@ -186,7 +186,7 @@ const Options = ({
   };
 
   const createEmbeds = async () => {
-    Element.options.close();
+    E.options.close();
 
     const response = await fetchAPI<{ time: number }>("embeddings_to_s3", {
       method: "POST",
@@ -217,7 +217,7 @@ const Options = ({
   };
 
   const checkEmbeds = async () => {
-    Element.options.close();
+    E.options.close();
 
     const response = await fetchAPI("load_segment", {
       method: "POST",
@@ -244,7 +244,7 @@ const Options = ({
   };
 
   const reloadTools = async () => {
-    Element.options.close();
+    E.options.close();
 
     const lassoResponse = await fetchAPI("load_lasso", { method: "POST", query: { cog_id } });
     const labelResponse = await fetchAPI("load_segment", { method: "POST", query: { cog_id } });
@@ -335,7 +335,14 @@ const Options = ({
             </div>
 
             <ul tabIndex={0} className="menu p-0">
-              {systems.size === 0 ? (
+              {systems === null ? (
+                <li>
+                  <div>
+                    <i className="loading loading-spinner loading-sm"></i>
+                    <span>Loading systems</span>
+                  </div>
+                </li>
+              ) : systems.size === 0 ? (
                 <li>
                   <div>
                     <i className="fa-solid fa-ban"></i>
@@ -358,7 +365,7 @@ const Options = ({
               <span>Upload All Validated Layers to CDR</span>
             </button>
 
-            <button className="btn btn-ghost" onClick={createEmbeds}>
+            <button disabled className="btn btn-ghost" onClick={createEmbeds}>
               <i className="fa-solid fa-circle-nodes"></i>
               <span>Create Image Embeddings for Label Tool</span>
             </button>

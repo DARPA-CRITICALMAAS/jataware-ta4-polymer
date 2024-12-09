@@ -2,10 +2,11 @@ import GeoJSON from "ol/format/GeoJSON";
 import { Fill, Stroke, Style } from "ol/style";
 import VectorSource from "ol/source/Vector.js";
 import { Vector as VectorLayer } from "ol/layer";
-// import { getCenter } from 'ol/extent.js';
+import { getCenter, getArea } from 'ol/extent.js';
 import Feature from "ol/Feature";
 import Polygon from "ol/geom/Polygon";
 import proj4 from "proj4";
+import { register } from "ol/proj/proj4";
 
 export const openLayersDefaultProjection = "EPSG:3857";
 export const cdrDefaultProjection = "EPSG:4326";
@@ -21,33 +22,43 @@ proj4.defs(
   "+proj=aea +lat_0=40 +lon_0=-96 +lat_1=20 +lat_2=60 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +type=crs",
 );
 
-/* By default proj4 has the following projections predefined:
-'EPSG:4326', which has the following alias
-'WGS84'
+/**
+ *
+ */
+export function isCRSRegistered(crs) {
+  try {
+    proj4(crs);
+  } catch(e) {
+    return false;
+  }
+  return true;
+}
 
-'EPSG:4269'
-'EPSG:3857', which has the following aliases
-'EPSG:3785'
-'GOOGLE'
-'EPSG:900913'
-'EPSG:102113'
-*/
+// if more than 1 in a line, it is an alias and its supported
+// Unused for now, as we check isCRSRegistered to fail instead of checking our
+// manually tracked list. Useful ofr the future, though.
+// const knownCRS = [
+//   "EPSG:4267",           // Some for maps we ran into in shapefiles, etc
+//   "ESRI:102008",         // some pre-existing CMAs use this
+//   "EPSG:4326", "WGS84",  // default for CDR
+//   "EPSG:3857",           // default for openlayers
+//   "EPSG:4269",           // included in proj4 by default
+//   // other aliases for the openlayers one, included by proj4:
+//   "EPSG:3785", "GOOGLE", "EPSG:900913", "EPSG:102113",
+// ];
 
 export const defaultLayerStyle = new Style({
   fill: new Fill({
-    color: 'rgba(255,255,255,0.15)',
+    color: "rgba(255,255,255,0.15)",
   }),
   stroke: new Stroke({
-    color: '#3399CC',
+    color: "#3399CC",
     width: 3,
   }),
 });
 
 /**
  * Use proj4 to loop and transform any coordinates found from->to projections
-  TODO if from_prj is unknown, catch the exception and use the epsg.io website/API
-  like so: https://epsg.io/?format=json&q=epsg:4267 in order to grab the proj or wkt
-  string and register new projections dynamically, as needed...
  **/
 export const transformPolygonCoordinates = (coordinates, from_prj, to_prj) => {
   let new_coords = [];
@@ -60,26 +71,6 @@ export const transformPolygonCoordinates = (coordinates, from_prj, to_prj) => {
   }
   return new_coords;
 };
-
-/**
- *
- */
-function random_rgba() {
-  var o = Math.round,
-    r = Math.random,
-    s = 255;
-  return (
-    "rgba(" +
-    o(r() * s) +
-    "," +
-    o(r() * s) +
-    "," +
-    o(r() * s) +
-    "," +
-    0.75 +
-    ")"
-  );
-}
 
 /**
  *
@@ -120,7 +111,7 @@ export function drawPolygonWithLayerID(
   map,
   layerID,
   polygon,
-  { id, color = "#eeeeee" },
+  { id, color = "#eeeeee", width = 2.75 },
 ) {
   let layer = map
     .getLayers()
@@ -137,11 +128,11 @@ export function drawPolygonWithLayerID(
   feature.setStyle(
     new Style({
       stroke: new Stroke({
-        width: 2,
+        width,
         color,
       }),
       fill: new Fill({
-        color,
+        color: color.replace("1.0", "0.075"),
       }),
     }),
   );
@@ -162,28 +153,54 @@ export function mapLayerById(map, layerID) {
   return found;
 }
 
+export function areaToZoomLevel(area) {
+    const minZoom = 5.3;
+    const maxZoom = 14.5;
+    const minArea = 100000;        // smallest area
+    const maxArea = 8000000000000; // largest area
+
+    // zoom level inversely proportional to area
+    const zoom = minZoom + (maxZoom - minZoom) * (1 - (Math.log(area) - Math.log(minArea)) / (Math.log(maxArea) - Math.log(minArea)));
+
+    return Math.round(zoom * 100) / 100; // round to 2 decimal places
+}
+
+export function centerMapToExtent(extent) {
+  const center = getCenter(extent);
+  const area = getArea(extent);
+  const view = window.polymer_map.getView();
+
+  view.setCenter(center);
+  view.setZoom(areaToZoomLevel(area));
+}
+
 /**
  * Assumes geoJSONMultiPolygon is already converted to correct ol projection
+ * Only used on CMA Selection map search filter for now
  */
 export function drawMultiPolygonOpenLayers(map, geoJSONMultiPolygon, layerID) {
+  const features = new GeoJSON().readFeatures(geoJSONMultiPolygon);
+
   const vectorSource = new VectorSource({
-    features: new GeoJSON().readFeatures(geoJSONMultiPolygon),
+    features,
   });
   const vectorLayer = new VectorLayer({
     id: layerID,
     source: vectorSource,
-    style: defaultLayerStyle
+    style: defaultLayerStyle,
   });
   map.addLayer(vectorLayer);
 
-  // TODO use center of coordinates, not first coordinate (corner...)
-  const firstCoordinate = geoJSONMultiPolygon.coordinates[0][0][0];
+  const geometry = features[0].getGeometry();
+  const extent = geometry.getExtent();
+
+  const center = getCenter(extent);
+  const area = getArea(extent);
 
   const view = map.getView();
-  view.setCenter(firstCoordinate);
-  // TODO base zoom on area of multipolygon
-  // Polygon.getArea()
-  view.setZoom(5.8);
+
+  view.setCenter(center);
+  view.setZoom(areaToZoomLevel(area));
 }
 
 /**
@@ -197,6 +214,8 @@ export function clearSourceByLayerID(map, layerID) {
   const layer = mapLayerById(map, layerID);
   if (layer) {
     clearLayerSource(layer);
+  } else {
+    console.log("Called clearSourceByLayerID but no layer was found. layer:", layer, "map:", map, "layerID:", layerID);
   }
 }
 
@@ -205,8 +224,39 @@ export function clearSourceByLayerID(map, layerID) {
  */
 export function clearShapeOpenLayers(layerID) {
   window.polymer_map.getLayers().forEach((layer) => {
-    if (layer.get("id") === layerID) {
+    if (layer?.get("id") === layerID) {
       window.polymer_map.removeLayer(layer);
     }
   });
 }
+
+
+// --
+// Projection helpers
+
+
+/**
+ *
+ */
+export const register_proj = async function (query) {
+  const response = await fetch("https://epsg.io/?format=json&q=" + query);
+  const json = await response.json();
+  const results = json["results"];
+  if (results && results.length > 0) {
+    const results = json["results"];
+    if (results && results.length > 0) {
+      for (let i = 0, ii = results.length; i < ii; i++) {
+        const result = results[i];
+        if (result) {
+          // const auth = result["authority"];
+          // const code = result["code"];
+          const wkt = result["wkt"];
+
+          proj4.defs(query, wkt);
+        }
+      }
+    }
+  }
+
+  return true;
+};

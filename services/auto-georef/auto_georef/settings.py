@@ -34,8 +34,12 @@ class Settings(BaseSettings):
     polymer_auto_georef_system: str = "polymer"
     polymer_auto_georef_system_version: str = "0.0.1"
 
+    segment_api_endpoint_url: str = "http://192.168.1.95:8000"
+
     ui_templates_dir: str = "auto_georef/templates"
     template_prefix: str = "/ui"
+    maps_ui_base_url: str = ""
+    maptiler_key: str
 
     redis_host: str = "redis.nyl.on"
     redis_port: int = 6379

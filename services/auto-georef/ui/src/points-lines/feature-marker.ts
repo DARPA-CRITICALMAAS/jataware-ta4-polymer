@@ -16,7 +16,8 @@ export default class FeatureMarker {
    * @returns A success response with the current feature or a failure response with an error message.
    */
   static getCurrent() {
-    return this.features ? Success(this.features[0]) : this.#FAIL;
+    const [current] = this.features ?? [];
+    return current !== undefined ? Success(current) : this.#FAIL;
   }
 
   /**
@@ -53,8 +54,9 @@ export default class FeatureMarker {
 
     // Rotate the features array so that the new feature is first
     const before = this.features.slice(0, i);
-    newFeature = this.features[i];
+    newFeature = this.features[i]!;
     const after = this.features.slice(i + 1);
+
     this.features = [newFeature, ...after, ...before];
 
     // Return the new feature

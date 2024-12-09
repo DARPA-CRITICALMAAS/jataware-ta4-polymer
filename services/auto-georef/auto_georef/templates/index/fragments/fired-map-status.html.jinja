@@ -1,0 +1,18 @@
+<div
+  {%if not completed_on and not pending%}
+    hx-swap="outerHTML"
+    hx-trigger="click"
+    hx-target="this"
+    hx-post="{{template_prefix}}/process-map/{{cog_id}}"
+  {%endif%}
+  class="tooltip tooltip-left tooltip-accent"
+  data-tip="{%if completed_on%}{{completed_on}}{%elif message%}{{message}}{%endif%}">
+  <input
+    type="checkbox"
+    {%if completed_on or pending%}checked="checked"{%endif%}
+    class="checkbox checkbox-sm
+    {%if pending%}checkbox-info{%elif message%}checkbox-error border-2{%else%}checkbox-success{%endif%}
+    {%if completed_on or pending %}pointer-events-none{%endif%}
+    opacity-80 rounded-sm mt-1"
+    />
+</div>

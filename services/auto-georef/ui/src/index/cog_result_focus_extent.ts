@@ -1,7 +1,9 @@
 import { Fill, Stroke, Style } from "ol/style.js";
 import Select from "ol/interaction/Select.js";
 
-import { expandSearchResults } from "./common";
+import { getArea } from "ol/extent";
+
+import { expandSearchResults } from "../common";
 
 import {
   transformPolygonCoordinates,
@@ -20,8 +22,8 @@ const selected = new Style({
     color: "#eeeeee",
   }),
   stroke: new Stroke({
-    color: "rgba(255, 255, 255, 0.7)",
-    width: 2,
+    color: "#FFF",
+    width: 4.5,
   }),
 });
 
@@ -29,7 +31,7 @@ const selected = new Style({
  *
  */
 function selectStyle(feature) {
-  const color = feature.get("color") || "#4ade80AA"; // in case we ever want to modify base color instead of replace it
+  const color = feature.get("color") || "#4ade8055"; // in case we ever want to modify base color instead of replace it
   selected.getFill().setColor(color);
 
   return selected;
@@ -41,7 +43,12 @@ function selectStyle(feature) {
 const selectSingleClick = new Select({
   style: selectStyle,
   layers: (layer) => layer.get("id") === "all-results",
+  multi: true,
 });
+
+function getFeatureArea(feature) {
+  return getArea(feature.getGeometry().getExtent());
+}
 
 /**
  *
@@ -61,17 +68,47 @@ selectSingleClick.on("select", function (e) {
     return;
   }
 
-  // TODO deselect previous feature if more than 2 are selected with shift...
-  // e.mapBrowserEvent.originalEvent.shiftKey
+  let featureToSelect = allFeatures[allFeatures.length - 1];
 
-  const cog_id = allFeatures[allFeatures.length - 1].get("cog_id");
+  // Deselect previous or disallow multi feature selection with shift...
+  const isShift = e.mapBrowserEvent.originalEvent.shiftKey;
+
+  if (isShift) {
+    const selected_collection = selectSingleClick.getFeatures();
+    selected_collection.clear();
+    selected_collection.push(featureToSelect);
+  }
+
+  // Decides closest click to extents of features clicked on if allFeatures.length > 1
+  if (allFeatures.length > 1) {
+    let min = getFeatureArea(featureToSelect);
+
+    allFeatures.forEach((feat, idx) => {
+      const area = getFeatureArea(feat);
+      if (area < min) {
+        min = area;
+        featureToSelect = feat;
+      }
+    });
+
+    const selected_collection = selectSingleClick.getFeatures();
+    selected_collection.clear();
+    selected_collection.push(featureToSelect);
+  }
+
+  let cog_id = featureToSelect.get("cog_id");
 
   if (cog_id) {
     const resultsContainer = document.getElementById("map-results-target");
     // If results collapsed, toggle to expand
-    if ([...resultsContainer.classList].includes("hidden")) {
+    if (
+      resultsContainer &&
+      [...resultsContainer.classList].includes("hidden")
+    ) {
       const resultsWrapper = document.getElementById("browse-results");
-      const icon = document.getElementById("toggle-search-results").querySelector("svg");
+      const icon = document
+        .getElementById("toggle-search-results")
+        .querySelector("svg");
 
       expandSearchResults(resultsContainer, resultsWrapper, icon);
     }
@@ -92,11 +129,12 @@ selectSingleClick.on("select", function (e) {
  *
  */
 window.connectMapResultsToMap = function () {
+
   const map = window.polymer_map;
 
   map.removeInteraction(selectSingleClick);
-
   map.addInteraction(selectSingleClick);
+
 
   /* Ensure previous result polygons are removed if we paginate */
   clearSourceByLayerID(map, "all-results");
@@ -104,7 +142,13 @@ window.connectMapResultsToMap = function () {
   const cogResults = document.querySelectorAll(".cog-result-card");
 
   cogResults.forEach((cogCard) => {
-    const extent = JSON.parse(cogCard.dataset.extent.replace(/'/g, '"'));
+    let extent = cogCard.dataset.extent;
+
+    if (!extent) {
+      console.log("Cog result does not have an extent property. Skipping:", cogCard.dataset);
+      return;
+    }
+    extent = JSON.parse(extent.replace(/'/g, '"'));
 
     const destCoordinates = transformPolygonCoordinates(
       extent.coordinates,
@@ -143,8 +187,8 @@ window.connectMapResultsToMap = function () {
       {
         id: cog_id,
         color: has_validated_projection
-          ? "rgba(233, 30, 99, 0.40)"
-          : "rgba(82,75,222,0.40)",
+          ? "rgba(233, 30, 99, 1.0)"
+          : "rgba(92, 115, 239, 1.0)",
       },
     );
 
@@ -159,7 +203,7 @@ window.connectMapResultsToMap = function () {
       const resultsLayer = mapLayerById(window.polymer_map, "all-results");
       const source = resultsLayer.getSource();
       const feature = source.getFeatureById(cog_id);
-      var selected_collection = selectSingleClick.getFeatures();
+      const selected_collection = selectSingleClick.getFeatures();
 
       selected_collection.clear();
       selected_collection.push(feature);

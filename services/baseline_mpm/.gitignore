@@ -1,0 +1,7 @@
+*.pyc
+*.tif
+*.png
+data/*
+sri_data/*
+bkj_data/*
+.secrets

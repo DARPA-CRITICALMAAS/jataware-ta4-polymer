@@ -1,0 +1,34 @@
+
+services:
+
+  segment_api:
+    profiles:
+      - segment_api
+    image: segment_api:dev
+    entrypoint:
+      - uvicorn
+      - segment_api.http.api:api
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --log-config
+      - logging.yaml
+      - --workers
+      - "1"
+      - "--reload"
+    ports:
+      - 8000:8000
+    volumes:
+      - ./services/segment_api:/home/apps/segment_api
+      - ./aws/credentials:/home/apps/.aws/credentials
+    env_file:
+      - ./services/segment_api/.env
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: "5"
+    networks:
+      - nylon
+

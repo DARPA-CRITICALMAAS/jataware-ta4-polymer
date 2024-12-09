@@ -1,4 +1,4 @@
-import React, { useState } from "react"; // useEffect,
+import React, { useMemo, useState, useEffect } from "react"; // useEffect,
 import axios from "axios";
 
 import Divider from "@mui/material/Divider";
@@ -18,6 +18,7 @@ import "../css/GCP_list.scss";
 enum DegreeType {
   DD = "DD", // decimal degrees
   DMS = "DMS", // degreees, minutes, seconds
+  UTM = "UTM"
 }
 
 const identity = (args) => args;
@@ -26,6 +27,16 @@ const _APP_JSON_HEADER = {
   "Access-Control-Allow-Origin": "*",
   "Content-Type": "application/json",
 };
+
+function returnDegreeType(gcps) {
+  for (let gcp of gcps) {
+
+    if (gcp?.["crs_unit"] == "meter" || gcp?.['crs_unit'] == "metre") {
+      return DegreeType.UTM
+    }
+  }
+  return DegreeType.DMS
+}
 
 function GCPList(props) {
   const {
@@ -38,8 +49,14 @@ function GCPList(props) {
     ClipComponent,
   } = props;
 
+  // const initialDegreesType = useMemo(() => returnDegreeType(gcps), [gcps]);
   const [degreesType, setDegreesType] = useState(DegreeType.DMS);
   const { updateGCP, deleteGCP } = GCPOps;
+
+  // useEffect(() => {
+  //   const newDegreesType = returnDegreeType(gcps);
+  //   setDegreesType(newDegreesType); // This will trigger a re-render when gcps changes
+  // }, [gcps]);
 
   const forceCogCache = useQuery({
     queryKey: ["mapCog", cog_id, "cache"],
@@ -81,6 +98,11 @@ function GCPList(props) {
             control={<Radio size="small" />}
             label="DECIMAL"
           />
+          <FormControlLabel
+            value={DegreeType.UTM}
+            control={<Radio size="small" />}
+            label="UTM"
+          />
         </RadioGroup>
       </FormControl>
 
@@ -96,7 +118,8 @@ function GCPList(props) {
                 key={
                   gcp.gcp_id +
                   gcp.columns_from_left.toString() +
-                  gcp.rows_from_top.toString()
+                  gcp.rows_from_top.toString() +
+                  degreesType
                 }
                 gcp={gcp}
                 updateGCP={updateGCP}

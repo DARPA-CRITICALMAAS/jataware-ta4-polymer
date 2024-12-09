@@ -13,6 +13,8 @@ import CardActions from "@mui/material/CardActions";
 import TextField from "@mui/material/TextField";
 import Box from "@mui/material/Box";
 import Text from "@mui/material/Typography";
+import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
+import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import Autocomplete from "@mui/material/Autocomplete";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
@@ -29,6 +31,9 @@ import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 
 import PolymerTooltip from "./Tooltip";
 
+const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
+const checkedIcon = <CheckBoxIcon fontSize="small" />;
+
 import {
   returnImageUrl,
   getColorForProvenance,
@@ -37,7 +42,6 @@ import {
 
 import "../css/legend_annotation.scss";
 
-const LightTooltip = PolymerTooltip;
 
 const OCRButton = React.forwardRef(({ onClick, ...props }, ref) => {
   const [isFetchingOCR, setIsFetchingOCR] = useState(false);
@@ -73,9 +77,9 @@ const OcrField = ({
   const [isFetchingOCR, setIsFetchingOCR] = useState(false);
   return (
     <div style={{ display: "flex", alignItems: "center", columnGap: "0.5rem" }}>
-      <LightTooltip title={tooltip} placement="left">
+      <PolymerTooltip title={tooltip} placement="left">
         <OCRButton onClick={() => setValueFromClip(clipName, null, item)} />
-      </LightTooltip>
+      </PolymerTooltip>
 
       <TextField
         id={item.legend_id}
@@ -131,7 +135,7 @@ function LegendCard({
   const [patternText, setPatternText] = useState(item["pattern"]);
   const [labelText, setLabelText] = useState(returnLabel(item));
   const [category, setCategory] = useState(item["category"]);
-  const [ageText, setAgeText] = useState(item["age_text"]);
+  const [ageText, setAgeText] = useState(item["age_texts"]);
   function returnLabel(item) {
     return item.label || "";
   }
@@ -154,6 +158,8 @@ function LegendCard({
       }
     }
     if (key_ != "minimized" && key_ != "status") {
+      new_item['in_cdr'] = false
+
       new_item["status"] = "created";
     }
     updateItem(new_item);
@@ -254,8 +260,9 @@ function LegendCard({
   };
 
   const handleAgeChange = (value) => {
+
     setAgeText(value);
-    wrapChanges("age_text", value);
+    wrapChanges("age_texts", value);
   };
 
   return (
@@ -289,7 +296,8 @@ function LegendCard({
                   </div>
                 </div>
                 <div style={{ justifySelf: "end" }}>
-                  {validateExtent(item.extent_from_bottom) && (
+                  
+                  {item._symbol_id !== null && validateExtent(item.extent_from_bottom) && (
                     <img
                       src={returnImageUrl(cog_id, item.extent_from_bottom)}
                       alt="Legend Item"
@@ -331,7 +339,7 @@ function LegendCard({
                       }}
                     />
                   ) : (
-                    <LightTooltip
+                    <PolymerTooltip
                       title="Press to assign manually selected shape on map as swatch."
                       placement="left"
                     >
@@ -342,7 +350,7 @@ function LegendCard({
                       >
                         <FormatShapesIcon />
                       </Button>
-                    </LightTooltip>
+                    </PolymerTooltip>
                   )}
                   <FormControl fullWidth sx={{ ml: "0.5rem" }} size="small">
                     <InputLabel id="demo-simple-select-label">
@@ -399,20 +407,39 @@ function LegendCard({
                     }}
                   >
                     {category == "polygon" && (
+
                       <div style={{ display: "flex", alignItems: "center" }}>
                         <Autocomplete
-                          size="small"
-                          value={ageText}
-                          className="autoComplete"
-                          disablePortal
-                          style={{ minWidth: "100%" }}
+                          multiple
+                          id="checkboxes-tags-demo"
                           options={geologicAges}
-                          renderInput={(params) => (
-                            <TextField {...params} label="Geologic Age" />
-                          )}
-                          onInputChange={(_, value) => {
+                          value={ageText}
+                          disableCloseOnSelect
+                          getOptionLabel={(option) => {
+                            return option
+                          }}
+                          onChange={(_, value) => {
+
                             handleAgeChange(value);
                           }}
+                          renderOption={(props, option, { selected }) => {
+                            const { key, ...optionProps } = props;
+                            return (
+                              <li key={key} {...optionProps}>
+                                <Checkbox
+                                  icon={icon}
+                                  checkedIcon={checkedIcon}
+                                  style={{ marginRight: 8 }}
+                                  checked={selected}
+                                />
+                                {option}
+                              </li>
+                            );
+                          }}
+                          style={{ minWidth: "100%", display: "flex", alignItems: "center" }}
+                          renderInput={(params) => (
+                            <TextField {...params} label="Geologic Age" placeholder="..." />
+                          )}
                         />
                       </div>
                     )}
@@ -465,7 +492,7 @@ function LegendCard({
                           marginTop: "0.5rem",
                         }}
                       >
-                        <LightTooltip
+                        <PolymerTooltip
                           title="OCR text from selected shape on map into field."
                           placement="left"
                         >
@@ -474,7 +501,7 @@ function LegendCard({
                               setValueFromClip("description", i, item)
                             }
                           />
-                        </LightTooltip>
+                        </PolymerTooltip>
                         <IconButton
                           onClick={() => {
                             removeDescription(i, item);
@@ -505,7 +532,7 @@ function LegendCard({
             }}
           >
             {item.status != "succeeded" && item.status != "validated" && (
-              <LightTooltip
+              <PolymerTooltip
                 title="Save to Polymer, moves to Reviewed."
                 placement="bottom"
               >
@@ -518,7 +545,7 @@ function LegendCard({
                 >
                   Save As Reviewed
                 </Button>
-              </LightTooltip>
+              </PolymerTooltip>
             )}
             {item.status !== "validated" && (
               <Button

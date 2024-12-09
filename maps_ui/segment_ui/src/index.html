@@ -1,8 +1,12 @@
 <!doctype html>
-<html lang="en" data-theme="light" style="scrollbar-gutter: auto">
+<html lang="en" style="scrollbar-gutter: auto">
   <head>
     <meta charset="UTF-8" />
     <title>Polymer Segmentation</title>
+
+    <!-- Avoid FART -->
+    <script>document.documentElement.dataset.theme = localStorage.getItem("theme") ?? "";</script>
+
     <link rel="shortcut icon" href="#" />
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -36,60 +40,171 @@
 
     <div class="pointer-events-none flex h-screen w-full flex-col">
       <div
-        class="navbar pointer-events-auto relative z-40 flex w-screen flex-row items-center justify-between bg-base-200 shadow-md"
+        class="navbar pointer-events-auto relative z-40 flex w-screen flex-row justify-between bg-base-200 shadow-md gap-8 transition-[gap] 2xl:gap-16"
       >
-        <div class="navbar-start w-fit gap-8 transition-[gap] xl:gap-16">
-          <a href="/" class="h-fit">
-            <h1 class="btn btn-ghost text-3xl">Polymer</h1>
+        <div class="gap-4 transition-[gap] 2xl:gap-16">
+          <a
+            href="/"
+            class="btn btn-ghost text-3xl gap-2 w-fit p-1 place-content-center"
+          >
+            <!-- <div
+              class="bg-base-content h-full aspect-square [mask-image:url('/static/img/polymer_logo.svg')]"
+            ></div> -->
+            <h1>Polymer</h1>
           </a>
           <div class="flex gap-2">
-            <a class="btn btn-ghost" id="points-link">
+            <div class="dropdown dropdown-hover lg:hidden">
+              <div role="button" class="btn btn-ghost">
+                <i class="fa-solid fa-map"></i>
+                <span>Map</span>
+                <i class="fa-solid fa-chevron-down"></i>
+              </div>
+              <ul
+                tabindex="0"
+                class="dropdown-content menu bg-base-100 rounded-box z-10 w-48 p-2 shadow gap-2"
+              >
+                <a id="points-link-alt" class="btn btn-ghost">
+                  <i class="fa-solid fa-map-pin"></i>
+                  <span>Map GCPs</span>
+                </a>
+                <a id="projections-link-alt" class="btn btn-ghost">
+                  <i class="fa-solid fa-earth-americas"></i>
+                  <span>Projections</span>
+                </a>
+                <a id="areas-link-alt" class="btn btn-ghost">
+                  <i class="fa-solid fa-chart-area"></i>
+                  <span>Areas</span>
+                </a>
+              </ul>
+            </div>
+            <a id="points-link" class="hidden lg:btn lg:btn-ghost">
               <i class="fa-solid fa-map-pin"></i>
               <span>Map GCPs</span>
             </a>
-            <a class="btn btn-ghost" id="proj-link">
+            <a id="projections-link" class="hidden lg:btn lg:btn-ghost">
               <i class="fa-solid fa-earth-americas"></i>
               <span>Projections</span>
             </a>
-            <a class="btn btn-ghost" id="legend-link">
+            <a id="areas-link" class="hidden lg:btn lg:btn-ghost">
+              <i class="fa-solid fa-chart-area"></i>
+              <span>Areas</span>
+            </a>
+            <div class="dropdown dropdown-hover xl:hidden">
+              <div role="button" class="btn btn-ghost">
+                <i class="fa-solid fa-shapes"></i>
+                <span>Features</span>
+                <i class="fa-solid fa-chevron-down"></i>
+              </div>
+              <ul
+                tabindex="0"
+                class="dropdown-content menu bg-base-100 rounded-box z-10 w-48 p-2 shadow gap-2"
+              >
+                <a id="legends-link-alt" class="btn btn-ghost">
+                  <i class="fa-solid fa-list"></i>
+                  <span>Legends</span>
+                </a>
+                <a id="lines-link-alt" class="btn btn-ghost">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                  <span>Points & Lines</span>
+                </a>
+                <a id="polygons-link-alt" class="btn btn-ghost">
+                  <i class="fa-solid fa-shapes"></i>
+                  <span>Polygons</span>
+                </a>
+              </ul>
+            </div>
+            <a id="legends-link" class="hidden xl:btn xl:btn-ghost">
               <i class="fa-solid fa-list"></i>
               <span>Legends</span>
             </a>
-            <a class="btn btn-ghost" id="lines-link">
+            <a id="lines-link" class="hidden xl:btn xl:btn-ghost">
               <i class="fa-solid fa-arrow-trend-up"></i>
               <span>Points & Lines</span>
             </a>
-            <a class="btn btn-ghost" id="poly-link">
+            <a id="polygons-link" class="hidden xl:btn xl:btn-ghost">
               <i class="fa-solid fa-shapes"></i>
               <span>Polygons</span>
             </a>
           </div>
         </div>
-
-        <div class="navbar-end w-fit gap-8 2xl:gap-16">
-          <h2 class="hidden items-center gap-2 text-sm 2xl:flex">
-            <span class="font-semibold uppercase opacity-65">COG</span>
+      
+        <div
+          class="gap-2 transition-[gap] sm:gap-4 2xl:gap-16 min-w-0 flex-1 justify-end"
+        >
+          <div class="hidden items-center gap-2 text-sm sm:flex min-w-0">
+            <h2 class="font-semibold uppercase opacity-65">COG</h2>
+      
             <div
-              class="tooltip tooltip-bottom pointer-events-auto cursor-pointer"
+              class="tooltip tooltip-bottom pointer-events-auto cursor-pointer min-w-0 !flex"
               data-tip="Copy to Clipboard"
             >
-              <span class="badge badge-neutral badge-sm px-2 py-2.5" id="cog-id"></span>
+              <span
+                class="badge badge-neutral badge-sm px-2 py-2.5 min-w-0 active:opacity-50"
+                id="cog-id"
+              >
+                <span class="overflow-hidden text-ellipsis"></span>
+              </span>
             </div>
-          </h2>
-
-          <div class="tooltip tooltip-left pointer-events-auto" data-tip="Change Theme">
-            <label
-              class="btn btn-square btn-ghost swap swap-rotate text-lg has-[:focus-visible]:outline has-[:focus-visible]:[outline-offset:2px] has-[:focus-visible]:[outline-width:2px]"
-            >
-              <input
-                type="checkbox"
-                class="theme-controller focus-visible:outline-none"
-                value="dark"
-                tabindex="0"
-              />
-              <i class="fa-solid fa-sun swap-off fill-current"></i>
-              <i class="fa-solid fa-moon swap-on fill-current"></i>
-            </label>
+          </div>
+      
+          <div
+            class="tooltip tooltip-bottom sm:hidden pointer-events-auto cursor-pointer before:-translate-x-[66%]"
+            data-tip="Copy COG ID to Clipboard"
+          >
+            <button class="btn btn-square btn-ghost text-lg" id="cog-id-alt">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+          </div>
+      
+          <div
+            class="tooltip tooltip-bottom pointer-events-auto before:-translate-x-[79%]"
+            data-tip="Change Theme"
+          >
+            <div id="theme-switcher">
+              <button class="btn btn-square btn-ghost text-lg" data-set-theme="">
+                <i class="fa-solid fa-sun"></i>
+              </button>
+              <button class="btn btn-square btn-ghost text-lg" data-set-theme="light">
+                <i class="fa-solid fa-moon"></i>
+              </button>
+              <button class="btn btn-square btn-ghost text-lg" data-set-theme="dark">
+                <i class="fa-solid fa-paint-roller"></i>
+                <i
+                  class="fa-solid fa-computer absolute text-xs translate-x-[75%] translate-y-[90%] text-stroke-ghost-button"
+                ></i>
+              </button>
+            </div>
+            <script>
+              const ts = document.querySelector("#theme-switcher");
+              const updateThemeButton = () => {
+                const system = ts.querySelector("[data-set-theme='']").classList;
+                const light = ts.querySelector("[data-set-theme='light']").classList;
+                const dark = ts.querySelector("[data-set-theme='dark']").classList;
+      
+                const theme = window.localStorage.getItem("theme");
+                console.log(theme);
+                if (theme === "light") {
+                  system.remove("hidden");
+                  light.add("hidden");
+                  dark.add("hidden");
+                } else if (theme === "dark") {
+                  system.add("hidden");
+                  light.remove("hidden");
+                  dark.add("hidden");
+                } else {
+                  system.add("hidden");
+                  light.add("hidden");
+                  dark.remove("hidden");
+                }
+              };
+      
+              ts.addEventListener("click", updateThemeButton);
+              updateThemeButton();
+            </script>
+            <script type="module">
+              import { themeChange } from "theme-change";
+              themeChange();
+            </script>
           </div>
         </div>
       </div>

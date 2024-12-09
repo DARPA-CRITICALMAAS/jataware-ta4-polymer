@@ -1,0 +1,70 @@
+<div class="relative border border-solid border-slate-600 shadow-lg p-2 mt-1">
+  <h5 class="absolute text-zinc-200 px-1 py-[0.1rem] left-2 top-[-0.75rem] bg-slate-600">Maps with Data</h5>
+  <ul id="cma-stats-list" class="not-prose flex justify-between items-center relative p-2">
+    {% for category in categories %}
+    <li class="flex-1 flex flex-col gap-1 items-center justify-between relative">
+      <h4 class="text-xs font-semibold text-{{colors[category]}}">{{headings[category]}}</h4>
+      <canvas class="max-h-16" id="cma-{{cma.cma_id}}-{{category}}-chart"></canvas>
+    </li>
+    {%endfor%}
+  </ul>
+
+  <div class="flex items-center justify-between">
+    <div class="tooltip tooltip-right"
+      data-tip="Grouping of Maps containing at least one of each extracted feature type. Click on chart slices to visually filter cma maps by extraction state.">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+        class="size-6 text-info font-bold">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+      </svg>
+
+    </div>
+    <ul id="cma-stats-legend" class="ml-2 flex flex-1 items-center justify-evenly not-prose">
+      <li class="flex items-center gap-1">
+        <div class="badge badge-sm rounded-md drop-shadow-md border-none px-2"
+          style="background-color: rgb(117 222 98);"></div>
+        <span class="text-xs">
+          Validated
+        </span>
+      </li>
+      <li class="flex items-center gap-1">
+        <div class="badge badge-sm rounded-md drop-shadow-md border-none px-2"
+          style="background-color: rgb(247,207,95);"></div>
+        <span class="text-xs">
+          Pending Review
+        </span>
+      </li>
+      <li class="flex items-center gap-1">
+        <div class="badge badge-sm rounded-md drop-shadow-md border-none px-2"
+          style="background-color: rgb(229 91 91);"></div>
+        <span class="text-xs">
+          No Extractions
+        </span>
+      </li>
+    </ul>
+  </div>
+</div> <!-- / charts stats div -->
+
+{% block javascript %}
+  <script>
+    {
+      {%for category in categories %}
+        {
+          const stat = {{ stats[category]| tojson }};
+
+          let data = {
+            labels: ['Validated', 'Pending', 'No {{category.replace("_item","")}}'],
+            datasets: [{
+              data: stat,
+            }]
+          };
+
+          const id = 'cma-{{cma.cma_id}}-{{category}}-chart';
+          const elem = document.getElementById(id);
+
+          window.createChart(elem, data, "{{category}}");
+        }
+      {% endfor %}
+    }
+  </script>
+{% endblock %}

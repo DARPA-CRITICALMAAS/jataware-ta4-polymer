@@ -25,7 +25,10 @@ class Settings(BaseSettings):
     authelia_pass: str
 
     cdr_api_host: str = "https://api.cdr.land"
+    cdr_admin_host: str = "https://admin.cdr.land"
+    cdr_auth_host: str = "https://auth.cdr.land"
 
+    polymer_internal_domain: str = "nyl.on"
     # zotero_user: str = Field(validation_alias="zotero_user")
     # zotero_token: SecretStr = ""
 

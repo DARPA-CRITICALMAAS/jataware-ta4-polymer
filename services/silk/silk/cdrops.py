@@ -18,7 +18,7 @@ def get_doc_meta(cdr_id: str):
 
     token = app_settings.cdr_api_key
     headers = {"Authorization": f"Bearer {token}"}
-    url = f"https://api.cdr.land/v1/docs/document/meta/{cdr_id}"
+    url = f"{app_settings.cdr_api_host}/v1/docs/document/meta/{cdr_id}"
     res = httpx.get(url, headers=headers, timeout=None)
     res.raise_for_status()
 

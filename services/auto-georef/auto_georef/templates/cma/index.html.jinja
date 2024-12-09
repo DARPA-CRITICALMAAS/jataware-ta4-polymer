@@ -1,0 +1,85 @@
+{% extends "shared/_page.html" %}
+
+{% block main_content %}
+
+  {% include 'index/fragments/absolute-polymer-logo.html.jinja' %}
+
+  <header class="flex items-center absolute z-10 top-[0.75rem] right-3 flex drop-shadow-md">
+    {% include 'index/fragments/toggle-theme.html.jinja' %}
+  </header>
+
+  <section
+    class="w-[31.25rem] card px-4 pb-4 gap-1 prose z-10 absolute left-[4.25rem] top-14 bg-base-200 rounded-lg drop-shadow-md flex flex-col bottom-3"
+    id="cmas-left-panel">
+
+    <div class="mx-[-0.75rem]">
+      {% include 'shared/_browse-tabs.html.jinja' %}
+    </div>
+
+    <div class="dark:text-base-content font-semibold text-slate-800 flex justify-between items-center">
+      <h2 class="mb-0 mt-2 card-title">CMA Management</h2><h4 class="font-regular my-0">Total: {{cmas|length}}</h4>
+    </div>
+
+    {% if failed %}
+      <p>Could not retrieve CMAs. A server error occured.</p>
+    {% else %}
+      <div class="flex">
+      <select
+        class="select select-sm select-bordered"
+        name="cma_id"
+        id="cma_selection"
+        hx-post="{{template_prefix}}/cmas/details"
+        hx-on::send-error="handleError(event)"
+        hx-on::before-on-load="resetError(event)"
+        hx-trigger="change"
+        hx-swap="outerHTML"
+        hx-indicator="#spinner"
+        hx-swap="outerHTML swap:0.25s"
+        hx-target="#cma-details">
+        <option disabled selected>Select CMA</option>
+        {%for cma in cmas%}
+          <option value="{{cma.cma_id}}">{{cma.mineral}}</option>
+        {%endfor%}
+      </select>
+      <ul id="cma-metadata" class="not-prose flex gap-1 items-center flex-1 text-slate-500">
+      </ul>
+      </div>
+
+      <div id="spinner" class="flex gap-2 leading-snug mt-2">
+        <span class="loading loading-spinner loading-sm mt-2 text-primary"></span>
+        <span class="inline text-slate-500">Retrieving Details. CMAs with many maps may take some time to load.</span>
+      </div>
+      <div id="cma-details">
+      </div>
+      <div id="cma-fetch-error" class="hidden">
+        <h3>A network error has occured.</h3>
+        <p>Please try again later, and ensure you have an active internet connection</p>
+      </div>
+    {% endif %}
+
+
+  </section> <!-- cma management -->
+
+  {% block javascript %}
+    <script type="module" src="/static/js/cma/cma_page.js"></script>
+    <script>
+      window.template_prefix = "{{template_prefix}}";
+
+      document.getElementById("cma_selection").addEventListener("change", (e) => {
+        const metadataArea = document.getElementById("cma-metadata");
+        metadataArea.innerHTML = ``;
+      });
+
+      function handleError(e) {
+        document.getElementById("cma-details").classList.add("hidden");
+        document.getElementById("cma-fetch-error").classList.remove("hidden");
+      }
+
+      function resetError(e) {
+        document.getElementById("cma-fetch-error").classList.add("hidden");
+      }
+
+    </script>
+  {% endblock %}
+
+{% endblock %}

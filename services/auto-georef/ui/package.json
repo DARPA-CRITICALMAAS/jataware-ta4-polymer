@@ -1,12 +1,13 @@
 {
   "name": "polymer_ui_v2",
   "devDependencies": {
-    "@fontsource/inter": "^5.0.20",
+    "@fontsource/inter": "^5.1.0",
     "@fortawesome/fontawesome-free": "^6.6.0",
     "@rollup/plugin-inject": "^5.0.5",
-    "@tailwindcss/typography": "^0.5.14",
+    "@tailwindcss/typography": "^0.5.15",
+    "@turf/turf": "^7.1.0",
     "@types/geojson": "^7946.0.14",
-    "@types/jest": "^29.5.12",
+    "@types/jest": "^29.5.13",
     "@zip.js/zip.js": "^2.7.52",
     "autocompleter": "^9.3.2",
     "daisyui": "^4.12.10",
@@ -14,19 +15,23 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "jest-matcher-deep-close-to": "^3.0.2",
+    "json5": "^2.2.3",
     "node-notifier": "^10.0.1",
     "ol": "^10.1.0",
     "postcss-import": "^16.1.0",
     "prettier": "^3.3.3",
-    "proj4": "^2.12.0",
+    "proj4": "^2.12.1",
     "shapefile": "^0.6.6",
-    "tailwindcss": "^3.4.10",
+    "tailwindcss": "^3.4.12",
     "theme-change": "^2.5.0",
     "ts-jest": "^29.2.5",
-    "typescript": "^5.5.4",
-    "vite": "^5.4.2",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.6",
     "vite-plugin-static-copy": "^1.0.6",
-    "web-streams-polyfill": "^4.0.0"
+    "web-streams-polyfill": "^4.0.0",
+    "glob": "^11.0.0",
+    "chart.js": "^4.4.4",
+    "color2k": "^2.0.3"
   },
   "private": true,
   "scripts": {
@@ -34,13 +39,8 @@
     "build": "vite build",
     "css": "tailwindcss build -i ./src/tailwind_input.css -o ../static/css/app.css",
     "css:watch": "tailwindcss -i ./src/tailwind_input.css -o ../static/css/app.css --watch",
-    "js:play": "vite",
-    "css:play": "tailwindcss -i ./src/tailwind_input.css -o ./static/css/app.css --watch",
     "format": "prettier src --write",
     "test": "NODE_OPTIONS=--experimental-vm-modules node_modules/jest/bin/jest.js --watch"
   },
-  "type": "module",
-  "dependencies": {
-    "json5": "^2.2.3"
-  }
+  "type": "module"
 }

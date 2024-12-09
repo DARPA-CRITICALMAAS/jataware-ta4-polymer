@@ -1,0 +1,130 @@
+{% for map in maps %}
+  <div
+    class="cog-result-card flex flex-col justify-evenly card bg-base-100 bg-opacity-80
+    rounded-md border-2 border-gray-300 dark:border-neutral border-solid py-1 px-2"
+    data-extent="{{map.best_bounds}}"
+    data-cog_id="{{map.cog_id}}"
+    data-validated="{{map.validated_count}}"
+    >
+    <div class="w-full flex items-start">
+
+      <div class="dropdown flex gap-1 flex-1">
+        <button class="btn btn-xs btn-ghost inline px-1">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 opacity-75">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+          </svg>
+        </button>
+
+        <h5
+          title="{{map.cog_name}}"
+          class="card-title line-clamp-2 text-base leading-snug flex-1 font-medium flex-1"
+          >
+          {{map.cog_name}}
+        </h5>
+
+        <div class="dropdown-content bg-base-200 drop-shadow-md border border-solid border-neutral rounded px-4 w-full z-[13]">
+          <table class="w-full my-0 prose">
+            <tr class="">
+              <td class="align-baseline text-secondary font-semibold">Name</td>
+              <td class="leading-tight opacity-90">{{map.cog_name}}</td>
+            </tr>
+            <tr class="">
+              <td class="align-baseline text-secondary font-semibold">Authors</td>
+              <td class="leading-tight opacity-90">{{map.authors|join(", ")}}</td>
+            </tr>
+            <tr class="align-baseline">
+              <td class="align-baseline text-secondary font-semibold">Publisher</td>
+              <td class="leading-tight opacity-90">{{map.publisher}}</td>
+            </tr>
+          </table>
+        </div>
+
+      </div>
+
+      <div
+        hx-get="{{template_prefix}}/map-process-status/{{map.cog_id}}"
+        hx-swap="outerHTML"
+        hx-trigger="load"
+        hx-target="this"
+        class="tooltip tooltip-left"
+        data-tip="Retrieving Map processed status."
+        >
+        <input
+          type="checkbox"
+          disabled
+          class="checkbox checkbox-sm checkbox-success opacity-60 bg-opacity-60 rounded-sm mt-1"
+          />
+      </div>
+    </div>
+    <div class="flex gap-2 items-center">
+      <div
+        class="outline rounded outline-solid outline-neutral-200
+               max-w-32 max-h-32 min-w-20 min-h-16 flex items-center"
+        >
+        <a
+          href="{{maps_ui_base_url}}{{map.gcp_url}}"
+          target="_blank"
+          >
+          <img class="not-prose" src="{{map.thumbnail}}" />
+        </a>
+      </div>
+
+      <div class="flex-1 rounded text-neutral-content">
+
+        <div
+          hx-get="{{template_prefix}}/map-stats/{{map.cog_id}}"
+          hx-swap="outerHTML"
+          hx-trigger="load"
+          hx-target="this"
+          >
+          <div class="flex inset-0 w-full">
+            <span class="loading loading-ring loading-sm"></span>
+            &nbsp;
+            <span class="text-neutral whitespace-nowrap">Loading features</span>
+          </div>
+        </div>
+        <div class="flex prose text-xs items-center justify-evenly">
+          {% if map.fmt_scale %}
+            <div class="flex gap-1">
+              <div class="">Scale</div>
+              <div class="text-base-content font-bold">
+                1:<span class="">{{map.fmt_scale}}</span>
+              </div>
+            </div>
+          {% endif %}
+          {% if map.publish_year %}
+            <div class="flex gap-1">
+              <div class="">Year</div>
+              <div class=""><span class="text-base-content font-bold">{{map.publish_year}}</span></div>
+            </div>
+          {% endif %}
+          <div class="flex gap-1">
+            <div>Source</div>
+            <a class="font-bold" target="_blank" {%if map.provider_name != "unknown" %}href="{{map.provider_catalog_url}}"{%endif%}>
+              {{map.provider_name}}
+            </a>
+          </div>
+        </div>
+
+      </div><!-- /map-result-data -->
+    </div>
+
+    <div hx-get="{{template_prefix}}/map-actions/{{map.cog_id}}"
+         hx-swap="outerHTML"
+         hx-trigger="load"
+         hx-target="this"
+         >
+         <div class="flex inset-0 w-full">
+           <span class="loading loading-ring loading-sm"></span>
+           &nbsp;
+           <span class="text-neutral whitespace-nowrap">Preparing</span>
+         </div>
+    </div>
+  </div>
+{%endfor%}
+
+{% block javascript %}
+  <script>
+    setTimeout(window.connectMapResultsToMap, 10);
+  </script>
+{% endblock %}

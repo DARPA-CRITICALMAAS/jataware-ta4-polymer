@@ -48,6 +48,9 @@
 
 <script>
   console.log("group-select.html.jinja");
+  window.polymer.legendMapping = {{ legend_id_to_label | tojson }};
+  window.polymer.system = "{{ system }}";
+  window.polymer.version = "{{ version }}";
   window.polymer.rawFeatures = {{ features | tojson }};
   window.polymer.rawPolymerFeatures = {{ polymer_features | tojson }};
 </script>

@@ -1,4 +1,4 @@
-FROM node:lts-slim as build
+FROM node:22.11.0-slim as build
 
 RUN mkdir /app
 WORKDIR /app
@@ -6,7 +6,7 @@ WORKDIR /app
 COPY ["package.json", "package-lock.json*", "./"]
 
 
-RUN npm install
+RUN npm ci
 COPY . .
 
 RUN npm run build

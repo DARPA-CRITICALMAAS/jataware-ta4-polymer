@@ -1,19 +1,21 @@
 import logging
 from logging import Logger
 
+import httpx
 from cachetools import TTLCache
 from fastapi import APIRouter, Response
 from starlette.status import HTTP_204_NO_CONTENT
 
 from auto_georef.common.tiff_cache import clear_disk
 from auto_georef.redisapi import cache_prefix, delete_keys_with_prefix
+from auto_georef.settings import app_settings
 
 logger: Logger = logging.getLogger(__name__)
 router = APIRouter()
 
 cache = TTLCache(maxsize=2, ttl=1000)
 
-segment_cache = TTLCache(maxsize=2, ttl=1000)
+# segment_cache = TTLCache(maxsize=2, ttl=1000)
 
 
 @router.get(
@@ -60,7 +62,9 @@ async def clear_memory_cache():
     response_class=Response,
 )
 async def clear_segment_memory_cache():
-    segment_cache.clear()
+    resp = httpx.get(app_settings.segment_api_endpoint_url + "/segment/clear_segment_memory_cache")
+    logger.info(resp)
+    resp.raise_for_status()
     return
 
 

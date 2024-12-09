@@ -8,6 +8,8 @@ import { Vector as VectorLayer } from "ol/layer";
 import GeoTIFF from "ol/source/GeoTIFF";
 import { Vector as VectorSource } from "ol/source";
 import GeoJSON from "ol/format/GeoJSON";
+import Polygon from 'ol/geom/Polygon';
+import Feature from "ol/Feature";
 import Draw, { createBox } from "ol/interaction/Draw";
 import { Fill, Stroke, Style } from "ol/style";
 
@@ -24,6 +26,8 @@ import { useQuery } from "@tanstack/react-query";
 import Tooltip, { TooltipProps, tooltipClasses } from "@mui/material/Tooltip";
 import LoadingButton from "@mui/lab/LoadingButton";
 import SaveIcon from "@mui/icons-material/Save";
+import LinearProgress from '@mui/material/LinearProgress';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import "../css/legend_annotation.scss";
 import { MapSpinner } from "../Spinner";
@@ -45,14 +49,15 @@ import FormatAlignJustifyIcon from "@mui/icons-material/FormatAlignJustify";
 
 import Header from "./Header";
 import PolymerTooltip from "./Tooltip";
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useConfig } from '../ConfigContext';
 
-const CDR_COG_URL = import.meta.env.VITE_CDR_COG_URL;
-const CDR_PUBLIC_BUCKET = import.meta.env.VITE_CDR_PUBLIC_BUCKET;
-const CDR_S3_COG_PREFEX = import.meta.env.VITE_CDR_S3_COG_PREFEX;
 const SYSTEM = import.meta.env.VITE_POLYMER_SYSTEM;
 const SYSTEM_VERSION = import.meta.env.VITE_POLYMER_SYSTEM_VERSION;
 
-const LightTooltip = PolymerTooltip;
 
 const _APP_JSON_HEADER = {
   "Access-Control-Allow-Origin": "*",
@@ -60,6 +65,8 @@ const _APP_JSON_HEADER = {
 };
 
 function SwatchAnnotationPage() {
+  const config = useConfig();
+
   const { cog_id } = useParams();
 
   const mapTargetElement = useRef<HTMLDivElement>(null);
@@ -69,6 +76,8 @@ function SwatchAnnotationPage() {
   const drawTypeRef = useRef("box");
   const [drawType, setDrawType] = useState("box");
   const mapRef = useRef();
+  const [isMagicStreaming, setIsMagicStreaming] = useState(false);
+  const [magicProgress, setMagicProgress] = useState<number | null>(null);
 
   const [legendProvenances, setlegendProvenances] = useState([]);
   const [provenanceOption, setProvenanceOption] = useState([]);
@@ -86,7 +95,9 @@ function SwatchAnnotationPage() {
   let legendAreaColor = "#AAFF00";
   let draw;
 
-  const [provenanceVisable, setProvenanceVisable] = React.useState(true);
+  const [provenanceVisible, setProvenanceVisible] = React.useState(true);
+
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   const forceCogCache = useQuery({
     queryKey: ["mapCog", cog_id, "cache", "swatches"],
@@ -113,8 +124,13 @@ function SwatchAnnotationPage() {
     const filteredSwatches = legendItems.filter((item) =>
       newOptions.includes(item.system + "_" + item.system_version),
     );
-    setFilteredLegendItems(filteredSwatches);
-    add_features_to_map(filteredSwatches);
+    const sortedLegendItems = filteredSwatches.sort((a, b) => {
+      const heightA = calculateHeight(a);
+      const heightB = calculateHeight(b);
+      return heightB - heightA;
+    });
+    setFilteredLegendItems(sortedLegendItems);
+    add_features_to_map(sortedLegendItems);
     setProvenanceOption(newOptions);
   };
 
@@ -239,7 +255,7 @@ function SwatchAnnotationPage() {
   const map_source = new GeoTIFF({
     sources: [
       {
-        url: `${CDR_COG_URL}/${CDR_PUBLIC_BUCKET}/${CDR_S3_COG_PREFEX}/${cog_id}.cog.tif`,
+        url: `${config.CDR_COG_URL}/${config.CDR_PUBLIC_BUCKET}/${config.CDR_S3_COG_PREFEX}/${cog_id}.cog.tif`,
         nodata: -1,
       },
     ],
@@ -301,7 +317,13 @@ function SwatchAnnotationPage() {
       mapRef.current,
       "swatch-finished-layer",
     ).getSource();
-    swatch_finished_source.clear();
+
+    swatch_finished_source.getFeatures().forEach((feature) => {
+      const status = feature.get('status');
+      if (status === 'succeeded' || status === 'validated') {
+        swatch_finished_source.removeFeature(feature);
+      }
+    });
     for (let swatch of selectedLegendItems) {
       // add swatch box
       if (swatch["coordinates_from_bottom"]["coordinates"].length != 0) {
@@ -354,6 +376,7 @@ function SwatchAnnotationPage() {
       }
     }
   }
+
 
   function add_features_to_map(filteredSwatches) {
     // clear swatches on the page
@@ -412,6 +435,12 @@ function SwatchAnnotationPage() {
       }
     }
   }
+  function calculateHeight(polygon) {
+    const yValues = polygon?.coordinates_from_bottom?.coordinates?.[0]?.map(point => point[1]) || [];
+    if (yValues.length === 0) return 0;
+
+    return Math.max(...yValues);
+  }
 
   function setLegendSwatchData() {
     return axios({
@@ -419,36 +448,70 @@ function SwatchAnnotationPage() {
       url: "/api/map/" + cog_id + "/px_extractions",
       headers: _APP_JSON_HEADER,
     }).then((response) => {
+      let geologicAgesCounter = {}
       if (response.data["legend_swatches"].length > 0) {
+
+
         let successItems = [];
         let createdItems = [];
         for (let swatch of response.data["legend_swatches"]) {
           if (swatch.status == "validated" || swatch.status == "succeeded") {
             successItems.push(swatch);
+            if (swatch?.age_texts) {
+              if (swatch.age_texts.length > 0) {
+                for (let age of swatch.age_texts) {
+                  if (!Object.keys(geologicAgesCounter).includes(age)) {
+                    geologicAgesCounter[age] = 1
+                  }
+                  geologicAgesCounter[age] += 1
+                }
+
+              }
+            }
           }
           if (swatch.status == "created") {
             swatch["minimized"] = true;
-
             createdItems.push(swatch);
           }
         }
         setSelectedLegendItems(successItems);
-        setLegendItems(createdItems);
+        const sortedLegendItems = createdItems.sort((a, b) => {
+          const heightA = calculateHeight(a);
+          const heightB = calculateHeight(b);
+          return heightB - heightA;
+        });
+
+        setLegendItems(sortedLegendItems);
         add_succeeded_features_to_map(successItems);
       }
+      // get map ages and sort them based on already used ages
+      axios({
+        method: "GET",
+        url: "/api/map/sgmc/ages",
+        headers: _APP_JSON_HEADER,
+      }).then((response) => {
+        let dict_values = []
+        for (let x of Object.keys(response.data)) {
+          if (!Object.keys(geologicAgesCounter).includes(x)) {
+            dict_values.push(x)
+          }
+        }
+        while (Object.keys(geologicAgesCounter).length > 0) {
+
+          let minKey = Object.keys(geologicAgesCounter).reduce((minKey, key) => {
+            return geologicAgesCounter[key] < geologicAgesCounter[minKey] ? key : minKey;
+          }, Object.keys(geologicAgesCounter)[0]);
+          dict_values.unshift(minKey)
+          delete geologicAgesCounter[minKey];
+        }
+        setGeologicAges(dict_values);
+      });
+
     });
   }
 
   function setData() {
     setLoadingProvenanceData(true);
-
-    axios({
-      method: "GET",
-      url: "/api/map/sgmc/ages",
-      headers: _APP_JSON_HEADER,
-    }).then((response) => {
-      setGeologicAges(response.data);
-    });
 
     //  get provenances
     const provenancePromise = axios({
@@ -516,6 +579,35 @@ function SwatchAnnotationPage() {
   }, [cog_id]);
 
   useEffect(() => {
+    let clickCount = 0;
+    let clickTimer = null;
+
+    const handleRightClick = (event) => {
+      event.preventDefault();
+      clickCount += 1;
+
+      if (clickCount === 1) {
+        clickTimer = setTimeout(() => {
+          clickCount = 0;
+        }, 500);
+      } else if (clickCount === 2) {
+        clearTimeout(clickTimer);
+        clickCount = 0;
+
+        processLegendSwatches();
+      }
+    };
+
+    window.addEventListener("contextmenu", handleRightClick);
+
+    return () => {
+      window.removeEventListener("contextmenu", handleRightClick);
+      clearTimeout(clickTimer);
+    };
+  }, [filteredLegendItems]);
+
+
+  useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === "Enter") {
         const focusedElement = document.activeElement;
@@ -525,7 +617,9 @@ function SwatchAnnotationPage() {
       }
     };
 
+
     window.addEventListener("keydown", handleKeyDown);
+
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
@@ -583,6 +677,7 @@ function SwatchAnnotationPage() {
   }
 
   async function ocrLastClipArea() {
+
     getLayerById(mapRef.current, "bounding-box").getSource().clear();
     const swatch_source = getLayerById(
       mapRef.current,
@@ -603,132 +698,328 @@ function SwatchAnnotationPage() {
 
   function processLegendSwatches() {
     getLayerById(mapRef.current, "bounding-box").getSource().clear();
-    let finished_swatch_source = getLayerById(
-      mapRef.current,
-      "swatch-finished-layer",
-    ).getSource();
-    let swatch_source = getLayerById(
-      mapRef.current,
-      "swatch-layer",
-    ).getSource();
+    let finished_swatch_source = getLayerById(mapRef.current, "swatch-finished-layer").getSource();
+    let swatch_source = getLayerById(mapRef.current, "swatch-layer").getSource();
     let features = swatch_source.getFeatures();
     if (features.length < 1) {
       alert("Please select at least one polygons for processing.");
       return;
-    } else {
-      let swatch_feature = features[0];
+    }
 
-      let label_feature = features[1];
-      let label_feature_coords = null;
-      if (label_feature != null) {
-        label_feature_coords = label_feature.getGeometry().getCoordinates();
-      }
-      let bboxes = [];
+    let swatch_feature = features[0];
 
-      for (let feat of features) {
-        bboxes.push(feat.getGeometry().extent_);
-      }
-      swatch_source.clear();
-      axios({
-        method: "post",
-        url: "/api/map/tif_ocr",
-        data: { cog_id: cog_id, bboxes: bboxes },
-        headers: _APP_JSON_HEADER,
-      })
-        .then((response) => {
-          let swatch_geom = swatch_feature.getGeometry();
-          let swatch_feature_id =
+    let label_feature = features[1];
+    let label_feature_coords = null;
+    if (label_feature != null) {
+      label_feature_coords = label_feature.getGeometry().getCoordinates();
+    }
+
+    let bboxes = [];
+    for (let feat of features) {
+      bboxes.push(feat.getGeometry().extent_);
+    }
+    swatch_source.clear();
+    axios({
+      method: "post",
+      url: "/api/map/tif_ocr",
+      data: { cog_id: cog_id, bboxes: bboxes },
+      headers: _APP_JSON_HEADER,
+    })
+      .then((response) => {
+        let swatch_geom = swatch_feature.getGeometry();
+        let swatch_feature_id =
+          cog_id +
+          asString(swatch_geom.extent_) +
+          response.data["extracted_text"][0];
+
+        // save swatch
+        let newLegendSwatch = {
+          cog_id: cog_id,
+          legend_id: swatch_feature_id,
+          descriptions: [],
+          image_url: returnImageUrl(cog_id, swatch_geom.extent_),
+          extent_from_bottom: swatch_geom.extent_,
+          coordinates_from_bottom: {
+            type: "Polygon",
+            coordinates: swatch_geom.getCoordinates(),
+          },
+          label_coordinates_from_bottom: {
+            type: "Polygon",
+            coordinates: label_feature_coords,
+          },
+          abbreviation: response.data["extracted_text"][0] ?? "",
+          label: response.data["extracted_text"][1] ?? "",
+          model: null,
+          model_version: null,
+          system: SYSTEM,
+          system_version: SYSTEM_VERSION,
+          provenance: SYSTEM + "_" + SYSTEM_VERSION,
+          category: "polygon",
+          confidence: null,
+          status: "created",
+          notes: "",
+          color: "",
+          pattern: "",
+          minimized: false,
+          age_text: "",
+          age_texts: [],
+        };
+        console.log(swatch_feature)
+        swatch_feature.set("legend_id", swatch_feature_id);
+        finished_swatch_source.addFeature(swatch_feature);
+        if (label_feature != null) {
+          label_feature.set("legend_id", swatch_feature_id);
+          finished_swatch_source.addFeature(label_feature);
+        }
+
+        for (let [index, item] of features.slice(2).entries()) {
+          let item_geom = item.getGeometry();
+
+          let item_feature_id =
             cog_id +
-            asString(swatch_geom.extent_) +
-            response.data["extracted_text"][0];
-
-          // save swatch
-          let newLegendSwatch = {
+            asString(item_geom.extent_) +
+            response.data["extracted_text"][index + 1];
+          let newLegendItem = {
             cog_id: cog_id,
-            legend_id: swatch_feature_id,
-            descriptions: [],
-            image_url: returnImageUrl(cog_id, swatch_geom.extent_),
-            extent_from_bottom: swatch_geom.extent_,
+            legend_id: item_feature_id,
+            image_url: returnImageUrl(cog_id, item_geom.extent_),
+            extent_from_bottom: item_geom.extent_,
             coordinates_from_bottom: {
               type: "Polygon",
-              coordinates: swatch_geom.getCoordinates(),
+              coordinates: item_geom.getCoordinates(),
             },
-            label_coordinates_from_bottom: {
-              type: "Polygon",
-              coordinates: label_feature_coords,
-            },
-            abbreviation: response.data["extracted_text"][0] ?? "",
-            label: response.data["extracted_text"][1] ?? "",
+            text: response.data["extracted_text"][index + 2],
             model: null,
             model_version: null,
             system: SYSTEM,
             system_version: SYSTEM_VERSION,
-            provenance: SYSTEM + "_" + SYSTEM_VERSION,
-            category: "polygon",
-            confidence: null,
-            status: "created",
+            confidence: 1,
             notes: "",
-            color: "",
-            pattern: "",
-            minimized: false,
-            age_text: "",
+            status: "created",
           };
-          swatch_feature.set("legend_id", swatch_feature_id);
-          finished_swatch_source.addFeature(swatch_feature);
-          if (label_feature != null) {
-            label_feature.set("legend_id", swatch_feature_id);
-            finished_swatch_source.addFeature(label_feature);
-          }
+          item.set("legend_id", item_feature_id);
+          item.set("parent_id", swatch_feature_id);
+          finished_swatch_source.addFeature(item);
+          newLegendSwatch["descriptions"].push(newLegendItem);
+        }
 
-          for (let [index, item] of features.slice(2).entries()) {
-            let item_geom = item.getGeometry();
+        let newOptions = [...provenanceOption, SYSTEM + "_" + SYSTEM_VERSION];
+        setProvenanceOption(newOptions);
 
-            let item_feature_id =
-              cog_id +
-              asString(item_geom.extent_) +
-              response.data["extracted_text"][index + 1];
-            let newLegendItem = {
-              cog_id: cog_id,
-              legend_id: item_feature_id,
-              image_url: returnImageUrl(cog_id, item_geom.extent_),
-              extent_from_bottom: item_geom.extent_,
-              coordinates_from_bottom: {
-                type: "Polygon",
-                coordinates: item_geom.getCoordinates(),
-              },
-              text: response.data["extracted_text"][index + 2],
-              model: null,
-              model_version: null,
-              system: SYSTEM,
-              system_version: SYSTEM_VERSION,
-              confidence: 1,
-              notes: "",
-              status: "created",
-            };
-            item.set("legend_id", item_feature_id);
-            item.set("parent_id", swatch_feature_id);
-            finished_swatch_source.addFeature(item);
-            newLegendSwatch["descriptions"].push(newLegendItem);
-          }
+        if (!legendProvenances.includes(SYSTEM + "_" + SYSTEM_VERSION)) {
+          setlegendProvenances([
+            ...legendProvenances,
+            SYSTEM + "_" + SYSTEM_VERSION,
+          ]);
+        }
+        setLegendItems([newLegendSwatch, ...legendItems]);
 
-          let newOptions = [...provenanceOption, SYSTEM + "_" + SYSTEM_VERSION];
-          setProvenanceOption(newOptions);
+        const filteredSwatches = [newLegendSwatch, ...filteredLegendItems];
+        setFilteredLegendItems(filteredSwatches);
+      })
+      .catch((error) => {
+        console.error("Error fetching data:", error);
+      });
+  }
 
-          if (!legendProvenances.includes(SYSTEM + "_" + SYSTEM_VERSION)) {
-            setlegendProvenances([
-              ...legendProvenances,
-              SYSTEM + "_" + SYSTEM_VERSION,
-            ]);
-          }
-          setLegendItems([...legendItems, newLegendSwatch]);
-
-          const filteredSwatches = [...filteredLegendItems, newLegendSwatch];
-          setFilteredLegendItems(filteredSwatches);
-        })
-        .catch((error) => {
-          console.error("Error fetching data:", error);
-        });
+  function cancelMagicStream() {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+      setIsMagicStreaming(false);
     }
+  }
+
+  function processLegendSwatchesMagic() {
+    // Create new AbortController and store it
+    const controller = new AbortController();
+    setAbortController(controller);
+
+    setIsMagicStreaming(true);
+
+    // --
+    // Clear the bounding box layer
+
+    getLayerById(mapRef.current, "bounding-box").getSource().clear();
+
+    // --
+    // Get the swatch layer and features
+
+    let finished_swatch_source = getLayerById(mapRef.current, "swatch-finished-layer").getSource();
+    let swatch_source = getLayerById(mapRef.current, "swatch-layer").getSource();
+    let features = swatch_source.getFeatures();
+    if (features.length !== 1) {
+      alert("Please select exactly one polygon for processing.");
+      setIsMagicStreaming(false);
+      return;
+    }
+
+    let swatch_feature = features[0];
+    let swatch_geom = swatch_feature.getGeometry();
+    let swatch_xmin = swatch_geom.extent_[0];
+    let swatch_ymax = swatch_geom.extent_[3];
+    let swatch_prefix = cog_id + asString(swatch_geom.extent_);
+
+    // --
+    // Get the bboxes
+
+    let bboxes = [swatch_geom.extent_];
+
+    // --
+    // Clear the swatch layer
+
+    swatch_source.clear();
+
+    // --
+    // Create fetch request with streaming response
+
+    fetch("/auto_legend_api/legend/auto_legend/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ cog_id: cog_id, bboxes: bboxes, no_description: false }),
+      signal: controller.signal  // Use the controller's signal
+    })
+      .then(response => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        function processText(text) {
+          buffer += text;
+
+          // Process complete JSON objects
+          let newlineIndex;
+          while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+            const jsonStr = buffer.slice(0, newlineIndex);
+            buffer = buffer.slice(newlineIndex + 1);
+
+            try {
+              const item = JSON.parse(jsonStr);
+              // Handle progress messages
+              if (item.__progress !== undefined) {
+                if (item.__status === "ERROR") {
+                  alert(`Algorithm failed with error message:\n"""\n${item.__error}.\n""" \n\nPlease retry.`);
+                  cancelMagicStream();
+                  return;
+                } else {
+                  setMagicProgress(item.__progress);
+                  return; // Skip further processing for progress messages
+                }
+              }
+
+              let item_geom: Polygon | null = null;
+              if (item.bbox) {
+                const [xmin, ymin, xmax, ymax] = item.bbox;
+                item_geom = new Polygon([[
+                  [swatch_xmin + xmin, swatch_ymax - ymin],
+                  [swatch_xmin + xmax, swatch_ymax - ymin],
+                  [swatch_xmin + xmax, swatch_ymax - ymax],
+                  [swatch_xmin + xmin, swatch_ymax - ymax],
+                  [swatch_xmin + xmin, swatch_ymax - ymin],
+                ]]);
+              }
+
+              const legend_id = swatch_prefix + item.id;
+              const newLegendSwatch = {
+                cog_id: cog_id,
+                legend_id: legend_id,
+
+                image_url: returnImageUrl(cog_id, item_geom ? item_geom.getExtent() : swatch_geom.getExtent()),
+                extent_from_bottom: item_geom ? item_geom.getExtent() : swatch_geom.getExtent(),
+                coordinates_from_bottom: {
+                  type: "Polygon",
+                  coordinates: item_geom ? item_geom.getCoordinates() : swatch_geom.getCoordinates(),
+                },
+                label_coordinates_from_bottom: {
+                  type: "Polygon",
+                  coordinates: null,
+                },
+
+                _symbol_id: item.symbol_id,
+                abbreviation: item.symbol ?? item.name,
+                label: item.name,
+                age_text: item.age ?? "",
+                age_texts: item.age ? [item.age] : [],
+                descriptions: item.description ? [{
+                  text: item.description,
+                  coordinates_from_bottom: null,
+                  legend_id: legend_id + "_0",
+                  parent_id: legend_id,
+                  status: "created",
+                }] : [],
+                category: item.category,
+                color: "",
+                pattern: "",
+
+                model: null,
+                model_version: null,
+                system: SYSTEM,
+                system_version: SYSTEM_VERSION,
+                provenance: SYSTEM + "_" + SYSTEM_VERSION,
+                confidence: null,
+                status: "created",
+                notes: "",
+                minimized: true,
+              };
+
+              if (item_geom) {
+                const _feature = new Feature({
+                  geometry: item_geom
+                });
+                _feature.set("legend_id", newLegendSwatch.legend_id);
+                finished_swatch_source.addFeature(_feature);
+              }
+
+              // Update state for each item
+              setLegendItems(prev => [...prev, newLegendSwatch]);
+              setFilteredLegendItems(prev => [...prev, newLegendSwatch]);
+              setProvenanceOption(prev => [...prev, SYSTEM + "_" + SYSTEM_VERSION]);
+
+            } catch (e) {
+              console.error("Error parsing JSON:", e);
+            }
+          }
+        }
+
+        // Read the stream
+        function readStream() {
+          return reader.read().then(({ done, value }) => {
+            if (done) {
+              if (buffer.length > 0) {
+                processText(buffer);
+              }
+              return;
+            }
+
+            processText(decoder.decode(value, { stream: true }));
+            return readStream();
+          });
+        }
+
+        // Update provenance if needed
+        if (!legendProvenances.includes(SYSTEM + "_" + SYSTEM_VERSION)) {
+          setlegendProvenances(prev => [...prev, SYSTEM + "_" + SYSTEM_VERSION]);
+        }
+
+        return readStream();
+      })
+      .catch(error => {
+        if (error.name === 'AbortError') {
+          console.log('Fetch aborted');
+        } else {
+          console.error("Error fetching data:", error);
+        }
+      })
+      .finally(() => {
+        setIsMagicStreaming(false);
+        setAbortController(null);
+        setMagicProgress(null);
+      });
+
+    // Return the cancel function
+    return cancelMagicStream;
   }
 
   function changeDraw_(type) {
@@ -790,6 +1081,9 @@ function SwatchAnnotationPage() {
         for (const [key, value] of Object.entries(item)) {
           feature[key] = value;
         }
+        if (item.in_cdr == true) {
+          item.in_cdr = false
+        }
         if (item.status == "succeeded") {
           console.log("clean");
         } else {
@@ -836,7 +1130,10 @@ function SwatchAnnotationPage() {
     );
     setSelectedLegendItems(successItems);
     if (!legendProvenances.includes(SYSTEM + "_" + SYSTEM_VERSION)) {
-      setlegendProvenances([...legendProvenances, SYSTEM + "_" + SYSTEM_VERSION])
+      setlegendProvenances([
+        ...legendProvenances,
+        SYSTEM + "_" + SYSTEM_VERSION,
+      ]);
     }
     if (!provenanceOption.includes(SYSTEM + "_" + SYSTEM_VERSION)) {
       let newOptions = [...provenanceOption, SYSTEM + "_" + SYSTEM_VERSION];
@@ -867,18 +1164,23 @@ function SwatchAnnotationPage() {
     add_features_to_map(filteredItems);
   }
 
+  // Add ref for the scroll container
+  const legendItemsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Add useEffect to scroll when filteredLegendItems changes
+  useEffect(() => {
+    if (legendItemsContainerRef.current) {
+      legendItemsContainerRef.current.scrollTop = legendItemsContainerRef.current.scrollHeight;
+    }
+  }, [filteredLegendItems]);
+
   return (
-    <div
-      className="swatch-annotation-root"
-      style={{ height: "100vh", display: "flex", flexDirection: "column" }}
-    >
+    <div className="swatch-annotation-root" style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
       <Header navigate={navigate} cog_id={cog_id} />
-      <PanelGroup
-        style={{ flex: 1 }}
-        autoSaveId="polymer-swatch-pane"
-        direction="horizontal"
-      >
+
+      <PanelGroup style={{ flex: 1 }} autoSaveId="polymer-swatch-pane" direction="horizontal">
         <Panel defaultSize={35} minSize={20} className="map-wrapper">
+          {/* Map */}
           {loadingMap && (
             <div className="loading-tiles">
               <MapSpinner />
@@ -893,6 +1195,8 @@ function SwatchAnnotationPage() {
               position: "relative",
             }}
           />
+
+          {/* Control Panel */}
           <div className="control-panel">
             <Box
               sx={{
@@ -901,7 +1205,8 @@ function SwatchAnnotationPage() {
               }}
             >
               <div>
-                <LightTooltip title="Create boxes to extract legend swatch, label and descriptions">
+                {/* Box Button */}
+                <PolymerTooltip title="Create boxes to extract legend swatch, label and descriptions">
                   <IconButton
                     style={{
                       backgroundColor: drawType === "box" ? "#bdddfc" : "",
@@ -913,8 +1218,10 @@ function SwatchAnnotationPage() {
                   >
                     <FormatShapesIcon />
                   </IconButton>
-                </LightTooltip>
-                <LightTooltip title="Create shapes to extract legend swatch, label and descriptions">
+                </PolymerTooltip>
+
+                {/* Shape Button */}
+                <PolymerTooltip title="Create shapes to extract legend swatch, label and descriptions">
                   <IconButton
                     style={{
                       backgroundColor: drawType === "poly" ? "#bdddfc" : "",
@@ -926,9 +1233,10 @@ function SwatchAnnotationPage() {
                   >
                     <ChangeHistoryIcon />
                   </IconButton>
-                </LightTooltip>
+                </PolymerTooltip>
 
-                <LightTooltip title="Remove last shape">
+                {/* Undo Button */}
+                <PolymerTooltip title="Remove last shape">
                   <IconButton
                     color="secondary"
                     onClick={() => {
@@ -937,8 +1245,10 @@ function SwatchAnnotationPage() {
                   >
                     <UndoIcon />
                   </IconButton>
-                </LightTooltip>
-                <LightTooltip title="Remove all in progress shapes">
+                </PolymerTooltip>
+
+                {/* Clear Button */}
+                <PolymerTooltip title="Remove all in progress shapes">
                   <IconButton
                     color="secondary"
                     onClick={() => {
@@ -947,23 +1257,26 @@ function SwatchAnnotationPage() {
                   >
                     <ClearIcon />
                   </IconButton>
-                </LightTooltip>
+                </PolymerTooltip>
 
-                <LightTooltip
-                  title={provenanceVisable ? "Hide Systems" : "Show Systems"}
+                {/* Systems Button */}
+                <PolymerTooltip
+                  title={provenanceVisible ? "Hide Systems" : "Show Systems"}
                 >
                   <IconButton
                     color="secondary"
                     disabled={Boolean(loadingProvenanceData)}
                     onClick={() => {
-                      setProvenanceVisable(!provenanceVisable);
+                      setProvenanceVisible(!provenanceVisible);
                     }}
                   >
                     <FormatAlignJustifyIcon />
                   </IconButton>
-                </LightTooltip>
+                </PolymerTooltip>
               </div>
-              <LightTooltip title="*Or Press Enter">
+
+              {/* Extract Legend Item Button */}
+              <PolymerTooltip title="*Or Press Enter or Double Right Click">
                 <Button
                   color="info"
                   size="small"
@@ -973,7 +1286,46 @@ function SwatchAnnotationPage() {
                 >
                   Extract Legend Item
                 </Button>
-              </LightTooltip>
+              </PolymerTooltip>
+
+              {/* Experimental Features Section */}
+              <Accordion
+                defaultExpanded
+                sx={{
+                  marginTop: "0.5rem",
+                  backgroundColor: "transparent",
+                  boxShadow: "none",
+                  "&:before": {
+                    display: "none" // Removes the default divider
+                  }
+                }}
+              >
+                <AccordionSummary
+                  expandIcon={<ExpandMoreIcon />}
+                  sx={{
+                    padding: "0 0.5rem",
+                    minHeight: "32px",
+                    "& .MuiAccordionSummary-content": {
+                      margin: "4px 0"
+                    }
+                  }}
+                >
+                  Experimental Features
+                </AccordionSummary>
+                <AccordionDetails sx={{ padding: "0 0.5rem" }}>
+                  <Button
+                    color={isMagicStreaming ? "error" : "info"}
+                    size="small"
+                    variant="contained"
+                    fullWidth
+                    onClick={isMagicStreaming ? cancelMagicStream : processLegendSwatchesMagic}
+                  >
+                    {isMagicStreaming ? "Cancel Auto Extract" : "Auto Legend Extract"}
+                  </Button>
+                </AccordionDetails>
+              </Accordion>
+
+              {/* Provenance Data Selector */}
               {loadingProvenanceData ? (
                 <LoadingButton
                   loading
@@ -984,7 +1336,7 @@ function SwatchAnnotationPage() {
                   Loading System Data
                 </LoadingButton>
               ) : (
-                provenanceVisable && (
+                provenanceVisible && (
                   <Box>
                     <Text variant="body2" style={{ marginTop: "0.75rem" }}>
                       Select System
@@ -1011,7 +1363,7 @@ function SwatchAnnotationPage() {
                           label={
                             <Text
                               style={{
-                                color: getColorForProvenance(option),
+                                color: "var(--mui-palette-text-primary)",
                               }}
                             >
                               <span>{option}</span>
@@ -1030,6 +1382,7 @@ function SwatchAnnotationPage() {
         <PanelResizeHandle className="panel-resize-handle" />
 
         <Panel defaultSize={65} minSize={40}>
+          {/* Header */}
           <div
             style={{
               margin: "0.25rem 1rem 0 1rem",
@@ -1038,9 +1391,11 @@ function SwatchAnnotationPage() {
             }}
           >
             <Text variant="h4" sx={{ fontSize: "1.75rem" }}>
-              Legend Items
+              Legend Items (V2)
             </Text>
-            <LightTooltip
+
+            {/* Save to CDR Button */}
+            <PolymerTooltip
               title="Submit Validated items in the Reviewed queue to CDR."
               placement="left"
             >
@@ -1051,8 +1406,9 @@ function SwatchAnnotationPage() {
               >
                 Save To CDR
               </LoadingButton>
-            </LightTooltip>
+            </PolymerTooltip>
           </div>
+
           <div key={"scroll" + cog_id} className="flex-child scrollableContent">
             <div className="right-panel">
               {forceCogCache.isPending ? (
@@ -1062,10 +1418,33 @@ function SwatchAnnotationPage() {
               ) : (
                 <div className="right-panel-swatch-list">
                   <div className="right-container">
+
+                    {/* left column */}
                     <div className="left_column">
-                      <Text variant="h5">Pending Review</Text>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Text variant="h5"> Pending Review </Text>
+                        {isMagicStreaming && (
+                          magicProgress !== null ? (
+                            <div style={{ width: '100px' }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={magicProgress}
+                                sx={{
+                                  height: 8,
+                                  borderRadius: 4,
+                                  '& .MuiLinearProgress-bar': {
+                                    borderRadius: 4,
+                                  },
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <CircularProgress size={20} />
+                          )
+                        )}
+                      </div>
                       <div className="legend-items">
-                        <div>
+                        <div ref={legendItemsContainerRef}>
                           {filteredLegendItems.map((item, i) => (
                             <LegendCard
                               key={item.legend_id}
@@ -1081,22 +1460,12 @@ function SwatchAnnotationPage() {
                           ))}
                         </div>
                       </div>
-                    </div>
-                    <div
-                      className="legend-items"
-                      style={{ display: "flex", flexDirection: "column" }}
-                    >
-                      <div
-                        style={{
-                          margin: "0 0.25rem 0.25rem 0",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <Text variant="h5" gutterBottom>
-                          Reviewed
-                        </Text>
+                    </div> {/* left column */}
+
+                    {/* reviewed column */}
+                    <div className="legend-items" style={{ display: "flex", flexDirection: "column" }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Text variant="h5"> Reviewed </Text>
                       </div>
                       <div className="right-column-legends">
                         <div>
@@ -1112,7 +1481,8 @@ function SwatchAnnotationPage() {
                           ))}
                         </div>
                       </div>
-                    </div>
+                    </div> {/* reviewed column */}
+
                   </div>
                 </div>
               )}

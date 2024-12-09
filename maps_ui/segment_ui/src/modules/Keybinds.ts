@@ -1,4 +1,4 @@
-import * as Element from "./Elements";
+import * as E from "./Elements";
 
 export const view = ["KeyQ"];
 export const label = ["KeyW"];
@@ -23,22 +23,22 @@ keyMap.set("BracketRight", "]");
 keyMap.set("Comma", ",");
 keyMap.set("Period", ".");
 
-Element.mode
+E.mode
   .querySelector(".tooltip:has(> input[value=view])")
   ?.setAttribute("data-tip", `View (${keyMap.get(view[0])!})`);
 
-Element.mode
+E.mode
   .querySelector(".tooltip:has(> input[value=label])")
   ?.setAttribute("data-tip", `Label (${keyMap.get(label[0])!})`);
 
-Element.mode
+E.mode
   .querySelector(".tooltip:has(> input[value=lasso])")
   ?.setAttribute("data-tip", `Lasso (${keyMap.get(lasso[0])!})`);
 
-Element.mode
+E.mode
   .querySelector(".tooltip:has(> input[value=add])")
   ?.setAttribute("data-tip", `Add (${keyMap.get(add[0])!})`);
 
-Element.mode
+E.mode
   .querySelector(".tooltip:has(> input[value=erase])")
   ?.setAttribute("data-tip", `Erase (${keyMap.get(erase[0])!})`);
