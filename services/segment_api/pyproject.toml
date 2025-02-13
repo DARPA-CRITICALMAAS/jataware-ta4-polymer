@@ -14,7 +14,7 @@ pydantic-settings = "^2.0.3"
 rasterio = { version = "1.3.8", extras = ["s3"] }
 numpy = "1.26.2"
 python-dotenv = "1.0.0"
-cdr_schemas = { git = "https://github.com/DARPA-CRITICALMAAS/cdr_schemas.git", tag = "v0.4.12" }
+cdr_schemas = { git = "https://github.com/DARPA-CRITICALMAAS/cdr_schemas.git", tag = "v0.4.18" }
 boto3 = "^1.28.52"
 python-multipart = "^0.0.6"
 pillow = "^10.1.0"

@@ -269,7 +269,7 @@ document
 
     const collapsed = [...resultsContainer.classList].includes("hidden");
 
-    expandSearchResults(resultsContainer, resultsWrapper, icon, {invert: !collapsed});
+    expandSearchResults(resultsContainer, resultsWrapper, icon, { invert: !collapsed });
 
     e.preventDefault();
   });

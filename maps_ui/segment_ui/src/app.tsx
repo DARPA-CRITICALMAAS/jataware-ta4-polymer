@@ -190,7 +190,7 @@ const onDrawModeChange = (drawMode: DrawMode, oldDrawMode: DrawMode) => {
       interaction.appendCoordinates([last]);
       interaction.removeLastPoint();
     }
-  } catch (_error) {} // eslint-disable-line no-empty, @typescript-eslint/no-unused-vars
+  } catch (_error) { } // eslint-disable-line no-empty, @typescript-eslint/no-unused-vars
 };
 const DrawModeSM = new StateManager<DrawMode>({
   defaultState: "fill",

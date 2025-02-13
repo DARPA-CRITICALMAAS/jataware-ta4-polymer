@@ -41,7 +41,7 @@ import FormatAlignJustifyIcon from "@mui/icons-material/FormatAlignJustify";
 
 import { MapSpinner } from "../Spinner";
 import "../css/map_extraction.scss";
-import epsg_data from "../assets/EPSG_CODES_verbose.json";
+import epsg_data from "../assets/PROJ_CODES_WORLD.json";
 import SmallMap from "./smallMap";
 import {
   checkIfEdited,
@@ -378,7 +378,7 @@ function GeoreferenceComponent({ mapDataInit }) {
           latitude: null,
           x_dms: null,
           y_dms: null,
-          crs: "EPSG:4267",
+          crs: "EPSG:4267__NAD27",
           provenance: SYSTEM + "_" + SYSTEM_VERSION,
           system: SYSTEM,
           system_verison: SYSTEM_VERSION,
@@ -443,6 +443,8 @@ function GeoreferenceComponent({ mapDataInit }) {
       checkbox.click();
     });
   }, [cog_id]);
+
+
 
   // Propagate data
   useEffect(() => {
@@ -586,7 +588,7 @@ function GeoreferenceComponent({ mapDataInit }) {
     setExtractedText(e.target.value);
   }
 
-  function returnEPSGName(code) {
+  function returnCRSName(code) {
     for (let epsg of epsg_data["codes"]) {
       if ("label" in epsg) {
         if (epsg["label"].split("__")[0] == code) {
@@ -933,13 +935,13 @@ function GeoreferenceComponent({ mapDataInit }) {
                       disabled={!extractedText || ocrAnalysis.isPending}
                       onClick={(e) => send_for_EPSGs()}
                     >
-                      Get EPSG Recomendations
+                      Get CRS Recomendations
                     </Button>
                     <ul>
                       {EPSGs.map((gcp, i) => {
                         return (
                           <li key={i}>
-                            {gcp}: {returnEPSGName(gcp)} { }
+                            {gcp}: {returnCRSName(gcp)} { }
                           </li>
                         );
                       })}
@@ -968,6 +970,7 @@ function GeoreferenceComponent({ mapDataInit }) {
                 scrollerRef={gcpsListRef}
                 GCPOps={{ updateGCP, deleteGCP }}
                 height={mapData["cog_info"]["height"]}
+                readonly={false}
                 ClipComponent={SmallMap}
               />
             )}

@@ -44,7 +44,7 @@ def ttl_lru_cache(seconds_to_live: int, maxsize: int = 128):
 
 @ttl_lru_cache(seconds_to_live=10)
 def get_cmas():
-    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/cmas?size=40"
+    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/cmas?size=300"
     response = httpx.get(fetch_url, headers=auth, timeout=None).raise_for_status()
     return response.json()
 
@@ -102,6 +102,7 @@ def search_maps(
     sgmc_geology_minor_4: Annotated[str, Form()] = "[]",
     sgmc_geology_minor_5: Annotated[str, Form()] = "[]",
     # query params
+    contains: Annotated[bool, Form()] = False,
     page: int = 0,
     page_size: int = 20,
 ):
@@ -143,6 +144,7 @@ def search_maps(
         "map_name": map_name,
         "page": page,
         "size": page_size,
+        "contains": contains,
         "count": count,
     } | formatted_params
 
@@ -645,7 +647,7 @@ def process_fire_map(request: Request, cog_id):
             "message": message,
             "pending": pending,
             "cog_id": cog_id,
-         },
+        },
     )
 
 
@@ -658,10 +660,7 @@ def jobs_queue(request: Request):
 
     return templates.TemplateResponse(
         "index/fragments/queue-size.html.jinja",
-        {
-            "request": request, 
-            "queue_size": queue_size
-         },
+        {"request": request, "queue_size": queue_size},
     )
 
 

@@ -9,6 +9,7 @@ import { Card, CardContent } from "@mui/material";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import Chip from "@mui/material/Chip";
 import Typography from "@mui/material/Typography";
+import PolymerTooltip from "./Tooltip";
 
 // import "../css/legend_annotation.scss";
 import "../css/legend_card_success.scss";
@@ -29,19 +30,19 @@ function LegendCardSuccess({
   zoomTo,
 }) {
   const [minimized, setMinimized] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
+  // const [isHovered, setIsHovered] = useState(false);
 
-  const handleMouseEnter = () => {
-    setIsHovered(true);
+  // const handleMouseEnter = () => {
+  //   // setIsHovered(true);
 
-    if (validateExtent(item.extent_from_bottom)) {
-      zoomTo(item);  // Call the zoomTo function on hover
-    }
-  };
+  //   if (validateExtent(item.extent_from_bottom)) {
+  //     zoomTo(item);  // Call the zoomTo function on hover
+  //   }
+  // };
 
-  const handleMouseLeave = () => {
-    setIsHovered(false);
-  };
+  // const handleMouseLeave = () => {
+  //   setIsHovered(false);
+  // };
   function handleMinimizeItem_() {
     setMinimized(!minimized);
   }
@@ -54,18 +55,28 @@ function LegendCardSuccess({
 
   return (
     <Card
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      style={{ width: "100%", borderRadius: "10px", padding: "1rem" }}>
+      // onMouseEnter={handleMouseEnter}
+      // onMouseLeave={handleMouseLeave}
+      style={{
+        width: "95%", borderRadius: "10px", padding: ".75rem",
+
+        marginLeft: "8px",
+        // padding: "1rem",
+        marginRight: "18px",
+        border: "1px solid gray",
+        backgroundColor: "var(--mui-palette-background-paper)",
+        color: "var(--mui-palette-text-secondary)",
+        // borderRadius: "14px",
+      }}>
       <div>
         <div
           style={{
-            marginLeft: "8px",
-            padding: "1rem",
-            border: "1px solid gray",
-            backgroundColor: "var(--mui-palette-background-paper)",
-            color: "var(--mui-palette-text-secondary)",
-            borderRadius: "14px",
+            // marginLeft: "8px",
+            // padding: "1rem",
+            // border: "1px solid gray",
+            // backgroundColor: "var(--mui-palette-background-paper)",
+            // color: "var(--mui-palette-text-secondary)",
+            // borderRadius: "14px",
           }}
         >
           {minimized || item.status == "validated" ? (
@@ -73,9 +84,15 @@ function LegendCardSuccess({
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr" }}>
                 <div>
                   <div>
-                    <b>Provenance: </b>
+                    <PolymerTooltip
+                      title="Provenance"
+                      placement="bottom"
+                    >
+                      <b>Prov*: </b>
+                    </PolymerTooltip>
                     <span
                       style={{
+                        fontSize: "0.675em",
                         color: getColorForProvenance(
                           item.system.toLowerCase() + "_" + item.system_version,
                         ),
@@ -84,10 +101,10 @@ function LegendCardSuccess({
                       {item.system.toUpperCase() + "_" + item.system_version}
                     </span>
                   </div>
-                  <Typography>
+                  <Typography component="span">
                     <span style={{ display: "flex" }}>
                       <span>
-                        In cdr:&nbsp;
+                        <b>In cdr:</b>
                         <Chip
                           style={returnInCDRStyle(item["in_cdr"])}
                           size="small"
@@ -97,12 +114,25 @@ function LegendCardSuccess({
                     </span>
                   </Typography>
                   <div>
-                    <b>Feature Type:</b> {item.category}
+                    <PolymerTooltip
+                      title="Feature type"
+                      placement="bottom"
+                    >
+                      <b>Type:</b>
+                    </PolymerTooltip> {item.category}
                   </div>
 
                   <div>
-                    <b>Abbreviation:</b> {item.abbreviation}
+                    <PolymerTooltip
+                      title="Abbreviation"
+                      placement="bottom"
+                    >
+                      <b>Abbr:</b>
+                    </PolymerTooltip>
+                    {item.abbreviation}
+
                   </div>
+
                 </div>
                 {validateExtent(item.extent_from_bottom) && (
                   <img
@@ -122,7 +152,12 @@ function LegendCardSuccess({
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr" }}>
                 <div>
                   <div>
-                    <b>Provenance: </b>
+                    <PolymerTooltip
+                      title="Provenance"
+                      placement="bottom"
+                    >
+                      <b>Prov*: </b>
+                    </PolymerTooltip>
                     <span
                       style={{
                         color: getColorForProvenance(
@@ -137,10 +172,23 @@ function LegendCardSuccess({
                     <b>Status: </b>
                     {item.status.toUpperCase()}
                   </div>
-                  <b>Type:</b> {item.category}
+                  <PolymerTooltip
+                    title="Feature Type"
+                    placement="bottom"
+                  >
+                    <b>Type:</b>
+                  </PolymerTooltip>
+                  {item.category}
                   <div style={{ display: "flex", alignItems: "center" }}>
-                    <b>Abbreviation: </b>
+
+                    <PolymerTooltip
+                      title="Abbreviation"
+                      placement="bottom"
+                    >
+                      <b>Abbr:</b>
+                    </PolymerTooltip>
                     {item.abbreviation}
+
                   </div>
                   <div>
                     <b>Label: </b>
@@ -209,11 +257,13 @@ function LegendCardSuccess({
             >
               Edit
             </Button>
-            {/* {validateExtent(item.extent_from_bottom) && (
-              <Button startIcon={<ZoomInIcon />} onClick={() => zoomTo(item)}>
-                Zoom
+            {validateExtent(item.extent_from_bottom) && (
+              <Button
+                style={{ padding: "0px", margin: "0px" }}
+                startIcon={<ZoomInIcon />} onClick={() => zoomTo(item)}>
+
               </Button>
-            )} */}
+            )}
           </>
           <FormControlLabel
             control={
@@ -225,7 +275,7 @@ function LegendCardSuccess({
                 inputProps={{ "aria-label": "controlled" }}
               />
             }
-            label={item["status"] != "validated" ? "Validate" : "Validated"}
+            label={item["status"] != "validated" ? "Validate" : "Validate"}
           />
         </div>
       </div>

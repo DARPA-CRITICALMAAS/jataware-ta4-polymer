@@ -36,11 +36,10 @@ export function removeLayersMatching(substring: string): boolean {
  *
  */
 export function removeVectorTileLayers() {
-    const fullSuccess = removeLayersMatching("tile");
-
-    if(!fullSuccess) {
-      removeLayersMatching("tile");
-    }
+  const fullSuccess = removeLayersMatching("tile");
+  if (!fullSuccess) {
+    removeLayersMatching("tile");
+  }
 }
 
 /**
@@ -92,7 +91,7 @@ export function styleFactory(type: Feature, color: string) {
   if (type === Feature.Point) {
     style = {
       image: new CircleStyle({
-      radius: 5,
+        radius: 5,
         ...style
       })
     }

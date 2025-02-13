@@ -10,7 +10,10 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    open_ai_key: str
+    openai_api_key: str
+    openai_endpoint: str = 'https://api.openai.com/v1'
+    openai_api_model: str = "gpt-3.5-turbo"
+
     cdr_bearer_token: str = "Bearer a0d45e47f4884fa5c3f9d13154a6ddf389373c184f224a1d4dbe88ed2e96b1512"
 
     cdr_s3_endpoint_url: str = "http://192.168.1.95:9000"  # "https://s3.amazonaws.com"

@@ -60,7 +60,6 @@ const areaTypeColorMap = {
 
 function AreaExtractionsComponent() {
     const config = useConfig();
-    console.log(config)
     const { cog_id } = useParams();
 
     const mapTargetElement = useRef<HTMLDivElement>(null);

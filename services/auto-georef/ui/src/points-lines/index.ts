@@ -221,7 +221,7 @@ async function onView(ftype: FType, system: string, version: string) {
   });
 
   // Succeed with an empty callback
-  return Success(() => {});
+  return Success(() => { });
 }
 
 /**
@@ -799,8 +799,16 @@ async function markFeatureHandler(type: "good" | "bad" | "skip" | "unset") {
       return;
     }
 
+    // markedFeature.feature.isValidated =
+    //   type === "good" ? true : type === "bad" ? false : null;
     markedFeature.feature.isValidated =
-      type === "good" ? true : type === "bad" ? false : null;
+      type === "good"
+        ? true
+        : type === "bad"
+          ? false
+          : type === "unset"
+            ? null
+            : false;
 
     const response = await fetch("/lines/update-status", {
       method: "POST",
@@ -808,7 +816,7 @@ async function markFeatureHandler(type: "good" | "bad" | "skip" | "unset") {
       body: JSON.stringify({
         feature_id: markedFeature.feature.featureID,
         ftype: ftype,
-        is_validated: type === "unset" ? null : false,
+        is_validated: markedFeature.feature.isValidated,
       }),
     });
 

@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "register-polymer"
+version = "0.1.0"
+description = ""
+authors = ["marshHawk4 <kyle@jataware.com>"]
+readme = "README.md"
+packages = [{ include = "register_polymer" }, { include = "register_polymer/**/*.py" }]
+
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pydantic-settings = "^2.0.3"
+httpx = "^0.26.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+register = "register_polymer.register:main"

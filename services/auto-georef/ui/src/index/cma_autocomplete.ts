@@ -23,6 +23,14 @@ const fetchCMAs = () =>
       })),
     );
 
+const createPackageBtn = document.getElementById("create-package-button");
+const createRasterBtn = document.getElementById("create-raster-button");
+function resetDownloadRasterButtons() {
+  if (createPackageBtn) { createPackageBtn.disabled = true }
+  if (createRasterBtn) { createRasterBtn.disabled = true }
+
+}
+
 export const initAutocomplete = async (elem, valueElem, containerElem, changedCalled) => {
   const cmas = await fetchCMAs();
 
@@ -41,7 +49,7 @@ export const initAutocomplete = async (elem, valueElem, containerElem, changedCa
       elem.value = item.label;
       valueElem.dataset.label = item.label;
       valueElem.dataset.id = item.id;
-
+      resetDownloadRasterButtons()
       // draw the polygon coordinates for CMA on map using cdr->openlayers projection
       let OLmultiPolygonCoordinates = item.value.coordinates;
 
@@ -93,15 +101,15 @@ export const initAutocomplete = async (elem, valueElem, containerElem, changedCa
       });
     },
     keyup: () =>
-      // {event, fetch}
-      {
-        if (!elem.value) {
-          valueElem.value = null;
-          valueElem.dataset.label = "";
-          // clear previous ol area preview
-          clearShapeOpenLayers(CMA_LAYER_ID);
-        }
-      },
+    // {event, fetch}
+    {
+      if (!elem.value) {
+        valueElem.value = null;
+        valueElem.dataset.label = "";
+        // clear previous ol area preview
+        clearShapeOpenLayers(CMA_LAYER_ID);
+      }
+    },
     minLength: 0,
     container: containerElem,
     showOnFocus: true,

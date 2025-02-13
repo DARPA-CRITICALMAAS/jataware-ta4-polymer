@@ -78,7 +78,6 @@ export function formatRawFeatures(
       ]),
     );
   }
-  console.log(features);
   return features;
 }
 

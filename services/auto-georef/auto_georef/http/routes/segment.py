@@ -265,6 +265,7 @@ def get_legend_items_from_system(cog_id: str, legend_id: str):
 
     client = CDRClient("")
     item = client.legend_item_intersect(legend_id)
+
     item = LayerLegendItemResponse(
         id=item["legend_id"], bbox=flip_bbox(item["px_bbox"], height), name=item["abbreviation"].strip()
     )
@@ -395,7 +396,7 @@ def import_polygons(cog_id: str, system: str, version: str, max_polygons: int = 
                 raise ValueError("No legend item")
 
             legend_item = get_legend_items_from_system(cog_id, li.legend_id)
-            name = legend_item.name
+            # name = legend_item.name
         except (ValueError, HTTPException):
             pass
 

@@ -159,7 +159,8 @@ const pages = [
     label: "Map GCPs",
     urlPath: "points",
   },
-  { label: "Projections",
+  {
+    label: "Projections",
     urlPath: "projections",
     statusKey: "projections"
   },
@@ -175,7 +176,7 @@ const pages = [
   {
     label: "Polygons",
     urlPath: "segment",
-    statusKey: "polygons" ,
+    statusKey: "polygons",
     external: true,
   },
   {
@@ -193,9 +194,9 @@ const pendingYellow = "pending"; // rgb(108, 171, 245) blue previously
 const emptyRed = "error";
 
 enum StatState {
-    VALIDATED = "validated",
-    PENDING = "pending",
-    EMPTY = "empty",
+  VALIDATED = "validated",
+  PENDING = "pending",
+  EMPTY = "empty",
 };
 
 const stateToColorMapper = {
@@ -252,7 +253,7 @@ export default function Header({ navigate, forceLoading, cog_id }) {
 
       let linePointKeyToUse = "lines";
       // if points has a higher state than lines, replace "lines" with "points" state
-      if (stateOrder.indexOf(data["lines"]) < stateOrder.indexOf(data["points"])) {
+      if (stateOrder.indexOf(data["lines"]?.["status"]) < stateOrder.indexOf(data["points"]?.["status"])) {
         linePointKeyToUse = "points";
       }
 
@@ -372,7 +373,7 @@ export default function Header({ navigate, forceLoading, cog_id }) {
       }
       return `${validated} / ${total}`;
     }
-      return "";
+    return "";
   }
 
   function getStatusTooltip(statusKey) {
@@ -443,7 +444,7 @@ export default function Header({ navigate, forceLoading, cog_id }) {
                       title={getStatusTooltip(page.statusKey)}
                       arrow
                     >
-                      <NavBadge 
+                      <NavBadge
                         badgeContent={getBadgeContents(page.statusKey)}
                         color={getDataForStatus(page.statusKey).color}
                       >
@@ -451,7 +452,7 @@ export default function Header({ navigate, forceLoading, cog_id }) {
                       </NavBadge>
                     </Tooltip>
                   ) : (
-                      <Text textAlign="center">{page.label}</Text>
+                    <Text textAlign="center">{page.label}</Text>
                   )}
                 </MenuItem>
               ))}
@@ -479,30 +480,30 @@ export default function Header({ navigate, forceLoading, cog_id }) {
           <nav>
             <ul>
               <li>
-                <NavButton 
-                  onClick={() => onNavClick("points")} 
+                <NavButton
+                  onClick={() => onNavClick("points")}
                 >
-                    {!isLargeScreen ? <span>GCPs</span> : <span>Map GCPs</span>}
-                  </NavButton>
+                  {!isLargeScreen ? <span>GCPs</span> : <span>Map GCPs</span>}
+                </NavButton>
               </li>
               {Boolean(cogProjectionsQuery?.data?.data?.length) && (
-                  <li>
-                    <NavButton
-                      onClick={() => onNavClick("projections")}
+                <li>
+                  <NavButton
+                    onClick={() => onNavClick("projections")}
+                  >
+                    <Tooltip
+                      title={getStatusTooltip("projections")}
+                      arrow
                     >
-                      <Tooltip
-                        title={getStatusTooltip("projections")}
-                        arrow
+                      <NavBadge
+                        badgeContent={getBadgeContents("projections")}
+                        color={getDataForStatus("projections").color}
                       >
-                        <NavBadge
-                          badgeContent={getBadgeContents("projections")}
-                          color={getDataForStatus("projections").color}
-                        >
-                          Projections
-                        </NavBadge>
-                      </Tooltip>
-                    </NavButton>
-                  </li>
+                        Projections
+                      </NavBadge>
+                    </Tooltip>
+                  </NavButton>
+                </li>
               )}
               <li>
                 <NavButton onClick={() => onNavClick("areas")}>
@@ -510,61 +511,61 @@ export default function Header({ navigate, forceLoading, cog_id }) {
                 </NavButton>
               </li>
               <li>
-                  <NavButton
-                    onClick={() => onNavClick("swatchannotation")}
+                <NavButton
+                  onClick={() => onNavClick("swatchannotation")}
+                >
+                  <Tooltip
+                    title={getStatusTooltip("legend_items")}
+                    arrow
                   >
-                    <Tooltip
-                      title={getStatusTooltip("legend_items")}
-                      arrow
+                    <NavBadge
+                      badgeContent={getBadgeContents("legend_items")}
+                      color={getDataForStatus("legend_items").color}
                     >
-                      <NavBadge
-                        badgeContent={getBadgeContents("legend_items")}
-                        color={getDataForStatus("legend_items").color}
-                      >
-                        {!isLargeScreen ? (
-                          <span>Swatches</span>
-                        ) : (
-                          <span>Legend Swatches</span>
-                        )}
-                      </NavBadge>
-                    </Tooltip>
-                  </NavButton>
+                      {!isLargeScreen ? (
+                        <span>Swatches</span>
+                      ) : (
+                        <span>Legend Swatches</span>
+                      )}
+                    </NavBadge>
+                  </Tooltip>
+                </NavButton>
               </li>
 
               <li>
-                <NavButton 
-                    href={toV2Url("segment")}
+                <NavButton
+                  href={toV2Url("segment")}
+                >
+                  <Tooltip
+                    title={getStatusTooltip("polygons")}
+                    arrow
                   >
-                    <Tooltip
-                      title={getStatusTooltip("polygons")}
-                      arrow
-                    >
                     <NavBadge
                       badgeContent={getBadgeContents("polygons")}
                       color={getDataForStatus("polygons").color}
                     >
                       Polygons
                     </NavBadge>
-                    </Tooltip>
+                  </Tooltip>
                 </NavButton>
               </li>
 
               <li>
-                  <NavButton
-                    href={toV2Url("lines")}
+                <NavButton
+                  href={toV2Url("lines")}
+                >
+                  <Tooltip
+                    title={getStatusTooltip("lines")}
+                    arrow
                   >
-                    <Tooltip
-                      title={getStatusTooltip("lines")}
-                      arrow
+                    <NavBadge
+                      badgeContent={getBadgeContents("lines")}
+                      color={getDataForStatus("lines").color}
                     >
-                      <NavBadge
-                        badgeContent={getBadgeContents("lines")}
-                        color={getDataForStatus("lines").color}
-                      >
-                        Points/Lines
-                      </NavBadge>
-                    </Tooltip>
-                  </NavButton>
+                      Points/Lines
+                    </NavBadge>
+                  </Tooltip>
+                </NavButton>
               </li>
 
               <li>
@@ -593,38 +594,38 @@ export default function Header({ navigate, forceLoading, cog_id }) {
               )}
               {cog_id && (
                 <>
-                <li>
-                  <COGDownloads cog_id={cog_id} />
-                </li>
-                {isProjectionsPage && mapDownloadsAvailable.isSuccess && (
                   <li>
-                    <Tooltip
-                      title={georeferenceFeatures.isSuccess ?
-                              "Successfully georeferenced all features. Click to run again." :
-                             georeferenceFeatures.isPending ? "Georeferencing new features (running)..." :
-                             georeferenceFeatures.isError ? "Failed to georeference new features. Try again later." :
-                              "Georeference manually-edited features and recreate packages."}
-                      placement="bottom"
-                      arrow
-                    >
-                      <span>
-                        <IconButton
-                          color={georeferenceFeatures.isSuccess ? "success" : georeferenceFeatures.isError ? "error" : "default"}
-                          onClick={georeferenceFeatures.mutate}
-                          disabled={georeferenceFeatures.isPending}
-                        >
-                          {georeferenceFeatures.isSuccess ? (
-                            <TaskAltIcon />
-                          ) : georeferenceFeatures.isError ? (
-                              <ErrorOutlineIcon />
-                          ) : (
-                            <RefreshRoundedIcon className={georeferenceFeatures.isPending ? 'rotating' : ''} />
-                          )}
-                        </IconButton>
-                      </span>
-                    </Tooltip>
+                    <COGDownloads cog_id={cog_id} />
                   </li>
-                )}
+                  {isProjectionsPage && mapDownloadsAvailable.isSuccess && (
+                    <li>
+                      <Tooltip
+                        title={georeferenceFeatures.isSuccess ?
+                          "Successfully georeferenced all features. Click to run again." :
+                          georeferenceFeatures.isPending ? "Georeferencing new features (running)..." :
+                            georeferenceFeatures.isError ? "Failed to georeference new features. Try again later." :
+                              "Georeference manually-edited features and recreate packages."}
+                        placement="bottom"
+                        arrow
+                      >
+                        <span>
+                          <IconButton
+                            color={georeferenceFeatures.isSuccess ? "success" : georeferenceFeatures.isError ? "error" : "default"}
+                            onClick={georeferenceFeatures.mutate}
+                            disabled={georeferenceFeatures.isPending}
+                          >
+                            {georeferenceFeatures.isSuccess ? (
+                              <TaskAltIcon />
+                            ) : georeferenceFeatures.isError ? (
+                              <ErrorOutlineIcon />
+                            ) : (
+                              <RefreshRoundedIcon className={georeferenceFeatures.isPending ? 'rotating' : ''} />
+                            )}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </li>
+                  )}
                 </>
               )}
             </ul>

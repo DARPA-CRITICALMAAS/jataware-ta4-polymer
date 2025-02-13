@@ -97,7 +97,11 @@ def search_by_cog_id(index, cog_id):
     try:
         response = es.search(
             index=index,
-            body={"query": {"bool": {"must": [{"match": {"cog_id": cog_id}}]}}},
+            body={
+                "query": {
+                    "bool": {"must": [{"match": {"cog_id": cog_id}}], "must_not": [{"match": {"status": "failed"}}]}
+                }
+            },
             size=10000,
         )
         return [hit["_source"] for hit in response["hits"]["hits"]]

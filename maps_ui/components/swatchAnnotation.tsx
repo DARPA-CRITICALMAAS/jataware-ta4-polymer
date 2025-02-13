@@ -12,6 +12,9 @@ import Polygon from 'ol/geom/Polygon';
 import Feature from "ol/Feature";
 import Draw, { createBox } from "ol/interaction/Draw";
 import { Fill, Stroke, Style } from "ol/style";
+import Snackbar from "@mui/material/Snackbar";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import Alert from "@mui/material/Alert";
 
 import Button from "@mui/material/Button";
 import ChangeHistoryIcon from "@mui/icons-material/ChangeHistory";
@@ -160,24 +163,8 @@ function SwatchAnnotationPage() {
       setWaitingForCDRSubmit(false);
       return;
     }
+    send_to_cdr.mutate(cog_id);
 
-    try {
-      const response = await axios({
-        method: "post",
-        url: "/api/map/send_to_cdr?cog_id=" + cog_id,
-        headers: _APP_JSON_HEADER,
-      });
-      if (response.status === 204) {
-        alert("Request was successful!");
-        navigate(0);
-      } else {
-        alert("Request was made but did not return a 204 status code.");
-      }
-    } catch (error) {
-      console.error("Error making the request:", error);
-    } finally {
-      setWaitingForCDRSubmit(false);
-    }
   }
 
   async function sendSwatchUpdates(data_) {
@@ -448,26 +435,12 @@ function SwatchAnnotationPage() {
       url: "/api/map/" + cog_id + "/px_extractions",
       headers: _APP_JSON_HEADER,
     }).then((response) => {
-      let geologicAgesCounter = {}
       if (response.data["legend_swatches"].length > 0) {
-
-
         let successItems = [];
         let createdItems = [];
         for (let swatch of response.data["legend_swatches"]) {
           if (swatch.status == "validated" || swatch.status == "succeeded") {
             successItems.push(swatch);
-            if (swatch?.age_texts) {
-              if (swatch.age_texts.length > 0) {
-                for (let age of swatch.age_texts) {
-                  if (!Object.keys(geologicAgesCounter).includes(age)) {
-                    geologicAgesCounter[age] = 1
-                  }
-                  geologicAgesCounter[age] += 1
-                }
-
-              }
-            }
           }
           if (swatch.status == "created") {
             swatch["minimized"] = true;
@@ -490,21 +463,16 @@ function SwatchAnnotationPage() {
         url: "/api/map/sgmc/ages",
         headers: _APP_JSON_HEADER,
       }).then((response) => {
-        let dict_values = []
-        for (let x of Object.keys(response.data)) {
-          if (!Object.keys(geologicAgesCounter).includes(x)) {
-            dict_values.push(x)
-          }
-        }
-        while (Object.keys(geologicAgesCounter).length > 0) {
-
-          let minKey = Object.keys(geologicAgesCounter).reduce((minKey, key) => {
-            return geologicAgesCounter[key] < geologicAgesCounter[minKey] ? key : minKey;
-          }, Object.keys(geologicAgesCounter)[0]);
-          dict_values.unshift(minKey)
-          delete geologicAgesCounter[minKey];
-        }
-        setGeologicAges(dict_values);
+        const sortedData = Object.entries(response.data).sort(([, a], [, b]) => {
+          const maxA = a.min_ma ?? -Infinity;
+          const maxB = b.min_ma ?? -Infinity;
+          return maxB - maxA;
+        })
+          .reduce((acc, [key, value]) => {
+            acc[key] = value;
+            return acc;
+          }, {});
+        setGeologicAges(Object.keys(sortedData));
       });
 
     });
@@ -513,7 +481,6 @@ function SwatchAnnotationPage() {
   function setData() {
     setLoadingProvenanceData(true);
 
-    //  get provenances
     const provenancePromise = axios({
       method: "GET",
       url: "/api/map/" + cog_id + "/px_extraction_systems",
@@ -527,7 +494,7 @@ function SwatchAnnotationPage() {
 
     const legendSwatchPromise = setLegendSwatchData();
 
-    Promise.all([provenancePromise, provenancePromise]).finally(() => {
+    Promise.all([provenancePromise, legendSwatchPromise]).finally(() => {
       setLoadingProvenanceData(false);
     });
   }
@@ -764,7 +731,6 @@ function SwatchAnnotationPage() {
           age_text: "",
           age_texts: [],
         };
-        console.log(swatch_feature)
         swatch_feature.set("legend_id", swatch_feature_id);
         finished_swatch_source.addFeature(swatch_feature);
         if (label_feature != null) {
@@ -1089,6 +1055,23 @@ function SwatchAnnotationPage() {
         } else {
           items_.push(feature);
         }
+        if (validateExtent(item.extent_from_bottom)) {
+          let swatch_finished_source = getLayerById(mapRef.current, "swatch-finished-layer").getSource()
+          let swatch_finished_features = swatch_finished_source.getFeatures()
+          for (let feature of swatch_finished_features) {
+            if (feature.get("legend_id") == item.legend_id) {
+              swatch_finished_source.removeFeature(feature)
+              let swatch_feature = new GeoJSON().readFeature({
+                type: "Feature",
+                geometry: item["coordinates_from_bottom"],
+                properties: {
+                  legend_id: item["legend_id"],
+                },
+              });
+              swatch_finished_source.addFeature(swatch_feature);
+            }
+          }
+        }
       } else {
         items_.push(feature);
       }
@@ -1173,6 +1156,71 @@ function SwatchAnnotationPage() {
       legendItemsContainerRef.current.scrollTop = legendItemsContainerRef.current.scrollHeight;
     }
   }, [filteredLegendItems]);
+
+  function validateAll() {
+    for (let item of selectedLegendItem) {
+      setValidated(item, 'validated')
+    }
+  }
+
+  function clearSelectedLayer() {
+    getLayerById(mapRef.current, "bounding-box").getSource().clear();
+    getLayerById(mapRef.current, "swatch-layer").getSource().clear();
+
+  }
+  const SECOND = 1000;
+  const MINUTE = SECOND * 60;
+  function formatReprojectError(e) {
+    const { status } = e.response;
+
+    if (status === 422) {
+      const { detail } = e.response.data;
+      console.log(e.response.data)
+      let template = "Validation Error: ";
+      for (let info of detail) {
+        template += info.msg;
+        template += `: ${JSON.stringify(info.loc)}`;
+      }
+      return template;
+    } else if (status === 500) {
+      console.log(e.response.data)
+      return "Internal Server Error. Contact us for details or retry operation.";
+    } else if (status === 400) {
+      console.log(e.response.data)
+      return "Bad Request withno further validation details. Retry operation or contact us.";
+    }
+
+    return "Unknown or unhandled error ocurred. Retry or contact us.";
+  }
+
+  const send_to_cdr = useMutation({
+    mutationFn: async (cog_id) => {
+      return axios({
+        method: "post",
+        url: "/api/map/send_to_cdr?cog_id=" + cog_id,
+        timeout: 5 * MINUTE,
+        headers: _APP_JSON_HEADER,
+      });
+    },
+    onSuccess: async (response) => {
+      if (response.status === 204) {
+        await new Promise((resolve) => setTimeout(resolve, 3500));
+        console.log("Request was successful!");
+        navigate(0);
+      }
+      setWaitingForCDRSubmit(false);
+
+    },
+    onError: (e) => {
+      setWaitingForCDRSubmit(false);
+      throw new Error(formatReprojectError(e));
+    },
+  });
+  const areMutationErrors = send_to_cdr.isError;
+  const closeNotifier = () => {
+    send_to_cdr.reset();
+    setWaitingForCDRSubmit(false);
+  };
 
   return (
     <div className="swatch-annotation-root" style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
@@ -1263,70 +1311,25 @@ function SwatchAnnotationPage() {
                 <PolymerTooltip
                   title={provenanceVisible ? "Hide Systems" : "Show Systems"}
                 >
-                  <IconButton
-                    color="secondary"
-                    disabled={Boolean(loadingProvenanceData)}
-                    onClick={() => {
-                      setProvenanceVisible(!provenanceVisible);
-                    }}
-                  >
-                    <FormatAlignJustifyIcon />
-                  </IconButton>
+                  <span>
+                    <IconButton
+                      color="secondary"
+                      disabled={Boolean(loadingProvenanceData)}
+                      onClick={() => {
+                        setProvenanceVisible(!provenanceVisible);
+                      }}
+                    >
+
+                      <FormatAlignJustifyIcon />
+                    </IconButton>
+                  </span>
                 </PolymerTooltip>
               </div>
 
-              {/* Extract Legend Item Button */}
-              <PolymerTooltip title="*Or Press Enter or Double Right Click">
-                <Button
-                  color="info"
-                  size="small"
-                  variant="contained"
-                  style={{ marginTop: "0.5rem" }}
-                  onClick={processLegendSwatches}
-                >
-                  Extract Legend Item
-                </Button>
-              </PolymerTooltip>
 
-              {/* Experimental Features Section */}
-              <Accordion
-                defaultExpanded
-                sx={{
-                  marginTop: "0.5rem",
-                  backgroundColor: "transparent",
-                  boxShadow: "none",
-                  "&:before": {
-                    display: "none" // Removes the default divider
-                  }
-                }}
-              >
-                <AccordionSummary
-                  expandIcon={<ExpandMoreIcon />}
-                  sx={{
-                    padding: "0 0.5rem",
-                    minHeight: "32px",
-                    "& .MuiAccordionSummary-content": {
-                      margin: "4px 0"
-                    }
-                  }}
-                >
-                  Experimental Features
-                </AccordionSummary>
-                <AccordionDetails sx={{ padding: "0 0.5rem" }}>
-                  <Button
-                    color={isMagicStreaming ? "error" : "info"}
-                    size="small"
-                    variant="contained"
-                    fullWidth
-                    onClick={isMagicStreaming ? cancelMagicStream : processLegendSwatchesMagic}
-                  >
-                    {isMagicStreaming ? "Cancel Auto Extract" : "Auto Legend Extract"}
-                  </Button>
-                </AccordionDetails>
-              </Accordion>
 
               {/* Provenance Data Selector */}
-              {loadingProvenanceData ? (
+              {(loadingProvenanceData || forceCogCache.isPending) ? (
                 <LoadingButton
                   loading
                   loadingPosition="start"
@@ -1337,42 +1340,94 @@ function SwatchAnnotationPage() {
                 </LoadingButton>
               ) : (
                 provenanceVisible && (
-                  <Box>
-                    <Text variant="body2" style={{ marginTop: "0.75rem" }}>
-                      Select System
-                    </Text>
+                  <>
+                    {/* Extract Legend Item Button */}
+                    <PolymerTooltip title="*Or Press Enter or Double Right Click">
+                      <Button
+                        color="info"
+                        size="small"
+                        variant="contained"
+                        style={{ marginTop: "0.5rem" }}
+                        onClick={processLegendSwatches}
+                      >
+                        Extract Legend Item
+                      </Button>
+                    </PolymerTooltip>
 
-                    <FormGroup>
-                      {legendProvenances.map((option) => (
-                        <FormControlLabel
-                          className="provenance-control-label"
-                          key={option}
-                          control={
-                            <Checkbox
-                              size="small"
-                              checked={provenanceOption.includes(option)}
-                              onChange={(e) => {
-                                handleProvenanceChange(
-                                  e.target.name,
-                                  e.target.checked,
-                                );
-                              }}
-                              name={option}
-                            />
+                    {/* Experimental Features Section */}
+                    <Accordion
+                      defaultExpanded
+                      sx={{
+                        marginTop: "0.5rem",
+                        backgroundColor: "transparent",
+                        boxShadow: "none",
+                        "&:before": {
+                          display: "none" // Removes the default divider
+                        }
+                      }}
+                    >
+                      <AccordionSummary
+                        expandIcon={<ExpandMoreIcon />}
+                        sx={{
+                          padding: "0 0.5rem",
+                          minHeight: "32px",
+                          "& .MuiAccordionSummary-content": {
+                            margin: "4px 0"
                           }
-                          label={
-                            <Text
-                              style={{
-                                color: "var(--mui-palette-text-primary)",
-                              }}
-                            >
-                              <span>{option}</span>
-                            </Text>
-                          }
-                        />
-                      ))}
-                    </FormGroup>
-                  </Box>
+                        }}
+                      >
+                        Experimental Features
+                      </AccordionSummary>
+                      <AccordionDetails sx={{ padding: "0 0.5rem" }}>
+                        <Button
+                          color={isMagicStreaming ? "error" : "info"}
+                          size="small"
+                          variant="contained"
+                          fullWidth
+                          onClick={isMagicStreaming ? cancelMagicStream : processLegendSwatchesMagic}
+                        >
+                          {isMagicStreaming ? "Cancel Auto Extract" : "Auto Legend Extract"}
+                        </Button>
+                      </AccordionDetails>
+                    </Accordion>
+                    <Box>
+                      <Text variant="body2" style={{ marginTop: "0.75rem" }}>
+                        Select System
+                      </Text>
+
+                      <FormGroup>
+                        {legendProvenances.map((option) => (
+                          <FormControlLabel
+                            className="provenance-control-label"
+                            key={option}
+                            control={
+                              <Checkbox
+                                size="small"
+                                checked={provenanceOption.includes(option)}
+                                onChange={(e) => {
+                                  handleProvenanceChange(
+                                    e.target.name,
+                                    e.target.checked,
+                                  );
+                                }}
+                                name={option}
+                              />
+                            }
+                            label={
+                              <Text
+                                style={{
+                                  color: "var(--mui-palette-text-primary)",
+                                }}
+                              >
+                                <span>{option}</span>
+                              </Text>
+                            }
+                          />
+                        ))}
+                      </FormGroup>
+                    </Box>
+                  </>
+
                 )
               )}
             </Box>
@@ -1382,7 +1437,6 @@ function SwatchAnnotationPage() {
         <PanelResizeHandle className="panel-resize-handle" />
 
         <Panel defaultSize={65} minSize={40}>
-          {/* Header */}
           <div
             style={{
               margin: "0.25rem 1rem 0 1rem",
@@ -1391,8 +1445,10 @@ function SwatchAnnotationPage() {
             }}
           >
             <Text variant="h4" sx={{ fontSize: "1.75rem" }}>
-              Legend Items (V2)
+              Legend Annotation
             </Text>
+            {/* <hr style={{ border: "1px solid #ccc", margin: "0.5rem 1rem" }} /> */}
+
 
             {/* Save to CDR Button */}
             <PolymerTooltip
@@ -1408,6 +1464,13 @@ function SwatchAnnotationPage() {
               </LoadingButton>
             </PolymerTooltip>
           </div>
+          <div
+            style={{
+              height: "1px",
+              backgroundColor: "#ccc",
+              margin: "0.25rem 0",
+            }}
+          ></div>
 
           <div key={"scroll" + cog_id} className="flex-child scrollableContent">
             <div className="right-panel">
@@ -1422,7 +1485,7 @@ function SwatchAnnotationPage() {
                     {/* left column */}
                     <div className="left_column">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Text variant="h5"> Pending Review </Text>
+                        <Text variant="h6"> Pending Review </Text>
                         {isMagicStreaming && (
                           magicProgress !== null ? (
                             <div style={{ width: '100px' }}>
@@ -1456,6 +1519,7 @@ function SwatchAnnotationPage() {
                               zoomTo={zoomTo}
                               ocrLastClipArea={ocrLastClipArea}
                               geologicAges={geologicAges}
+                              clearSelectedLayer={clearSelectedLayer}
                             ></LegendCard>
                           ))}
                         </div>
@@ -1464,8 +1528,12 @@ function SwatchAnnotationPage() {
 
                     {/* reviewed column */}
                     <div className="legend-items" style={{ display: "flex", flexDirection: "column" }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Text variant="h5"> Reviewed </Text>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <Text variant="h6"> Reviewed </Text>
+                        <Button variant="text"
+                          onClick={() => validateAll()}
+                        >Validate all</Button>
+
                       </div>
                       <div className="right-column-legends">
                         <div>
@@ -1490,6 +1558,23 @@ function SwatchAnnotationPage() {
           </div>
         </Panel>
       </PanelGroup>
+      <Snackbar
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        open={areMutationErrors}
+        autoHideDuration={6000}
+        onClose={closeNotifier}
+      >
+        <Alert
+          onClose={closeNotifier}
+          severity="error"
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {send_to_cdr.isError
+            ? `Saving to cdr failed. ${send_to_cdr?.error?.message},`
+            : ""}
+        </Alert>
+      </Snackbar>
     </div>
   );
 }

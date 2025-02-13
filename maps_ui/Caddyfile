@@ -65,6 +65,10 @@
     reverse_proxy {env.API}:3000
   }
 
+  handle /sgmc/* {
+    reverse_proxy {env.API}:3000
+  }
+
   handle /features/* {
     reverse_proxy {env.API}:3000
   }

@@ -13,6 +13,7 @@ import { transform, get as getProjection } from "ol/proj";
 import proj4 from "proj4";
 import Draw, { createBox } from "ol/interaction/Draw";
 import { getCenter } from "ol/extent";
+import { Projection } from "ol/proj";
 
 import { Modal, Switch } from "@mui/material";
 import { Card, CardContent, Link } from "@mui/material";
@@ -61,12 +62,29 @@ const _APP_JSON_HEADER = {
   "Content-Type": "application/json",
 };
 
+function order_projections(proj_info) {
+  let validated_projections = []
+  let non_validated = []
+  for (let x of proj_info) {
+    if (x['status'] == "validated") {
+      validated_projections.push(x)
+    } else {
+      non_validated.push(x)
+    }
+  }
+  validated_projections.sort((a, b) => new Date(b.created) - new Date(a.created));
+  non_validated.sort((a, b) => new Date(b.created) - new Date(a.created));
+
+  let all = [...validated_projections, ...non_validated]
+  return all
+}
+
 function ProjectionsPage({ cog_id, mapData }) {
   const config = useConfig();
 
   const navigate = useNavigate();
   const cog_name = mapData["cog_info"]["cog_name"];
-  const all_proj_info = mapData["proj_info"].toReversed();
+  const all_proj_info = order_projections(mapData["proj_info"]);
   const proj_index = useRef(0);
   const curr_proj_info = all_proj_info[proj_index.current];
 
@@ -108,6 +126,7 @@ function ProjectionsPage({ cog_id, mapData }) {
   const base_source = new XYZ({
     url: `https://api.maptiler.com/tiles/satellite/{z}/{x}/{y}.jpg?key=${config.MAPTILER_KEY}`,
     crossOrigin: "",
+    projection: 'EPSG:3857'
   });
 
   const base_layer = new TileLayer({
@@ -116,23 +135,8 @@ function ProjectionsPage({ cog_id, mapData }) {
     visible: false,
   });
   const XYZ_base_layers = { Satellite: base_layer };
-  const XYZ_source_layers = { Satellite: base_source };
+  let first_proj = all_proj_info[proj_index.current]["crs"];
 
-  const map_source = new GeoTIFF({
-    sources: [
-      {
-        url: determineMapSourceURL(curr_proj_info, cog_id, config),
-        nodata: -1,
-      },
-    ],
-    convertToRGB: true,
-    interpolate: false,
-  });
-
-  const map_layer = new TileLayer({
-    id: "map-layer",
-    source: map_source,
-  });
   const clip_source = new VectorSource({ wrapX: false });
   const clip_layer = new VectorLayer({
     id: "bounding-box",
@@ -187,12 +191,30 @@ function ProjectionsPage({ cog_id, mapData }) {
 
     waitForProjections(codes)
       .then(() => {
-        return setCenterExtent(config);
+        return setCenterExtent();
       })
       .then((center) => {
         return buildWMTSBaseLayers(center);
       })
       .then(([WMTS_base_layers, WMTS_source_layers, center]) => {
+
+        const map_source = new GeoTIFF({
+          sources: [
+            {
+              url: determineMapSourceURL(curr_proj_info, cog_id, config),
+              nodata: -1,
+            },
+          ],
+          projection: first_proj,
+          convertToRGB: true,
+          interpolate: false,
+        });
+
+        const map_layer = new TileLayer({
+          id: "map-layer",
+          source: map_source,
+        });
+
         let all_layers = [
           ...Object.values(XYZ_base_layers),
           ...Object.values(WMTS_base_layers),
@@ -258,7 +280,6 @@ function ProjectionsPage({ cog_id, mapData }) {
     let extent = await getGeoTIFFExtent(
       determineMapSourceURL(all_proj_info[0], cog_id, config),
     );
-    console.log(extent)
     let center = [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2];
     currCenterRef.current = center;
     return center;
@@ -310,6 +331,8 @@ function ProjectionsPage({ cog_id, mapData }) {
       proj_index.current = proj_index.current + 1;
     }
     // new map source
+    let proj_ = all_proj_info[proj_index.current]["crs"];
+
     const new_map_source = new GeoTIFF({
       sources: [
         {
@@ -317,13 +340,12 @@ function ProjectionsPage({ cog_id, mapData }) {
           nodata: -1,
         },
       ],
+      projection: proj_,
       convertToRGB: true,
     });
 
-    // update view to new projection view
-    let proj_ = all_proj_info[proj_index.current]["crs"];
-
     setCurrentProj(proj_);
+
     const newView = new View({
       center: currCenterRef.current,
       zoom: 10,
@@ -332,7 +354,7 @@ function ProjectionsPage({ cog_id, mapData }) {
 
     mapRef.current.setView(newView);
     Proj_Ref.current = proj_;
-    // set map layer to new source
+
     getLayerById(mapRef.current, "map-layer").setSource(new_map_source);
 
     setGCPS([...all_proj_info[proj_index.current]["gcps"]]);
@@ -372,6 +394,14 @@ function ProjectionsPage({ cog_id, mapData }) {
             window.location.reload();
           }, 2000);
         }
+        if (status == "failed") {
+          alert("Marked as failed");
+
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
+
 
       })
       .catch((e) => {
@@ -480,6 +510,14 @@ function ProjectionsPage({ cog_id, mapData }) {
     );
   }
 
+  function failProjection() {
+    saveProjStatus(
+      mapData["cog_info"]["cog_id"],
+      all_proj_info[proj_index.current]["projection_id"],
+      "failed",
+    );
+  }
+
 
   function checkValidatedProj(status) {
     if (status == "validated") {
@@ -554,7 +592,6 @@ function ProjectionsPage({ cog_id, mapData }) {
                 >
                   Random Map
                 </Button>
-
               </section>
 
               <Typography>
@@ -570,7 +607,7 @@ function ProjectionsPage({ cog_id, mapData }) {
                 </span>
               </Typography>
 
-              <Typography component="div">
+              <Typography component="span">
                 <span style={{ display: "flex" }}>
                   In CDR:&nbsp;
                   <Chip
@@ -582,9 +619,10 @@ function ProjectionsPage({ cog_id, mapData }) {
                       all_proj_info[proj_index.current]["in_cdr"],
                     )}
                   />
+
                 </span>
               </Typography>
-              <Typography>
+              <Typography component="span">
                 <span style={{ display: "flex" }}>
                   <span>
                     Validated:&nbsp;
@@ -600,6 +638,7 @@ function ProjectionsPage({ cog_id, mapData }) {
                   </span>
                 </span>
               </Typography>
+
               <Typography
                 component="div"
                 style={{ display: "flex", alignItems: "center" }}
@@ -615,12 +654,26 @@ function ProjectionsPage({ cog_id, mapData }) {
                 <span style={{ marginLeft: "5px" }}>
                   <Button
                     variant="outlined"
-                    href={`https://epsg.io/${all_proj_info[proj_index.current]["crs"].split("EPSG:")[1]}`}
+                    href={`https://epsg.io/${all_proj_info[proj_index.current]["crs"].split(":")[1]}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
                     ({all_proj_info[proj_index.current]["crs"]})
                   </Button>
+                </span>
+              </Typography>
+              <Typography>
+                <span style={{ display: "flex", float: "right" }}>
+                  {(all_proj_info[proj_index.current]["in_cdr"] === false) && (
+                    <Button variant="text"
+                      color="error"
+                      onClick={() => {
+                        failProjection();
+                      }}>
+                      Mark as failed
+                    </Button>
+                  )
+                  }
                 </span>
               </Typography>
 
@@ -708,10 +761,10 @@ function ProjectionsPage({ cog_id, mapData }) {
             </aside>
           </Panel>
         </PanelGroup>
-      </div>
+      </div >
       {/*projection-main*/}
 
-      <SubmitProjectionModal
+      < SubmitProjectionModal
         open={openReview}
         handleClose={handleClose}
         save={saveProjection}

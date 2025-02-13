@@ -98,9 +98,10 @@ function ProjectionViewer() {
       const mapper = fetchCog.data.mapper;
       const validRequests = Object.keys(mapper)
         .map((code) => {
-          let code_ = parseInt(code.split("EPSG:")[1]);
+          let code_ = parseInt(code.split(":")[1]);
+          let auth_ = code.split(":")[0];
           if (isNaN(code_)) return null; // Return null for invalid codes
-          return axios.get(`/api/map/get_projection_name/${code_}`, {
+          return axios.get(`/api/map/get_projection_name/${code}`, {
             headers: _APP_JSON_HEADER,
           });
           // .catch((error) =>
@@ -112,11 +113,10 @@ function ProjectionViewer() {
       const responses = await Promise.all(validRequests);
 
       responses.forEach((response) => {
-        const epsgCode = "EPSG:" + response.config.url.split("/").pop();
+        const epsgCode = response.config.url.split("/").pop();
         const projectionName = response.data.projection_name;
         mapper[epsgCode] = projectionName;
       });
-
       return {
         ...fetchCog.data.allData,
         crs_names: mapper,
@@ -126,51 +126,72 @@ function ProjectionViewer() {
   });
 
   return (
-    <div className="projection-viewer-root">
-      <Header navigate={navigate} cog_id={cog_id} />
-      {fetchCog.isPending || fetchProjectionNames.isPending ? (
-        <div className="flex-container"></div>
-      ) : fetchCog.isError ? (
-        <div className="error-message">
-          <Text variant="h4">Error Retrieving Cog Data</Text>
-          <br />
-          <Text variant="subtitle1">Details: {fetchCog?.error?.message}</Text>
-          <div>
-            <Button link onClick={() => navigate(-1)}>
-              Back
-            </Button>
-            <Button link onClick={() => navigate("/")}>
-              Home
-            </Button>
+    <>
+      <div className="projection-viewer-root">
+        <Header navigate={navigate} cog_id={cog_id} />
+        {fetchCog.isPending || fetchProjectionNames.isPending ? (
+          <div className="flex-container"></div>
+        ) : fetchCog.isError ? (
+          <div className="error-message">
+            <Text variant="h4">Error Retrieving Cog Data</Text>
+            <br />
+            <Text variant="subtitle1">Details: {fetchCog?.error?.message}</Text>
+            <div>
+              <Button link onClick={() => navigate(-1)}>
+                Back
+              </Button>
+              <Button link onClick={() => navigate("/")}>
+                Home
+              </Button>
+            </div>
           </div>
-        </div>
-      ) : fetchProjectionNames.isError ? (
-        <div className="error-message">
-          <Text variant="h4">Error Retrieving Projection Names</Text>
-          <br />
-          <Text variant="subtitle1">
-            Details: {fetchProjectionNames?.error?.message}
-          </Text>
-          <div>
-            <Button link onClick={() => navigate(-1)}>
-              Back
-            </Button>
-            <Button link onClick={() => navigate("/")}>
-              Home
-            </Button>
+        ) : fetchProjectionNames.isError ? (
+          <div className="error-message">
+            <Text variant="h4">Error Retrieving Projection Names</Text>
+            <br />
+            <Text variant="subtitle1">
+              Details: {fetchProjectionNames?.error?.message}
+            </Text>
+            <div>
+              <Button link onClick={() => navigate(-1)}>
+                Back
+              </Button>
+              <Button link onClick={() => navigate("/")}>
+                Home
+              </Button>
+            </div>
           </div>
-        </div>
-      ) : (
-        fetchCog.data &&
-        fetchProjectionNames.data && (
-          <MapPage
-            key={cog_id}
-            cog_id={cog_id}
-            mapData={fetchProjectionNames.data}
-          />
-        )
-      )}
-    </div>
+        ) : (
+          fetchCog.data &&
+          fetchProjectionNames.data && (
+            <>
+              {(fetchCog.data.allData.proj_info.length == 0) ? (
+                <div className="error-message">
+                  <Text variant="subtitle1">
+                    There are no projections to view.
+                    Try to create another projection.
+                  </Text>
+                  <Button
+                    onClick={() => navigate("/points/" + cog_id)}
+                  >
+                    GCPs Page
+                  </Button>
+                </div>
+              ) :
+                (
+                  <MapPage
+                    key={cog_id}
+                    cog_id={cog_id}
+                    mapData={fetchProjectionNames.data}
+                  />
+                )
+              }
+
+            </>
+          ))}
+      </div>
+
+    </>
   );
 }
 

@@ -8,6 +8,7 @@ from datetime import datetime
 from io import BytesIO
 from logging import Logger
 from time import perf_counter
+from openai import OpenAI
 
 import httpx
 import pytesseract
@@ -17,6 +18,7 @@ from cdr_schemas.georeference import GeoreferenceResults
 from fastapi import HTTPException, Response, status
 from PIL import Image
 from pyproj import Transformer
+import pyproj
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 from rasterio.windows import Window
 
@@ -27,18 +29,15 @@ from auto_georef.settings import app_settings
 
 logger: Logger = logging.getLogger(__name__)
 
+client = OpenAI(
+    api_key=app_settings.openai_api_key,
+    base_url=app_settings.openai_endpoint)
+
 Image.MAX_IMAGE_PIXELS = None
 
 auth = {
     "Authorization": app_settings.cdr_bearer_token,
 }
-
-
-# async def cog_height(cache, cog_id):
-#     s3_key = f"{app_settings.cdr_s3_cog_prefix}/{cog_id}.cog.tif"
-
-#     src = await run_in_threadpool(get_cached_tiff, cache, s3_key)
-#     return src.height
 
 
 def cog_height(cache, cog_id):
@@ -78,12 +77,12 @@ def clip_tiff_(cache, rowb, coll, cog_id):
     if clipped_img.mode != "RGB":
         clipped_img = clipped_img.convert("RGB")
 
-    center_x, center_y = int(size / 2), int(size / 2)  # Center of a 200x200 image
+    center_x, center_y = int(size / 2), int(size / 2)
 
     for i in range(center_y - 5, center_y + 5):
         for j in range(center_x - 5, center_x + 5):
             try:
-                clipped_img.putpixel((j, i), (255, 0, 0))  # Red
+                clipped_img.putpixel((j, i), (255, 0, 0))
             except Exception as e:
                 logging.error(e)
 
@@ -102,19 +101,32 @@ def cps_to_transform(cps, to_crs):
             "x": float(cp["longitude"]),
             "y": float(cp["latitude"]),
             "crs": cp["crs"],
+            "crs_obj": get_wkt_from_authority(cp["crs"].split(":")[0], cp["crs"].split(":")[1])
         }
         for cp in cps
     ]
     cps_p = []
+    to_crs_obj = get_wkt_from_authority(to_crs.split(":")[0], to_crs.split(":")[1])
     for cp in cps:
-        proj = Transformer.from_crs(cp["crs"], to_crs, always_xy=True)
+        proj = Transformer.from_crs(cp["crs_obj"], to_crs_obj, always_xy=True)
         x_p, y_p = proj.transform(xx=cp["x"], yy=cp["y"])
         cps_p.append(riot.GroundControlPoint(row=cp["row"], col=cp["col"], x=x_p, y=y_p))
 
     return riot.from_gcps(cps_p)
 
 
+def get_wkt_from_authority(auth, code):
+    try:
+        crs = pyproj.CRS.from_authority(auth, str(code))
+        return crs
+    except pyproj.exceptions.CRSError:
+        raise ValueError(f"Invalid CRS: {auth}:{code}")
+
+
 def project_(cache, cog_id, pro_cog_path, geo_transform, crs):
+    auth=crs.split(":")[0]
+    code=crs.split(":")[1]
+    crs_obj = get_wkt_from_authority(auth, code)
     disk_cache_path = os.path.join(app_settings.disk_cache_dir, cog_id + ".cog.tif")
     if not os.path.isfile(disk_cache_path):
         logging.info(f"File was not found on disk")
@@ -125,18 +137,22 @@ def project_(cache, cog_id, pro_cog_path, geo_transform, crs):
     with rio.open(disk_cache_path) as raw:
         bounds = riot.array_bounds(raw.height, raw.width, geo_transform)
         pro_transform, pro_width, pro_height = calculate_default_transform(
-            crs, crs, raw.width, raw.height, *tuple(bounds)
+            crs_obj, crs_obj, raw.width, raw.height, *tuple(bounds)
         )
         pro_kwargs = raw.profile.copy()
+
+
         pro_kwargs.update(
             {
                 "driver": "COG",
-                "crs": {"init": crs},
+                "crs": crs_obj.to_wkt(),
                 "transform": pro_transform,
                 "width": pro_width,
                 "height": pro_height,
             }
         )
+        logger.info("here")
+        logger.info(pro_kwargs)
         _raw_data = raw.read()
         with rio.open(pro_cog_path, "w", **pro_kwargs) as pro:
             for i in range(raw.count):
@@ -161,31 +177,24 @@ def compare_dicts(dict1, dict2, keys):
 
 
 def query_gpt4(prompt_text):
-    endpoint = "https://api.openai.com/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {app_settings.open_ai_key}",
-        "OPENAI_API_KEY": f"{app_settings.open_ai_key}",
-        "Content-Type": "application/json",
-        "User-Agent": "OpenAI-Python-Client",
-    }
+    """
+    Queries GPT-4 (or GPT-3.5 Turbo) using the OpenAI Python client.
+    """
+    try:
+        response = client.chat.completions.create(
+            model=app_settings.openai_api_model,
+            messages=[{"role": "user", "content": prompt_text}],
+            max_tokens=550
+        )
 
-    data = {
-        "model": "gpt-3.5-turbo",
-        "messages": [{"role": "user", "content": prompt_text}],
-        "max_tokens": 550,
-    }
-
-    response = httpx.post(endpoint, headers=headers, json=data)
-
-    if response.status_code == 200:
-        choices = response.json()["choices"]
-        first_message = choices[0]["message"]["content"]
+        first_message = response.choices[0].message.content
         matches = re.findall(r"EPSG:\d+", first_message)
 
         return {"matches": matches, "reasoning": first_message}
-    else:
-        raise Exception(f"API call failed with status code {response.status_code}: {response.text}")
 
+    except Exception as e:
+        raise Exception(f"API call failed: {str(e)}")
+ 
 
 def inverse_geojson(geojson, image_height):
     if geojson is None:
@@ -430,7 +439,6 @@ def get_projections_from_cdr(cog_id):
     response_data = []
     if response.status_code == 200:
         response_data = response.json()
-
         if response_data is None:
             response_data = []
         for response in response_data:
@@ -509,6 +517,7 @@ def project_cog(cache, req):
         geo_transform = cps_to_transform(cps, to_crs=crs)
 
         time_since(logger, "geo_transform loaded", start_transform)
+        logger.info(geo_transform)
 
         start_reproj = perf_counter()
 
@@ -567,16 +576,52 @@ def ocr_bboxes(req):
 
 
 def cog_height_not_in_memory(cog_id):
-    
-    
     s3_key = f"{app_settings.cdr_s3_cog_prefix}/{cog_id}.cog.tif"
     gdal_env = {
         "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
     }
-    
+
     print(f"{app_settings.cdr_s3_endpoint_url}/{app_settings.cdr_public_bucket}/{s3_key}")
 
     with rio.Env(**gdal_env) as rio_env:
         with rio.open(f"{app_settings.cdr_s3_endpoint_url}/{app_settings.cdr_public_bucket}/{s3_key}") as src:
             height = src.height
             return height
+
+
+def determine_display_format(crs):
+    """
+    Determines how coordinates should be displayed:
+    - "DMS" for geographic CRS
+    - "N/E", "S/E", "E/N", etc., based on projected CRS axis info
+    """
+    if crs.is_geographic:
+        return "DMS"
+
+    elif crs.is_projected:
+        # Extract axis information
+        axis_1 = crs.axis_info[0].direction.lower()
+        axis_2 = crs.axis_info[1].direction.lower()
+
+        # Define standard abbreviations for common directions
+        direction_map = {
+            "north": "N",
+            "south": "S",
+            "east": "E",
+            "west": "W"
+        }
+
+        # Get the corresponding abbreviations, default to original if unknown
+        axis_1_label = direction_map.get(axis_1, axis_1[:1].upper())
+        axis_2_label = direction_map.get(axis_2, axis_2[:1].upper())
+        
+        if axis_1_label =="N" and axis_2_label == "E":
+            return f"{axis_2_label}{axis_1_label}" 
+        if axis_1_label =="S" and axis_2_label == "W":
+            return f"{axis_2_label}{axis_1_label}" 
+        if axis_1_label =="N" and axis_2_label == "W":
+            return f"{axis_2_label}{axis_1_label}" 
+        
+        return f"{axis_1_label}{axis_2_label}"
+
+    return "DMS"  # Default fallback

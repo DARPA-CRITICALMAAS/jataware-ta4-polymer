@@ -7,6 +7,7 @@ from typing import Annotated
 import fitz
 import httpx
 import openai
+from openai import OpenAI
 import pandas
 from fastapi import APIRouter, Form, Request, status
 from fastapi.responses import HTMLResponse
@@ -21,6 +22,11 @@ from ...settings import app_settings
 from ...templates import templates
 
 openai.api_key = app_settings.openai_api_key
+client = OpenAI(
+    api_key=app_settings.openai_api_key,
+    base_url=app_settings.openai_endpoint
+    )
+
 
 logger: Logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -252,11 +258,9 @@ def rect_labels(
 
 @router.get("/partial/gpt/table/{doc_id}/{page}/{x0}/{y0}/{x1}/{y1}")
 def gpt_table(doc_id: str, page: int, x0: float, y0: float, x1: float, y1: float, request: Request):
-    with db_session() as session:
-        pdf = session.query(DbPdf).filter_by(id=doc_id).one()
-
-    doc = cache_open_pdf(pdf.id)
-    p = doc[page]
+    doc = cache_open_pdf(doc_id)
+    page0 = page - 1
+    p = doc[page0]
     r = p.rect
     rotation = p.rotation
     page_x1 = r.x1
@@ -282,7 +286,7 @@ def gpt_table(doc_id: str, page: int, x0: float, y0: float, x1: float, y1: float
 
     msgs = [{"role": "system", "content": context}, {"role": "user", "content": prompt}]
 
-    completion = openai.ChatCompletion.create(
+    completion = client.chat.completions.create(
         model="gpt-4",
         messages=msgs,
         temperature=0,
@@ -302,7 +306,7 @@ def gpt_table(doc_id: str, page: int, x0: float, y0: float, x1: float, y1: float
         {
             "doc_id": doc_id,
             "request": request,
-            "file": pdf.file_name,
+            "file": f"{doc_id}",
             "page_num": page,
             "page_count": doc.page_count,
             "page_height": page_y1,

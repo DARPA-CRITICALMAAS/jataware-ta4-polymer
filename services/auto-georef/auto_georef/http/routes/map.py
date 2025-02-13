@@ -36,6 +36,7 @@ from auto_georef.common.map_utils import (
     query_gpt4,
     send_georef_to_cdr,
     send_new_legend_items_to_cdr,
+    determine_display_format
 )
 from auto_georef.common.shapefile_extraction import (
     get_transform,
@@ -118,16 +119,28 @@ def clip_bbox(cog_id: str, minx: int, miny: int, maxx: int, maxy: int):
         return Response(content=str(e), media_type="text/plain", status_code=500)
 
 
-@router.get("/get_projection_name/{epsg_code}")
-def get_projection_name(epsg_code: int):
+@router.get("/get_projection_name/{auth_code}")
+def get_projection_name(auth_code: str):
     try:
-        crs = pyproj.CRS.from_epsg(epsg_code)
-        # Extracting the projection name
+        auth=auth_code.split(":")[0]
+        code=auth_code.split(":")[1]
+        crs = pyproj.CRS.from_authority(auth, code)
         projection_name = crs.name
         return {"projection_name": projection_name}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
+@router.get("/get_projection_format/{auth_code}", status_code=HTTP_200_OK)
+async def cog_gcps(auth_code:str):
+    try:
+        crs =  pyproj.CRS.from_authority(auth_code.split(":")[0], auth_code.split(":")[1])
+        format = determine_display_format(crs)
+    except Exception as e:
+        logger.exception(e)
+        format="DMS"
+
+    return format
 
 @router.get("/codes", status_code=HTTP_200_OK)
 def codes():
@@ -194,16 +207,10 @@ def georeference_features_refresh(cog_id: str):
         return response_data
     else:
         try:
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=response.json() # {job_id: ""}
-            )
+            raise HTTPException(status_code=response.status_code, detail=response.json())  # {job_id: ""}
         except Exception as e:
             logger.error(f"Failed to parse georeferce features error as json, returning as text...: {type(e)}")
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=response.text
-            )
+            raise HTTPException(status_code=response.status_code, detail=response.text)
 
 
 @router.get("/{cog_id}/legend_features_json")
@@ -219,17 +226,19 @@ async def cog_gcps(cog_id: str):
     polymer_gcps = search_by_cog_id(app_settings.polymer_gcps_index, cog_id)
     all_gcps = cdr_gcps + polymer_gcps
     epsg_unit_mapper = {}
+    logger.info(f' gcps all{all_gcps} ')
     for gcp in all_gcps:
+
         if gcp.get("crs") not in epsg_unit_mapper.keys():
             try:
-                crs = CRS.from_epsg(gcp.get("crs").split(":")[1])
-                logger.info(crs)
-                epsg_unit_mapper[gcp.get("crs")] = crs.axis_info[0].unit_name
+                crs =  pyproj.CRS.from_authority(gcp.get("crs").split(":")[0], gcp.get("crs").split(":")[1])
+                    
+                epsg_unit_mapper[gcp.get("crs")] = determine_display_format(crs)
             except Exception as e:
                 epsg_unit_mapper[gcp.get("crs")] = "unknown"
                 logger.exception(e)
 
-        gcp["crs_unit"] = epsg_unit_mapper[gcp.get("crs")]
+        gcp["crs_format"] = epsg_unit_mapper[gcp.get("crs")]
 
     return all_gcps
 
@@ -247,12 +256,14 @@ async def cog_projs(cog_id: str):
         for gcp in projection.get("gcps"):
             if gcp.get("crs") not in epsg_unit_mapper.keys():
                 try:
-                    crs = CRS.from_epsg(gcp.get("crs").split(":")[1])
-                    epsg_unit_mapper[gcp.get("crs")] = crs.axis_info[0].unit_name
+                    # crs = CRS.from_epsg(gcp.get("crs").split(":")[1])
+                    crs =  pyproj.CRS.from_authority(gcp.get("crs").split(":")[0], gcp.get("crs").split(":")[1])
+                    
+                    epsg_unit_mapper[gcp.get("crs")] = determine_display_format(crs)
                 except Exception:
                     epsg_unit_mapper[gcp.get("crs")] = "unknown"
 
-            gcp["crs_unit"] = epsg_unit_mapper[gcp.get("crs")]
+            gcp["crs_format"] = epsg_unit_mapper[gcp.get("crs")]
     return projections
 
 
@@ -385,7 +396,6 @@ def return_polymer_legend_items(cog_id):
 @router.get("/{cog_id}/px_extractions")
 def load_extractions(cog_id: str):
     polymer_legend_items = return_polymer_legend_items(cog_id)
-
     return {"legend_swatches": polymer_legend_items}
 
 
@@ -961,13 +971,13 @@ async def parse_shapefile_zip(
         projection = {"crs": found_crs, "gcps": gcps}
         geo_transform = get_transform(projection=projection)
 
-        point_legend_results=[]
+        point_legend_results = []
         if point_df is not None:
             point_legend_results = prepare_point_data(required_column_names, point_df, geo_transform)
-        line_legend_results=[]
+        line_legend_results = []
         if line_df is not None:
             line_legend_results = prepare_line_data(required_column_names, line_df, geo_transform)
-        polygon_legend_results=[]
+        polygon_legend_results = []
         if polygon_df is not None:
             polygon_legend_results = prepare_polygon_data(required_column_names, polygon_df, geo_transform)
 
@@ -1012,6 +1022,7 @@ count_data_keys = {
     "legend_items": ["total_legend_items_count", "total_validated_legend_item_count"],
 }
 
+
 def highest_extraction_state(dict_data):
     features = ["projections", "points", "lines", "polygons", "legend_items"]
     acc = {}
@@ -1046,7 +1057,4 @@ def get_cog_stats_status(cog_id: str):
         stat_data = response.json()
         return highest_extraction_state(stat_data)
     else:
-        raise HTTPException(
-            status_code=response.status_code,
-            detail=response.text
-        )
+        raise HTTPException(status_code=response.status_code, detail=response.text)

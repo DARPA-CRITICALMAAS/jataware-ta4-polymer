@@ -4,9 +4,7 @@ from logging import Logger
 from typing import List
 
 import fitz
-from langchain.vectorstores.chroma import Chroma
 from langchain_core.documents import Document
-from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from openai import OpenAI
 
@@ -17,15 +15,8 @@ logger: Logger = logging.getLogger(__name__)
 
 client = OpenAI(
     api_key=app_settings.openai_api_key,
-)
-
-embeddings_model = OpenAIEmbeddings(api_key=app_settings.openai_api_key)
-
-
-def getdb(doc_id: str):
-    # TODO fix path
-    db = Chroma(persist_directory=f"/tmp/db/{doc_id}", embedding_function=embeddings_model)
-    return db
+    base_url=app_settings.openai_endpoint
+    )
 
 
 def parse(doc_id: str, pdf: fitz.Document):
@@ -90,7 +81,7 @@ def gptit(pdf: fitz.Document):
             }
         )
 
-    proompt = """
+    prompt = """
 
     Attached are the first 2 pages of a pdf please respond on each line in order with the `title` `author` and `year` of the document.
     Respond with a blank line if you cannot determine the value. Do not respond with anything other than the values
@@ -104,13 +95,13 @@ def gptit(pdf: fitz.Document):
                 "content": [
                     {
                         "type": "text",
-                        "text": proompt,
+                        "text": prompt,
                     },
                 ]
                 + imgs,
             }
         ],
-        model="gpt-4-vision-preview",
+        model=app_settings.openai_api_model,
         max_tokens=500,
     )
 

@@ -11,22 +11,36 @@ from logging import Logger
 from pathlib import Path
 
 import httpx
+import zipfile
 import numpy as np
 import rasterio as rio
+from sklearn.metrics import roc_auc_score
 from sklearn.ensemble import RandomForestClassifier
 from tqdm import tqdm
+from pydantic import BaseModel
+from typing import List
+from baseline_mpm.settings import app_settings
 
 logger: Logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.ERROR)
 
 from cdr_schemas.prospectivity_input import ProspectivityOutputLayer
 
+class Metric(BaseModel):
+    name: str
+    value: float
+    description: str
+
+class ModelRunMetrics(BaseModel):
+    train: List[Metric]
+    valid: List[Metric]
+    test: List[Metric]
 
 class BaselineModel:
-    SYSTEM_NAME = "bkj_rf_1030_003"
-    SYSTEM_VERSION = "0.0.2"
-    ML_MODEL_NAME = "bkj_mpm_baseline_rf"
-    ML_MODEL_VERSION = "0.0.0"
+    SYSTEM_NAME = app_settings.system_name
+    SYSTEM_VERSION =  app_settings.system_version
+    ML_MODEL_NAME = app_settings.ml_model_name
+    ML_MODEL_VERSION = app_settings.ml_model_version
     LOCAL_CACHE = False
     DEV_CACHE = False
 
@@ -153,12 +167,16 @@ class BaselineModel:
         clf = RandomForestClassifier(**params).fit(X_flat[sel], y_flat[sel])
         preds = clf.predict_proba(X_flat)[:, 1]
 
+        roc_auc_train = float(roc_auc_score(y_flat[sel], preds[sel]))
+
         # replace training data predictions w/ OOB scores
         # [Q] Is this OK?
         # [A] It's just a shortcut instead of doing proper CV ... However, the
         #     training samples are estimated w/ only (1 - 1/n)**n% of the estimators ... If performance
         #     is not plateaued at n_estimators / 3, this might look weird.
         preds[sel] = clf.oob_decision_function_[:, 1]
+
+        roc_auc_test = float(roc_auc_score(y_flat, preds))
 
         # clamp positive training points to 1
         preds[pos_sel] = 1
@@ -181,17 +199,27 @@ class BaselineModel:
         self._p_hat = p_hat
         self._u_hat = u_hat
 
-        return p_hat, u_hat
+        metrics = ModelRunMetrics(
+            train = [
+                Metric(name="Area under ROC", value=roc_auc_train, description="In-sample AUC for training points only"),
+            ],
+            valid = [],
+            test  = [
+                Metric(name="Area under ROC", value=roc_auc_test, description="OOB AUC for all points"),
+            ]
+        )
+        return p_hat, u_hat, metrics
 
-    def save_outputs(self, p_hat, u_hat, meta):
+    def save_outputs(self, p_hat, u_hat, metrics, meta):
         """Save the outputs to the filesystem AND submit to CDR"""
 
         out_layers = [
-            (p_hat, "likelihood"),
-            (u_hat, "uncertainty"),
+            (p_hat, "Likelihoods", "tif"),
+            (u_hat, "Uncertainty", "tif"),
+            (metrics, "metrics", "zip"),
         ]
         out_layer_ids = []
-        for _layer, _type in tqdm(out_layers):
+        for _layer, _type, _format in tqdm(out_layers):
 
             out_layer = ProspectivityOutputLayer(
                 **{
@@ -202,20 +230,25 @@ class BaselineModel:
                     "model_run_id": self.model_run_id,
                     "cma_id": self.cma_id,
                     "output_type": _type,
-                    "title": f"{_type}.tif",
+                    "title": f"{_type}.{_format}",
                 }
             )
 
             # save to
-            outpath = self.outdir / f"{_type}.tif"
-            with rio.open(outpath, "w", **meta) as dst:
-                dst.write(_layer, 1)
+            outpath = self.outdir / f"{_type}.{_format}"
+            if _format == "tif":
+                with rio.open(outpath, "w", **meta) as dst:
+                    dst.write(_layer, 1)
+
+            elif _format == "zip":
+                with zipfile.ZipFile(outpath, 'w') as zf:
+                    zf.writestr(f'{_type}.json', _layer.model_dump_json(exclude_none=True))
 
             # submit to CDR
             resp = self.client.post(
                 f"{self.cdr_host}/v1/prospectivity/prospectivity_output_layer",
                 data={"metadata": out_layer.model_dump_json(exclude_none=True)},
-                files={"input_file": (f"{_type}.tif", open(outpath, "rb"), "application/octet-stream")},
+                files={"input_file": (f"{_type}.{_format}", open(outpath, "rb"), "application/octet-stream")},
             )
 
             if resp.status_code not in [200, 204]:
@@ -236,8 +269,8 @@ class BaselineModel:
         # logger.info(meta)
 
         X = model.get_inputs()
-        p_hat, u_hat = model.fit_predict(X, y)
-        out_layer_ids = model.save_outputs(p_hat, u_hat, meta)
+        p_hat, u_hat, metrics = model.fit_predict(X, y)
+        out_layer_ids = model.save_outputs(p_hat, u_hat, metrics, meta)
         print(
             json.dumps(
                 {

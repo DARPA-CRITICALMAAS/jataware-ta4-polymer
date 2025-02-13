@@ -108,10 +108,7 @@ def validate_columns(columns, feature_type, df):
 
     # If you need to know if any of these exist
     if has_null_or_empty.any():
-        raise ValueError(
-                f"A {feature_type} does not have a LABEL column value"
-            )
-
+        raise ValueError(f"A {feature_type} does not have a LABEL column value")
 
 
 def apply_transform_to_gdf(gdf, transform):
@@ -338,10 +335,18 @@ def prepare_polygon_data(required_column_names, df, geo_transform):
 
         group_desc = ", ".join(sorted(set(group["DESCR"])))
         label = label_abbr.split("_")[0]
-        abbr = group.get("ABBRV", pd.Series([])).mode()[0] if not group.get("ABBRV", pd.Series([])).mode().empty else ""
+        abbr = (
+            group.get("ABBRV", pd.Series([])).mode()[0] if not group.get("ABBRV", pd.Series([])).mode().empty else ""
+        )
 
-        pattern = group.get("PATTERN", pd.Series([])).mode()[0] if not group.get("PATTERN", pd.Series([])).mode().empty else ""
-        color = group.get("COLOR", pd.Series([])).mode()[0] if not group.get("COLOR", pd.Series([])).mode().empty else ""
+        pattern = (
+            group.get("PATTERN", pd.Series([])).mode()[0]
+            if not group.get("PATTERN", pd.Series([])).mode().empty
+            else ""
+        )
+        color = (
+            group.get("COLOR", pd.Series([])).mode()[0] if not group.get("COLOR", pd.Series([])).mode().empty else ""
+        )
         polygon_features = []
         for idx, row in group.iterrows():
             geometry = Polygon(row["geometry"])

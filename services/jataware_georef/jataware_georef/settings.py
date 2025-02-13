@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     cdr_bearer_token: str = "Bearer a0d45e47f4884fa5c3f9d13154a6ddf389373c184f224a1d4dbe88ed2e96b151"
     secret_token: str = ""
 
+    system: str = "jataware_georef"
+    version: str = "0.1.0"
+    
     class Config:
         extra = 'allow'
         case_sensitive = False

@@ -58,7 +58,8 @@ export default function LocationInput({
     <Box className="location-input-root">
       <div>
         <label style={{ fontSize: "12px", paddingLeft: 15 }}>
-          {input_label.split("_")[0].toUpperCase()} DMS{" "}
+          {/* {input_label.split("_")[0].toUpperCase()} DMS{" "} */}
+          {input_label.split("_")[0] == "x" ? "lng" : "lat"}
         </label>
       </div>
       <Grid

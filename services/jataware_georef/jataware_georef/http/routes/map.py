@@ -161,8 +161,8 @@ async def georeference_map(req: MapEventPayload,  response_model=GeoreferenceRes
                 "cog_id": cog_id,
                 "gcps": all_gcps,
                 "georeference_results": [],
-                "system": "jataware_georef",
-                "system_version": "0.1.0"
+                "system": app_settings.system,
+                "system_version": app_settings.version
             }).model_dump_json()
 
             await post_results(files=[], data=results)
@@ -251,8 +251,8 @@ async def georeference_map(req: MapEventPayload,  response_model=GeoreferenceRes
                 "cog_id": cog_id,
                 "gcps": all_gcps,
                 "georeference_results": georeference_results,
-                "system": "jataware_georef",
-                "system_version": "0.1.0"
+                "system": app_settings.system,
+                "system_version": app_settings.version
             }).model_dump_json()
 
             await post_results(files=all_files, data=data)

@@ -169,7 +169,6 @@ export const dms2dec = function (dms) {
       "Invalid DMS format. Expected format: {degrees}° {minutes}' {seconds}\""
     );
   }
-  console.log(result)
   if (!result) {
     throw new Error("Invalid DMS format");
   }
@@ -209,6 +208,7 @@ function _register_proj(code, wkt, bbox, proj4_) {
 
 export const register_proj = async function (query) {
   const response = await fetch("https://epsg.io/?format=json&q=" + query);
+
   const json = await response.json();
   const results = json["results"];
   if (results && results.length > 0) {
@@ -343,7 +343,6 @@ export const oneMap = async (status, navigate, nav_path) => {
       url: "/api/map/search/random_cog?georeferenced=" + path,
     });
     if (data) {
-      console.log(data);
       navigate(nav_path + data[0]["cog_id"]);
       navigate(0);
     }

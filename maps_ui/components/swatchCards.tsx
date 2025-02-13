@@ -130,6 +130,7 @@ function LegendCard({
   zoomTo,
   ocrLastClipArea,
   geologicAges,
+  clearSelectedLayer
 }) {
   const [abbrText, setAbbrText] = useState(item["abbreviation"]);
   const [patternText, setPatternText] = useState(item["pattern"]);
@@ -199,8 +200,10 @@ function LegendCard({
     const resp = await ocrLastClipArea();
     let coordinates_from_bottom = resp[1];
     let extent_from_bottom = resp[2];
+    clearSelectedLayer()
     wrapChanges("coordinates_from_bottom", coordinates_from_bottom);
     wrapChanges("extent_from_bottom", extent_from_bottom);
+
   }
 
   async function setValueFromClip(type, index, item) {
@@ -296,7 +299,7 @@ function LegendCard({
                   </div>
                 </div>
                 <div style={{ justifySelf: "end" }}>
-                  
+
                   {item._symbol_id !== null && validateExtent(item.extent_from_bottom) && (
                     <img
                       src={returnImageUrl(cog_id, item.extent_from_bottom)}
@@ -329,7 +332,20 @@ function LegendCard({
 
               <CardContent sx={{ paddingBottom: "0" }}>
                 <div style={{ display: "flex", alignItems: "center" }}>
-                  {validateExtent(item.extent_from_bottom) ? (
+                  <PolymerTooltip
+                    title="Press to assign manually selected shape on map as swatch."
+                    placement="left"
+                    style={{ marginRight: "6px" }}
+                  >
+                    <Button
+                      onClick={setSwatchCoordinates}
+                      variant="contained"
+                      sx={{ px: 0, minWidth: "2.25rem" }}
+                    >
+                      <FormatShapesIcon />
+                    </Button>
+                  </PolymerTooltip>
+                  {validateExtent(item.extent_from_bottom) && (
                     <img
                       src={returnImageUrl(cog_id, item.extent_from_bottom)}
                       alt="Legend Item"
@@ -338,20 +354,9 @@ function LegendCard({
                         maxWidth: "60%",
                       }}
                     />
-                  ) : (
-                    <PolymerTooltip
-                      title="Press to assign manually selected shape on map as swatch."
-                      placement="left"
-                    >
-                      <Button
-                        onClick={setSwatchCoordinates}
-                        variant="contained"
-                        sx={{ px: 0, minWidth: "2.25rem" }}
-                      >
-                        <FormatShapesIcon />
-                      </Button>
-                    </PolymerTooltip>
                   )}
+
+
                   <FormControl fullWidth sx={{ ml: "0.5rem" }} size="small">
                     <InputLabel id="demo-simple-select-label">
                       Feature Type

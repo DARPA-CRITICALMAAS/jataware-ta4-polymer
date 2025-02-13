@@ -20,7 +20,7 @@ auth = {
 
 @router.get("/")
 def list_cmas():
-    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/cmas?size=60"
+    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/cmas?size=500"
     response = httpx.get(fetch_url, headers=auth, timeout=None).raise_for_status()
     return response.json()
 

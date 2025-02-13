@@ -1,11 +1,12 @@
-FROM oven/bun:debian AS ui-dist
+FROM node:18 AS ui-dist
 
 WORKDIR /app/auto-georef/ui
 COPY . /app/auto-georef
 
-RUN bun install
-RUN bun run build
-RUN bun run css
+
+RUN npm install
+RUN npm run build
+RUN npm run css
 
 FROM python:3.11
 RUN apt update 

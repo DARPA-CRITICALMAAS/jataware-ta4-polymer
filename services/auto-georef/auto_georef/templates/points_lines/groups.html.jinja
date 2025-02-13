@@ -1,8 +1,9 @@
 {% for group in groups %}
 <label
-  class="btn btn-block text-lg bg-base-300 shadow-inner has-[:checked]:btn-active has-[:checked]:btn-primary pointer-events-auto"
-  tabindex="0">
-  <input class="hidden" type="checkbox" checked autocomplete="off" name="group-toggle" value="{{ group.legend_id }}">
+class=" btn-block text-lg bg-base-300 shadow-inner has-[:checked]:btn-active has-[:checked]:btn-primary pointer-events-auto"  
+style=" padding: 10px 20px; min-height: 50px; width: auto; max-width: 100%; font-size: 18px; font-weight: bold; border-radius: 8px; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; text-align: center;"
+tabindex="0">
+  <input type="checkbox" style="display: none;" checked autocomplete="off" name="group-toggle" value="{{ group.legend_id }}">
   <span>{{ group.name }}</span>
 </label>
 {% endfor %}

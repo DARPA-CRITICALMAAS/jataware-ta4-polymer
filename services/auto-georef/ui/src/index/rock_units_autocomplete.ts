@@ -176,6 +176,7 @@ export const initAutocomplete = async (elem, containerElem) => {
       autocomplete_elem.style.top = `${rect.y + rect.height - 52}px`;
       autocomplete_elem.style.left = `${rect.x - 13}px`;
       autocomplete_elem.style["max-height"] = "12rem";
+      autocomplete_elem.style['zIndex'] = 6;
     },
     render: (suggestion, current_value) => {
       const div = document.createElement("div");

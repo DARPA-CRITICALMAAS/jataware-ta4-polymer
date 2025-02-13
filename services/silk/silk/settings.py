@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     s3_documents_prefix: str = "silk/pdfs"
     s3_aws_profile: str | None = ""
     openai_api_key: str
+    openai_endpoint: str = 'https://api.openai.com/v1'
+    openai_api_model: str = "gpt-4-vision-preview"
+
     templates_dir: str = "silk/templates"
 
     sqlite_db: str = "/home/apps/db/silk.db"

@@ -1,8 +1,8 @@
 import logging
 from datetime import datetime
+from functools import reduce
 from logging import Logger
 from typing import Annotated
-from functools import reduce
 
 import httpx
 from fastapi import APIRouter, Form, Request
@@ -23,7 +23,7 @@ auth = {
 
 @router.get("/")
 def index(request: Request):
-    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/cmas?size=60"
+    fetch_url = f"{app_settings.cdr_endpoint_url}/v1/prospectivity/cmas?size=500"
     response = httpx.get(fetch_url, headers=auth, timeout=None)
     cmas = response.json()
 
@@ -59,19 +59,19 @@ extraction_headings = {
 }
 
 
-def reformat_dict(input_dict): 
+def reformat_dict(input_dict):
     """
     Reformats inconsistent cdr total,validated count keys for each
     feature_type to the same keys: either to "validated" or "total". Sample input:
     {"total_lines":..., "total_validated_lines"} or {"georeference_count":..., "validated_count":...}
     output: {"validated":..., "total":...}
     """
-    output_dict = {} 
+    output_dict = {}
     for key, value in input_dict.items():
-        if "validated" in key: 
-            output_dict["validated"] = value 
+        if "validated" in key:
+            output_dict["validated"] = value
         else:
-            output_dict["total"] = value 
+            output_dict["total"] = value
     return output_dict
 
 
@@ -86,7 +86,7 @@ def group_totals(acc, cog_dict):
 
 
 def accumulate_stats_for_feature(cog_stats_for_feature):
-    totals = [0,0,0]
+    totals = [0, 0, 0]
     formatted = map(reformat_dict, cog_stats_for_feature.values())
     totals = reduce(group_totals, formatted, totals)
     return totals
@@ -112,21 +112,23 @@ def get_cma_stats(request: Request, cma_id):
 
     stats_url = f"{app_settings.cdr_endpoint_url}/v1/features/feature_type/statistics"
     for feature_type in cdr_features:
-        stat_call = httpx.post(stats_url, headers=auth, timeout=None, json={
-            "cog_ids": list(map(lambda c: c["cog_id"], cogs)),
-            "feature_type": feature_type
-        })
-    #     # sample response:
-    #     # {
-    #     #   "46d902d905b92df90c39447955b9593d583d5a9d322525252525252583679344": {
-    #     #     "georeferenced_count": 8,
-    #     #     "validated_count": 2
-    #     #   },
-    #     #   "48e472e466e504e50cd54eb561b5c4b516b53bb53db51cb5d8b471b557844f0a": {
-    #     #     "georeferenced_count": 4,
-    #     #     "validated_count": 2
-    #     #   }
-    #     # }
+        stat_call = httpx.post(
+            stats_url,
+            headers=auth,
+            timeout=None,
+            json={"cog_ids": list(map(lambda c: c["cog_id"], cogs)), "feature_type": feature_type},
+        )
+        #     # sample response:
+        #     # {
+        #     #   "46d902d905b92df90c39447955b9593d583d5a9d322525252525252583679344": {
+        #     #     "georeferenced_count": 8,
+        #     #     "validated_count": 2
+        #     #   },
+        #     #   "48e472e466e504e50cd54eb561b5c4b516b53bb53db51cb5d8b471b557844f0a": {
+        #     #     "georeferenced_count": 4,
+        #     #     "validated_count": 2
+        #     #   }
+        #     # }
         if stat_call.status_code == 200:
             # endpoint was already pluralizing, so we'll add (s) from cdr singular feature_type..
             stats[f"{feature_type}s"] = accumulate_stats_for_feature(stat_call.json())

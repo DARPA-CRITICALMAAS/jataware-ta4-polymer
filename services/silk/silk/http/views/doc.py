@@ -8,6 +8,7 @@ from typing import Dict, List
 
 import fitz
 import openai
+from openai import OpenAI
 from cachetools import TTLCache
 from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -19,6 +20,12 @@ from ...db.models import DbAnnotation, DbPdf
 from ...pdf.utils import cache_open_pdf
 from ...settings import app_settings
 from ...templates import templates
+
+
+client = OpenAI(
+    api_key=app_settings.openai_api_key,
+    base_url=app_settings.openai_endpoint
+    )
 
 openai.api_key = app_settings.openai_api_key
 
@@ -337,7 +344,7 @@ async def gpt_response(gpt: GptRequest, request: Request, model: str = "gpt-3.5-
     """
     msgs = [{"role": "system", "content": prompt}]
     msgs.append({"role": "user", "content": gpt.prompt})
-    completion = openai.ChatCompletion.create(
+    completion = client.chat.completions.create(
         model="gpt-4",
         messages=msgs,
         temperature=0,

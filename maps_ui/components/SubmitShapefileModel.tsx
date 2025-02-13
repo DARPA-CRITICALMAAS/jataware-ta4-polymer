@@ -64,8 +64,10 @@ export default function SubmitShapefileButtonModal({ cog_id }) {
         submitZip.reset()
         setErrorMessage("")
         setValidationError("")
-        const zipFile = acceptedFiles.find((file) => file.type === "application/zip");
-
+        // const zipFile = acceptedFiles.find((file) => file.type === "application/zip");
+        const zipFile = acceptedFiles.find((file) =>
+            ["application/zip", "application/x-zip-compressed"].includes(file.type)
+        );
         if (!zipFile) {
             setValidationError("Please upload a valid .zip file.");
             return;
@@ -77,6 +79,8 @@ export default function SubmitShapefileButtonModal({ cog_id }) {
     };
 
     const validateZipContents = (zipFile) => {
+        if (!zipFile) return;  // Prevent running on initial render
+
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
@@ -145,19 +149,21 @@ export default function SubmitShapefileButtonModal({ cog_id }) {
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        accept: ".zip",
+        accept: {
+            "application/zip": [".zip"],
+            "application/x-zip-compressed": [".zip"],
+        },
     });
 
     return (
         <>
             <Tooltip
                 title="
-      Upload georeferenced features
-            "
+                    Upload georeferenced features
+                "
                 arrow
             >
                 <Button variant="contained" onClick={() => setShpOpenReview(true)}>
-
                     Upload
                 </Button>
 
@@ -209,29 +215,29 @@ export default function SubmitShapefileButtonModal({ cog_id }) {
                         </Typography>
                         <Typography variant="body2" paragraph>
                             <strong>Type: Point</strong>
-                            <ul>
-                                <li><Typography variant="body2">DIP: int</Typography></li>
-                                <li><Typography variant="body2">DIP_DIRECT: int</Typography></li>
-                            </ul>
                         </Typography>
+                        <ul>
+                            <li><Typography variant="body2">DIP: int</Typography></li>
+                            <li><Typography variant="body2">DIP_DIRECT: int</Typography></li>
+                        </ul>
                         <Typography variant="body2" paragraph>
                             <strong>Type: LineString</strong>
-                            <ul>
-                                <li><Typography variant="body2">DASH_PATT: string (allowed options:"","solid","dash", "dotted")</Typography></li>
-                                <li><Typography variant="body2">SYMBOL: string</Typography></li>
-                            </ul>
                         </Typography>
+                        <ul>
+                            <li><Typography variant="body2">DASH_PATT: string (allowed options:"","solid","dash", "dotted")</Typography></li>
+                            <li><Typography variant="body2">SYMBOL: string</Typography></li>
+                        </ul>
                         <Typography variant="body2" paragraph>
                             <strong>Type: Polygon</strong>
-                            <ul>
-                                <li><Typography variant="body2">PATTERN: string</Typography></li>
-                                <li><Typography variant="body2">COLOR: string</Typography></li>
-                                <li><Typography variant="body2">MU_TEXT: string (map unit age name, e.g., Cambrian)</Typography></li>
-                                <li><Typography variant="body2">MU_B_AGE: int (youngest age of map unit)</Typography></li>
-                                <li><Typography variant="body2">MU_T_AGE: int (oldest age of map unit)</Typography></li>
-                                <li><Typography variant="body2">MU_LITH: string (lithology name)</Typography></li>
-                            </ul>
                         </Typography>
+                        <ul>
+                            <li><Typography variant="body2">PATTERN: string</Typography></li>
+                            <li><Typography variant="body2">COLOR: string</Typography></li>
+                            <li><Typography variant="body2">MU_TEXT: string (map unit age name, e.g., Cambrian)</Typography></li>
+                            <li><Typography variant="body2">MU_B_AGE: int (youngest age of map unit)</Typography></li>
+                            <li><Typography variant="body2">MU_T_AGE: int (oldest age of map unit)</Typography></li>
+                            <li><Typography variant="body2">MU_LITH: string (lithology name)</Typography></li>
+                        </ul>
                     </Box>
 
 

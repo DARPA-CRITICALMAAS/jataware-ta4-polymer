@@ -292,10 +292,8 @@ function Landing() {
           response["data"]["maps"].forEach(function (map) {
             let bounds = [];
             for (let b of map.best_bounds_geojson.coordinates[0]) {
-              console.log(b);
               let transformed_bound = transform(b, "EPSG:4326", "EPSG:3857");
               bounds.push(transformed_bound);
-              console.log(bounds);
             }
             map.best_bounds_geojson.coordinates[0] = bounds;
             let geoJSONFeature = new GeoJSON().readFeature({
