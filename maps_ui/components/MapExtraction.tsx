@@ -44,11 +44,8 @@ import "../css/map_extraction.scss";
 import epsg_data from "../assets/PROJ_CODES_WORLD.json";
 import SmallMap from "./smallMap";
 import {
-  checkIfEdited,
   getColorForProvenance,
   dec2dms,
-  dms2dec,
-  register_proj,
   getLayerById,
   expand_resolutions,
   valuetext,
@@ -341,28 +338,28 @@ function GeoreferenceComponent({ mapDataInit }) {
     }
 
     // register to OL
-    register_proj(map_crs).then(() => {
-      let gcps_ = gcps.map((gcp) => ({
-        gcp_id: create_gcp_id(gcp),
-        longitude: gcp.longitude,
-        latitude: gcp.latitude,
-        rows_from_top: gcp.rows_from_top,
-        columns_from_left: gcp.columns_from_left,
-        crs: gcp.crs.split("__")[0],
-        system: gcp.system ?? SYSTEM,
-        system_version: gcp.system_version ?? SYSTEM_VERSION,
-        reference_id: ensureString(gcp.reference_id),
-        registration_id: gcp.registration_id,
-        cog_id: cog_id,
-        confidence: gcp.confidence,
-        model_id: nullToString(gcp.model_id),
-        model_version: nullToString(gcp.model_version),
-        model: nullToString(gcp.model),
-      }));
 
-      // project action
-      reproject.mutate({ cog_id, gcps_, map_crs });
-    });
+    let gcps_ = gcps.map((gcp) => ({
+      gcp_id: create_gcp_id(gcp),
+      longitude: gcp.longitude,
+      latitude: gcp.latitude,
+      rows_from_top: gcp.rows_from_top,
+      columns_from_left: gcp.columns_from_left,
+      crs: gcp.crs.split("__")[0],
+      system: gcp.system ?? SYSTEM,
+      system_version: gcp.system_version ?? SYSTEM_VERSION,
+      reference_id: ensureString(gcp.reference_id),
+      registration_id: gcp.registration_id,
+      cog_id: cog_id,
+      confidence: gcp.confidence,
+      model_id: nullToString(gcp.model_id),
+      model_version: nullToString(gcp.model_version),
+      model: nullToString(gcp.model),
+    }))
+
+    // project action
+    reproject.mutate({ cog_id, gcps_, map_crs });
+
   }
 
   function map_onClick(e, height) {

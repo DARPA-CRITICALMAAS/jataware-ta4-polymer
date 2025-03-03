@@ -145,7 +145,7 @@ function ProjectionsPage({ cog_id, mapData }) {
 
   async function register_projs(codes) {
     for (let code of codes) {
-      await register_proj(code);
+      await register_proj(code, config.MAPTILER_KEY);
     }
   }
 
@@ -188,7 +188,6 @@ function ProjectionsPage({ cog_id, mapData }) {
     for (let proj_ of all_proj_info) {
       codes.push(proj_["crs"]);
     }
-
     waitForProjections(codes)
       .then(() => {
         return setCenterExtent();
@@ -197,7 +196,6 @@ function ProjectionsPage({ cog_id, mapData }) {
         return buildWMTSBaseLayers(center);
       })
       .then(([WMTS_base_layers, WMTS_source_layers, center]) => {
-
         const map_source = new GeoTIFF({
           sources: [
             {
@@ -225,7 +223,6 @@ function ProjectionsPage({ cog_id, mapData }) {
         baseMapSwitchRef.current = { ...XYZ_base_layers, ...WMTS_base_layers };
         setBaseMapSwitch({ ...XYZ_base_layers, ...WMTS_base_layers });
         setBaseMapSources({ ...WMTS_source_layers });
-
         const map = new Map({
           controls: [],
           layers: all_layers,

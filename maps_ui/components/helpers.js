@@ -206,9 +206,9 @@ function _register_proj(code, wkt, bbox, proj4_) {
   register(proj4);
 }
 
-export const register_proj = async function (query) {
-  const response = await fetch("https://epsg.io/?format=json&q=" + query);
+export const register_proj = async function (query, maptiler_key) {
 
+  const response = await fetch("https://api.maptiler.com/coordinates/search/" + query + ".json" + "?exports=true&key=" + maptiler_key);
   const json = await response.json();
   const results = json["results"];
   if (results && results.length > 0) {
@@ -217,14 +217,15 @@ export const register_proj = async function (query) {
       for (let i = 0, ii = results.length; i < ii; i++) {
         const result = results[i];
         if (result) {
-          const auth = result["authority"];
-          const code = result["code"];
-          const wkt = result["wkt"];
-          const proj4_ = result["proj4"];
+          const auth = result["id"]["authority"];
+          const code = result["id"]["code"];
+          const wkt = result["exports"]["wkt"];
+          const proj4_ = result["exports"]["proj4"];
           const bbox = result["bbox"];
+
           if (
             code &&
-            code.length > 0 &&
+            code.toString().length > 0 &&
             wkt &&
             wkt.length > 0 &&
             bbox &&
